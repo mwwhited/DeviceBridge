@@ -6,7 +6,7 @@
 #include "DataInterface.h"
 #include <RingBuf.h>
 
-namespace DeviceBridge
+namespace DeviceBridge::Printer
 {
   // https://forum.arduino.cc/t/use-attachinterrupt-with-a-class-method-function/301108/8
 
@@ -28,6 +28,11 @@ namespace DeviceBridge
     // if interrupt fell but strobe is high then it was a glitch so ignore
     if (_control.getStrobeValue())
       return;
+
+    // TODO: job status events
+    // TODO: set/push timeout for lpt read
+    // TODO: set read status, clear on timeout
+    // TODO: is it possible to detect new write?
 
     // TODO: if buffer is full do error instead
     //  if (_buffer.isFull()){

@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include "DataInterface.h"
 
-namespace DeviceBridge
+namespace DeviceBridge::Printer
 {
   DataInterface::DataInterface(
       uint8_t data0,

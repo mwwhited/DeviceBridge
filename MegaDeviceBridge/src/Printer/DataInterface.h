@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-namespace DeviceBridge
+namespace DeviceBridge::Printer
 {
   class DataInterface
   {

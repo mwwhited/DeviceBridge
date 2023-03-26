@@ -6,7 +6,7 @@
 #include "DataInterface.h"
 #include <RingBuf.h>
 
-namespace DeviceBridge
+namespace DeviceBridge::Printer
 {
   class PrinterInterface
   {

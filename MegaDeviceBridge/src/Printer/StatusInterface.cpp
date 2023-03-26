@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include "StatusInterface.h"
 
-namespace DeviceBridge
+namespace DeviceBridge::Printer
 {
   StatusInterface::StatusInterface(
       uint8_t acknowledge,

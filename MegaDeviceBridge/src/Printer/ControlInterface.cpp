@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include "ControlInterface.h"
 
-namespace DeviceBridge
+namespace DeviceBridge::Printer
 {
     ControlInterface::ControlInterface(
         uint8_t strobe,
