@@ -4,6 +4,7 @@
 #include "ControlInterface.h"
 #include "StatusInterface.h"
 #include "DataInterface.h"
+#include <RingBuf.h>
 
 namespace DeviceBridge
 {
@@ -15,6 +16,8 @@ namespace DeviceBridge
     DataInterface _data;
 
     void handleInterrupt();
+    
+    RingBuf<uint8_t, 512> _buffer;
 
     const byte _whichIsr;
     static byte _isrSeed;
@@ -24,7 +27,7 @@ namespace DeviceBridge
     static PrinterInterface *_instance1;
     static void isr2();
     static PrinterInterface *_instance2;
-
+    
   public:
     PrinterInterface(
         ControlInterface control,
@@ -32,6 +35,10 @@ namespace DeviceBridge
         DataInterface data);
 
     void initialize();
+    bool hasData();
+    bool isAlmostFull();
+    bool isFull();
+    uint16_t readData(uint8_t buffer[], uint16_t index = 0, uint16_t lenght = 0);
   };
 
   /*

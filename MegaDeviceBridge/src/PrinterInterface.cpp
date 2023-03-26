@@ -4,6 +4,7 @@
 #include "ControlInterface.h"
 #include "StatusInterface.h"
 #include "DataInterface.h"
+#include <RingBuf.h>
 
 namespace DeviceBridge
 {
@@ -12,22 +13,33 @@ namespace DeviceBridge
   PrinterInterface::PrinterInterface(
       ControlInterface control,
       StatusInterface status,
-      DataInterface data) : _control(control), _status(status), _data(data), _whichIsr(_isrSeed++)
+      DataInterface data) : _control(control),
+                            _status(status),
+                            _data(data),
+                            _whichIsr(_isrSeed++),
+                            _buffer()
   {
   }
 
   void PrinterInterface::handleInterrupt()
   {
-    //TODO: should probaly have 2ms spin 
+    // TODO: should probaly have 2ms spin
 
     // if interrupt fell but strobe is high then it was a glitch so ignore
-    if (_control.getStrobeValue()) return;
+    if (_control.getStrobeValue())
+      return;
+
+    // TODO: if buffer is full do error instead
+    //  if (_buffer.isFull()){
+    //    _status.setError();
+    //  }
 
     _status.setBusy();
     uint8_t value = _data.readValue();
     _status.setAck();
 
-    //TODO: write value to ring buffer
+    // Note: write value to ring buffer
+    _buffer.push(value);
   }
 
   byte PrinterInterface::_isrSeed = 0;
@@ -68,6 +80,50 @@ namespace DeviceBridge
       attachInterrupt(digitalPinToInterrupt(_control.getStrobePin()), isr2, FALLING); // Attach to pin interrupt
       break;
     }
+  }
+
+  bool PrinterInterface::hasData()
+  {
+    return !_buffer.isEmpty();
+  }
+
+  bool PrinterInterface::isAlmostFull()
+  {
+    return _buffer.size() > (_buffer.maxSize() / 4 * 3);
+  }
+
+  bool PrinterInterface::isFull()
+  {
+    return _buffer.isFull();
+  }
+
+  uint16_t PrinterInterface::readData(uint8_t buffer[], uint16_t index = 0, uint16_t lenght = 0)
+  {
+    uint16_t size = sizeof(buffer);
+    if (lenght == 0) // if length is 0 use input buffer size
+      lenght = size;
+
+    if ((lenght + index) > size) // if index with length is greater than buffer than scale to fit
+      lenght = size - index;
+
+    if (lenght > size) // still invalid
+      return 0;
+
+    uint16_t cnt = 0;
+    for (; index < lenght; index++)
+    {
+      uint8_t element;
+      if (_buffer.lockedPop(element))
+      {
+        buffer[index] = element;
+        cnt++;
+      }
+      else
+      {
+        break; // read buffer is empty
+      }
+    }
+    return cnt;
   }
 
   /*

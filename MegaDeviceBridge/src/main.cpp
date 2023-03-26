@@ -15,4 +15,12 @@ void setup()
 void loop()
 {
   // put your main code here, to run repeatedly:
+  
+  if (printer.isAlmostFull()){
+    uint8_t buffer[512];
+    uint16_t readBytes = printer.readData(buffer);
+    if (readBytes){
+      //TODO: write data somewhere
+    }
+  }
 }
