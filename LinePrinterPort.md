@@ -8,26 +8,26 @@ on the original design now known as `Standard Parallel Port` (SPP) with 8 data l
 
 ## Pinout
 
-| Name         | DB25  |  Direction |
-|--------------|-------|------------|
-| /Strobe      | 1     |  Input     |
-| D0           | 2     |  Input     |
-| D1           | 3     |  Input     |
-| D2           | 4     |  Input     |
-| D3           | 5     |  Input     |
-| D4           | 6     |  Input     |
-| D5           | 7     |  Input     |
-| D6           | 8     |  Input     |
-| D7           | 9     |  Input     |
-| /Acknowledge | 10    |  Output    |
-| Busy         | 11    |  Output    |
-| Paper Out    | 12    |  Output    |
-| Select       | 13    |  Output    |
-| /Auto Feed   | 14    |  Input     |
-| /Error       | 15    |  Output    |
-| /Initialize  | 16    |  Input     |
-| /Select In   | 17    |  Input     |
-| Ground       | 18-25 |  Power     |
+| Name         | DB25  |  Direction | Register |
+|--------------|-------|------------|----------|
+| /Strobe      | 1     |  Input     | Control  |
+| D0           | 2     |  Input     | Data     |
+| D1           | 3     |  Input     | Data     |
+| D2           | 4     |  Input     | Data     |
+| D3           | 5     |  Input     | Data     |
+| D4           | 6     |  Input     | Data     |
+| D5           | 7     |  Input     | Data     |
+| D6           | 8     |  Input     | Data     |
+| D7           | 9     |  Input     | Data     |
+| /Acknowledge | 10    |  Output    | Status   |
+| Busy         | 11    |  Output    | Status   |
+| Paper Out    | 12    |  Output    | Status   |
+| Select       | 13    |  Output    | Status   |
+| /Auto Feed   | 14    |  Input     | Control  |
+| /Error       | 15    |  Output    | Status   |
+| /Initialize  | 16    |  Input     | Control  |
+| /Select In   | 17    |  Input     | Control  |
+| Ground       | 18-25 |  Power     |          |
 
 ## Timing Diagram
 
