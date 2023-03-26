@@ -1,6 +1,4 @@
 
-#pragma once
-
 #include <stdint.h>
 #include <Arduino.h>
 #include "ControlInterface.h"
@@ -28,8 +26,12 @@ namespace DeviceBridge
         pinMode(_select, INPUT_PULLUP);
     }
 
-    uint8_t ControlInterface::getStrobe()
+    uint8_t ControlInterface::getStrobePin()
     {
         return _strobe;
+    }
+
+    int ControlInterface::getStrobeValue(){
+        return digitalRead(_strobe);
     }
 }

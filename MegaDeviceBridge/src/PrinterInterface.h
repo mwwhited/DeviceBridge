@@ -13,7 +13,18 @@ namespace DeviceBridge
     ControlInterface _control;
     StatusInterface _status;
     DataInterface _data;
-    
+
+    void handleInterrupt();
+
+    const byte _whichIsr;
+    static byte _isrSeed;
+    static void isr0();
+    static PrinterInterface *_instance0;
+    static void isr1();
+    static PrinterInterface *_instance1;
+    static void isr2();
+    static PrinterInterface *_instance2;
+
   public:
     PrinterInterface(
         ControlInterface control,

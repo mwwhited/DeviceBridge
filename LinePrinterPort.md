@@ -95,6 +95,9 @@ BufferIndex is "+1"
 
 @5 as :read_ack
 Ack is low
+
+@6 as :read_ack_rst
+Ack is high
 Busy is low
 Data is ""
 

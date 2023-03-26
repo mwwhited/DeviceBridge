@@ -18,5 +18,7 @@ namespace DeviceBridge
         uint8_t error);
 
     void initialize();
+    void setBusy();
+    void setAck();
   };
 }

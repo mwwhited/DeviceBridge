@@ -1,5 +1,3 @@
-#pragma once
-
 #include <stdint.h>
 #include <Arduino.h>
 #include "StatusInterface.h"
@@ -36,5 +34,22 @@ namespace DeviceBridge
 
     pinMode(_acknowledge, OUTPUT); // Ack - normally high
     digitalWrite(_acknowledge, true);
+  }
+
+  void StatusInterface::setBusy(){
+    // set busy
+    digitalWrite(_busy, true);
+  }
+  void StatusInterface::setAck(){
+    // set acknowledgement
+    digitalWrite(_acknowledge, false);
+    
+    //TODO: might need spin lock
+
+    // reset acknowledgement
+    digitalWrite(_acknowledge, true);
+    // reset busy
+    digitalWrite(_busy, false);
+    
   }
 }

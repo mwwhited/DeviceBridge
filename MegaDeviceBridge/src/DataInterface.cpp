@@ -1,5 +1,3 @@
-#pragma once
-
 #include <stdint.h>
 #include <Arduino.h>
 #include "DataInterface.h"
@@ -38,7 +36,7 @@ namespace DeviceBridge
     pinMode(_data[7], INPUT_PULLUP); // D7
   }
 
-  uint8_t DataInterface::read()
+  uint8_t DataInterface::readValue()
   {
     return (digitalRead(_data[0]) << 0) |
            (digitalRead(_data[1]) << 1) |

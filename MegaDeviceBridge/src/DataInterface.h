@@ -21,6 +21,6 @@ namespace DeviceBridge
         uint8_t data7);
 
     void initialize();
-    uint8_t read();
+    uint8_t readValue();
   };
 }

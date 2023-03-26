@@ -17,6 +17,7 @@ namespace DeviceBridge
         uint8_t select);
 
     void initialize();
-    uint8_t getStrobe();
+    uint8_t getStrobePin();
+    int getStrobeValue();
   };
 }
