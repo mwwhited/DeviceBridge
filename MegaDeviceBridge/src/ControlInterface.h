@@ -1,5 +1,4 @@
-#ifndef __H_DeviceBridge_ControlInterface_
-#define __H_DeviceBridge_ControlInterface_
+#pragma once
 
 #include <stdint.h>
 
@@ -7,6 +6,9 @@ namespace DeviceBridge
 {
   class ControlInterface
   {
+  private:
+    uint8_t _strobe, _autoFeed, _initialize, _select;
+
   public:
     ControlInterface(
         uint8_t strobe,
@@ -18,4 +20,3 @@ namespace DeviceBridge
     uint8_t getStrobe();
   };
 }
-#endif

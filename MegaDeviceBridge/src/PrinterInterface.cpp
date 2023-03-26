@@ -1,44 +1,29 @@
+#pragma once
 
 #include <stdint.h>
 #include <Arduino.h>
+#include "PrinterInterface.h"
 #include "ControlInterface.h"
 #include "StatusInterface.h"
 #include "DataInterface.h"
 
 namespace DeviceBridge
 {
-  void strobeHandler()
+  PrinterInterface::PrinterInterface(
+      ControlInterface control,
+      StatusInterface status,
+      DataInterface data) : _control(control), _status(status), _data(data)
   {
   }
 
-  class PrinterInterface
+  void PrinterInterface::initialize()
   {
-  private:
-    ControlInterface _control;
-    StatusInterface _status;
-    DataInterface _data;
+    _control.initialize();
+    _status.initialize();
+    _data.initialize();
 
-    void StrobeHandler()
-    {
-    }
-
-  public:
-    PrinterInterface(
-        const ControlInterface &control,
-        const StatusInterface &status,
-        const DataInterface &data) : _control(control), _status(status), _data(data)
-    {
-    }
-
-    void initialize()
-    {
-      _control.initialize();
-      _status.initialize();
-      _data.initialize();
-
-      attachInterrupt(digitalPinToInterrupt(_control.getStrobe()), strobeHandler, FALLING); // Attach to pin interrupt
-    }
-  };
+    // attachInterrupt(digitalPinToInterrupt(_control.getStrobe()), strobeHandler, FALLING); // Attach to pin interrupt
+  }
 
   /*
   | Name         | DB25  |  Direction | Register |

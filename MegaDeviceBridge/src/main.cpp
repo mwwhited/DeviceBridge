@@ -8,8 +8,8 @@ DeviceBridge::PrinterInterface printer = DeviceBridge::PrinterInterface(
 
 void setup()
 {
-  printer.initialize();
   // put your setup code here, to run once:
+  printer.initialize();
 }
 
 void loop()

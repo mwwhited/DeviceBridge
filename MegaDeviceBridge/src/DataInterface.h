@@ -1,5 +1,4 @@
-#ifndef __H_DeviceBridge_DataInterface_
-#define __H_DeviceBridge_DataInterface_
+#pragma once
 
 #include <stdint.h>
 
@@ -7,6 +6,9 @@ namespace DeviceBridge
 {
   class DataInterface
   {
+  private:
+    uint8_t _data[8]; 
+    
   public:
     DataInterface(
         uint8_t data0,
@@ -22,4 +24,3 @@ namespace DeviceBridge
     uint8_t read();
   };
 }
-#endif

@@ -1,5 +1,4 @@
-#ifndef __H_DeviceBridge_StatusInterface_
-#define __H_DeviceBridge_StatusInterface_
+#pragma once
 
 #include <stdint.h>
 
@@ -7,6 +6,9 @@ namespace DeviceBridge
 {
   class StatusInterface
   {
+  private:
+    uint8_t _acknowledge, _busy, _paperOut, _selected, _error;
+
   public:
     StatusInterface(
         uint8_t acknowledge,
@@ -18,5 +20,3 @@ namespace DeviceBridge
     void initialize();
   };
 }
-
-#endif

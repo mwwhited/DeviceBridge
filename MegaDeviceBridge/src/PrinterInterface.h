@@ -1,5 +1,4 @@
-#ifndef __H_DeviceBridge_PrinterInterface_
-#define __H_DeviceBridge_PrinterInterface_
+#pragma once
 
 #include <stdint.h>
 #include "ControlInterface.h"
@@ -10,6 +9,11 @@ namespace DeviceBridge
 {
   class PrinterInterface
   {
+  private:
+    ControlInterface _control;
+    StatusInterface _status;
+    DataInterface _data;
+    
   public:
     PrinterInterface(
         ControlInterface control,
@@ -42,4 +46,3 @@ namespace DeviceBridge
   | Ground       | 18-25 |  Power     |          |
   */
 }
-#endif
