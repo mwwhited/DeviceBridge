@@ -19,5 +19,6 @@ namespace DeviceBridge::Printer
     void initialize();
     uint8_t getStrobePin();
     int getStrobeValue();
+    uint8_t readValue();
   };
 }

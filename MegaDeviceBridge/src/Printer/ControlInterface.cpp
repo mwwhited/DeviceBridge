@@ -30,8 +30,17 @@ namespace DeviceBridge::Printer
     {
         return _strobe;
     }
-
+    
     int ControlInterface::getStrobeValue(){
         return digitalRead(_strobe);
+    }
+    
+    uint8_t ControlInterface::readValue(){
+        uint8_t val =   
+            (digitalRead(_strobe) << 0)    | 
+            (digitalRead(_autoFeed) << 1)  |
+            (digitalRead(_initialize) << 2)| 
+            (digitalRead(_select) << 3);
+        return val;
     }
 }
