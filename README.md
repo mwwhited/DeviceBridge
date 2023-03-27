@@ -41,6 +41,9 @@ The original intention of this device is to bridge the old world line printer po
   * https://forum.arduino.cc/t/nasa-eefs/329543/3
   * https://github.com/slviajero/EepromFS
   * https://github.com/feilipu/avr_eefs
+  * https://feilipu.me/2015/03/06/nasa-eefs-on-avr-atmega/
+  * https://feilipu.me/tag/eefs/
+  * https://hackaday.io/project/5997-goldilocks-analogue/log/18568-implementing-nasa-eefs-on-avr
   * https://www.instructables.com/Introduction-to-LittleFs-Write-LittleFs-Read-Littl/
   * https://github.com/arduino-libraries/Arduino_MKRMEM
 * The current read/write process is rather slow

@@ -1,19 +1,19 @@
 #pragma once
 
 #include <stdint.h>
-#include "ControlInterface.h"
-#include "StatusInterface.h"
-#include "DataInterface.h"
+#include "Control.h"
+#include "Status.h"
+#include "Data.h"
 #include <RingBuf.h>
 
-namespace DeviceBridge::Printer
+namespace DeviceBridge::Parallel
 {
-  class PrinterInterface
+  class Port
   {
   private:
-    ControlInterface _control;
-    StatusInterface _status;
-    DataInterface _data;
+    Control _control;
+    Status _status;
+    Data _data;
 
     void handleInterrupt();
     
@@ -22,17 +22,17 @@ namespace DeviceBridge::Printer
     const byte _whichIsr;
     static byte _isrSeed;
     static void isr0();
-    static PrinterInterface *_instance0;
+    static Port *_instance0;
     static void isr1();
-    static PrinterInterface *_instance1;
+    static Port *_instance1;
     static void isr2();
-    static PrinterInterface *_instance2;
+    static Port *_instance2;
     
   public:
-    PrinterInterface(
-        ControlInterface control,
-        StatusInterface status,
-        DataInterface data);
+    Port(
+        Control control,
+        Status status,
+        Data data);
 
     void initialize();
     bool hasData();

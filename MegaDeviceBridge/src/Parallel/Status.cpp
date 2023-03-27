@@ -1,10 +1,10 @@
 #include <stdint.h>
 #include <Arduino.h>
-#include "StatusInterface.h"
+#include "Status.h"
 
-namespace DeviceBridge::Printer
+namespace DeviceBridge::Parallel
 {
-  StatusInterface::StatusInterface(
+  Status::Status(
       uint8_t acknowledge,
       uint8_t busy,
       uint8_t paperOut,
@@ -18,7 +18,7 @@ namespace DeviceBridge::Printer
     _error = error;
   }
 
-  void StatusInterface::initialize()
+  void Status::initialize()
   {
     pinMode(_error, OUTPUT); // Error - normally high
     digitalWrite(_error, true);
@@ -36,11 +36,11 @@ namespace DeviceBridge::Printer
     digitalWrite(_acknowledge, true);
   }
 
-  void StatusInterface::setBusy(){
+  void Status::setBusy(){
     // set busy
     digitalWrite(_busy, true);
   }
-  void StatusInterface::setAck(){
+  void Status::setAck(){
     // set acknowledgement
     digitalWrite(_acknowledge, false);
     

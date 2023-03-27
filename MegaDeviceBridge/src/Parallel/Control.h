@@ -2,15 +2,15 @@
 
 #include <stdint.h>
 
-namespace DeviceBridge::Printer
+namespace DeviceBridge::Parallel
 {
-  class ControlInterface
+  class Control
   {
   private:
     uint8_t _strobe, _autoFeed, _initialize, _select;
 
   public:
-    ControlInterface(
+    Control(
         uint8_t strobe,
         uint8_t autoFeed,
         uint8_t initialize,
@@ -19,5 +19,6 @@ namespace DeviceBridge::Printer
     void initialize();
     uint8_t getStrobePin();
     int getStrobeValue();
+    uint8_t readValue();
   };
 }

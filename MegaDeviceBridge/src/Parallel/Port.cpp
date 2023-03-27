@@ -1,19 +1,19 @@
 #include <stdint.h>
 #include <Arduino.h>
-#include "PrinterInterface.h"
-#include "ControlInterface.h"
-#include "StatusInterface.h"
-#include "DataInterface.h"
+#include "Port.h"
+#include "Control.h"
+#include "Status.h"
+#include "Data.h"
 #include <RingBuf.h>
 
-namespace DeviceBridge::Printer
+namespace DeviceBridge::Parallel
 {
   // https://forum.arduino.cc/t/use-attachinterrupt-with-a-class-method-function/301108/8
 
-  PrinterInterface::PrinterInterface(
-      ControlInterface control,
-      StatusInterface status,
-      DataInterface data) : _control(control),
+  Port::Port(
+      Control control,
+      Status status,
+      Data data) : _control(control),
                             _status(status),
                             _data(data),
                             _whichIsr(_isrSeed++),
@@ -21,7 +21,7 @@ namespace DeviceBridge::Printer
   {
   }
 
-  void PrinterInterface::handleInterrupt()
+  void Port::handleInterrupt()
   {
     // TODO: should probaly have 2ms spin
 
@@ -47,24 +47,24 @@ namespace DeviceBridge::Printer
     _buffer.push(value);
   }
 
-  byte PrinterInterface::_isrSeed = 0;
-  PrinterInterface *PrinterInterface::_instance0;
-  void PrinterInterface::isr0()
+  byte Port::_isrSeed = 0;
+  Port *Port::_instance0;
+  void Port::isr0()
   {
     _instance0->handleInterrupt();
   }
-  PrinterInterface *PrinterInterface::_instance1;
-  void PrinterInterface::isr1()
+  Port *Port::_instance1;
+  void Port::isr1()
   {
     _instance1->handleInterrupt();
   }
-  PrinterInterface *PrinterInterface::_instance2;
-  void PrinterInterface::isr2()
+  Port *Port::_instance2;
+  void Port::isr2()
   {
     _instance2->handleInterrupt();
   }
 
-  void PrinterInterface::initialize()
+  void Port::initialize()
   {
     _control.initialize();
     _status.initialize();
@@ -87,22 +87,22 @@ namespace DeviceBridge::Printer
     }
   }
 
-  bool PrinterInterface::hasData()
+  bool Port::hasData()
   {
     return !_buffer.isEmpty();
   }
 
-  bool PrinterInterface::isAlmostFull()
+  bool Port::isAlmostFull()
   {
     return _buffer.size() > (_buffer.maxSize() / 4 * 3);
   }
 
-  bool PrinterInterface::isFull()
+  bool Port::isFull()
   {
     return _buffer.isFull();
   }
 
-  uint16_t PrinterInterface::readData(uint8_t buffer[], uint16_t index = 0, uint16_t lenght = 0)
+  uint16_t Port::readData(uint8_t buffer[], uint16_t index = 0, uint16_t lenght = 0)
   {
     uint16_t size = sizeof(buffer);
     if (lenght == 0) // if length is 0 use input buffer size
