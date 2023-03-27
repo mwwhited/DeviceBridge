@@ -1,16 +1,16 @@
 #include <Arduino.h>
-#include "./Printer/PrinterInterface.h"
-#include "./User/DisplayInterface.h"
+#include "./Parallel/Port.h"
+#include "./User/Display.h"
 
 // See [Pin Outs](../PinOuts.md)
 
 // https://arduinoinfo.mywikis.net/wiki/Timers-Arduino
-DeviceBridge::Printer::PrinterInterface _printer(
-    DeviceBridge::Printer::ControlInterface(18, 22, 26, 26),
-    DeviceBridge::Printer::StatusInterface(41, 43, 45, 47, 24),
-    DeviceBridge::Printer::DataInterface(25, 27, 29, 31, 33, 35, 37, 39));
+DeviceBridge::Parallel::Port _printer(
+    DeviceBridge::Parallel::Control(18, 22, 26, 26),
+    DeviceBridge::Parallel::Status(41, 43, 45, 47, 24),
+    DeviceBridge::Parallel::Data(25, 27, 29, 31, 33, 35, 37, 39));
     
-DeviceBridge::User::DisplayInterface _display(
+DeviceBridge::User::Display _display(
   8, 9, 4, 5, 6, 7
 );
 

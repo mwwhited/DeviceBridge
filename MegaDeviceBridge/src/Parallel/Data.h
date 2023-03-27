@@ -2,15 +2,15 @@
 
 #include <stdint.h>
 
-namespace DeviceBridge::Printer
+namespace DeviceBridge::Parallel
 {
-  class DataInterface
+  class Data
   {
   private:
     uint8_t _data[8]; 
     
   public:
-    DataInterface(
+    Data(
         uint8_t data0,
         uint8_t data1,
         uint8_t data2,

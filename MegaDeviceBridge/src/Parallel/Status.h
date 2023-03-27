@@ -2,15 +2,15 @@
 
 #include <stdint.h>
 
-namespace DeviceBridge::Printer
+namespace DeviceBridge::Parallel
 {
-  class StatusInterface
+  class Status
   {
   private:
     uint8_t _acknowledge, _busy, _paperOut, _selected, _error;
 
   public:
-    StatusInterface(
+    Status(
         uint8_t acknowledge,
         uint8_t busy,
         uint8_t paperOut,

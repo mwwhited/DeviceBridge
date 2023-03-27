@@ -1,11 +1,11 @@
 
 #include <stdint.h>
 #include <Arduino.h>
-#include "ControlInterface.h"
+#include "Control.h"
 
-namespace DeviceBridge::Printer
+namespace DeviceBridge::Parallel
 {
-    ControlInterface::ControlInterface(
+    Control::Control(
         uint8_t strobe,
         uint8_t autoFeed,
         uint8_t initialize,
@@ -17,7 +17,7 @@ namespace DeviceBridge::Printer
         _select = select;
     }
 
-    void ControlInterface::initialize()
+    void Control::initialize()
     {
         pinMode(_strobe, INPUT_PULLUP); // Strobe - normally high
 
@@ -26,16 +26,16 @@ namespace DeviceBridge::Printer
         pinMode(_select, INPUT_PULLUP);
     }
 
-    uint8_t ControlInterface::getStrobePin()
+    uint8_t Control::getStrobePin()
     {
         return _strobe;
     }
     
-    int ControlInterface::getStrobeValue(){
+    int Control::getStrobeValue(){
         return digitalRead(_strobe);
     }
     
-    uint8_t ControlInterface::readValue(){
+    uint8_t Control::readValue(){
         uint8_t val =   
             (digitalRead(_strobe) << 0)    | 
             (digitalRead(_autoFeed) << 1)  |

@@ -5,13 +5,13 @@
 
 namespace DeviceBridge::User
 {
-    class DisplayInterface
+    class Display
     {
     private:
         LiquidCrystal _lcd;
 
     public:
-        DisplayInterface(
+        Display(
             uint8_t reset,
             uint8_t enable,
             uint8_t data0,

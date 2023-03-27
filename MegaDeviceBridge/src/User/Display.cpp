@@ -1,11 +1,11 @@
 
 #include <stdint.h>
 #include <LiquidCrystal.h>
-#include "DisplayInterface.h"
+#include "Display.h"
 
 namespace DeviceBridge::User
 {
-    DisplayInterface::DisplayInterface(
+    Display::Display(
         uint8_t reset,
         uint8_t enable,
         uint8_t data0,
@@ -15,7 +15,7 @@ namespace DeviceBridge::User
     {
     }
 
-    void DisplayInterface::initialize()
+    void Display::initialize()
     {
         _lcd.begin(16, 2);
         _lcd.clear();

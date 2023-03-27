@@ -1,10 +1,10 @@
 #include <stdint.h>
 #include <Arduino.h>
-#include "DataInterface.h"
+#include "Data.h"
 
-namespace DeviceBridge::Printer
+namespace DeviceBridge::Parallel
 {
-  DataInterface::DataInterface(
+  Data::Data(
       uint8_t data0,
       uint8_t data1,
       uint8_t data2,
@@ -24,7 +24,7 @@ namespace DeviceBridge::Printer
     _data[7] = data7;
   }
 
-  void DataInterface::initialize()
+  void Data::initialize()
   {
     pinMode(_data[0], INPUT_PULLUP); // D0
     pinMode(_data[1], INPUT_PULLUP); // D1
@@ -36,7 +36,7 @@ namespace DeviceBridge::Printer
     pinMode(_data[7], INPUT_PULLUP); // D7
   }
 
-  uint8_t DataInterface::readValue()
+  uint8_t Data::readValue()
   {
     return (digitalRead(_data[0]) << 0) |
            (digitalRead(_data[1]) << 1) |
