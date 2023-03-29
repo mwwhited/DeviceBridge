@@ -1,6 +1,12 @@
+
+#define ENABLE_DEDICATED_SPI 0
+
+#include <SdFatConfig.h>
 #include <Arduino.h>
 #include "./Parallel/Port.h"
 #include "./User/Display.h"
+#include "./Storage/SdCard.h"
+#include "./Storage/SpiEeprom.h"
 
 // See [Pin Outs](../PinOuts.md)
 
@@ -14,11 +20,20 @@ DeviceBridge::User::Display _display(
   8, 9, 4, 5, 6, 7
 );
 
+DeviceBridge::Storage::StorageInterface _sdCard = DeviceBridge::Storage::SdCard(
+  10
+);
+
+DeviceBridge::Storage::StorageInterface _eeprom = DeviceBridge::Storage::SpiEeprom(
+  3
+);
+
 void setup()
 {
   // put your setup code here, to run once:
   _printer.initialize();
   _display.initialize();
+  _sdCard.initialize();
 }
 
 void loop()
