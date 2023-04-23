@@ -19,5 +19,6 @@ namespace DeviceBridge::User
     {
         _lcd.begin(16, 2);
         _lcd.clear();
+        _lcd.write("initialized!");
     }
 }

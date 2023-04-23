@@ -4,9 +4,9 @@
 #include "StorageInterface.h"
 
 #include <common_types.h>
-#include <eefs_filesys.h>
-#include <eefstool_driver.h>
-#include <eefstool_opts.h>
+// #include <eefs_filesys.h>
+// #include <eefstool_driver.h>
+// #include <eefstool_opts.h>
 
 namespace DeviceBridge::Storage
 {
