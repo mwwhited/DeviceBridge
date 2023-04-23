@@ -1,6 +1,7 @@
 
 #define ENABLE_DEDICATED_SPI 0
 
+#include <Arduino_FreeRTOS.h>
 #include <SdFatConfig.h>
 #include <Arduino.h>
 #include "./Parallel/Port.h"

@@ -26,7 +26,7 @@
 
 
 /* Scheduler include files. */
-#include "FreeRTOS.h"
+#include <Arduino_FreeRTOS.h>
 #include "task.h"
 #include "queue.h"
 #include "semphr.h"

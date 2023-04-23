@@ -15,7 +15,7 @@
 #include <util/delay.h>
 
 /* Scheduler include files. */
-#include "FreeRTOS.h"
+#include <Arduino_FreeRTOS.h>
 #include "semphr.h"
 
 /* SPI interface include file. */
