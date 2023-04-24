@@ -14,10 +14,9 @@ namespace DeviceBridge::Parallel
       Control control,
       Status status,
       Data data) : _control(control),
-                            _status(status),
-                            _data(data),
-                            _whichIsr(_isrSeed++),
-                            _buffer()
+                   _status(status),
+                   _data(data),
+                   _buffer()
   {
   }
 
@@ -47,21 +46,10 @@ namespace DeviceBridge::Parallel
     _buffer.push(value);
   }
 
-  byte Port::_isrSeed = 0;
   Port *Port::_instance0;
   void Port::isr0()
   {
     _instance0->handleInterrupt();
-  }
-  Port *Port::_instance1;
-  void Port::isr1()
-  {
-    _instance1->handleInterrupt();
-  }
-  Port *Port::_instance2;
-  void Port::isr2()
-  {
-    _instance2->handleInterrupt();
   }
 
   void Port::initialize()
@@ -70,21 +58,8 @@ namespace DeviceBridge::Parallel
     _status.initialize();
     _data.initialize();
 
-    switch (_whichIsr)
-    {
-    case 0:
-      _instance0 = this;
-      attachInterrupt(digitalPinToInterrupt(_control.getStrobePin()), isr0, FALLING); // Attach to pin interrupt
-      break;
-    case 1:
-      _instance1 = this;
-      attachInterrupt(digitalPinToInterrupt(_control.getStrobePin()), isr1, FALLING); // Attach to pin interrupt
-      break;
-    case 2:
-      _instance2 = this;
-      attachInterrupt(digitalPinToInterrupt(_control.getStrobePin()), isr2, FALLING); // Attach to pin interrupt
-      break;
-    }
+    _instance0 = this;
+    attachInterrupt(digitalPinToInterrupt(_control.getStrobePin()), isr0, FALLING); // Attach to pin interrupt
   }
 
   bool Port::hasData()
@@ -130,27 +105,4 @@ namespace DeviceBridge::Parallel
     }
     return cnt;
   }
-
-  /*
-  | Name         | DB25  |  Direction | Register |
-  |--------------|-------|------------|----------|
-  | /Strobe      | 1     |  Input     | Control  |
-  | D0           | 2     |  Input     | Data     |
-  | D1           | 3     |  Input     | Data     |
-  | D2           | 4     |  Input     | Data     |
-  | D3           | 5     |  Input     | Data     |
-  | D4           | 6     |  Input     | Data     |
-  | D5           | 7     |  Input     | Data     |
-  | D6           | 8     |  Input     | Data     |
-  | D7           | 9     |  Input     | Data     |
-  | /Acknowledge | 10    |  Output    | Status   |
-  | Busy         | 11    |  Output    | Status   |
-  | Paper Out    | 12    |  Output    | Status   |
-  | Select       | 13    |  Output    | Status   |
-  | /Auto Feed   | 14    |  Input     | Control  |
-  | /Error       | 15    |  Output    | Status   |
-  | /Initialize  | 16    |  Input     | Control  |
-  | /Select In   | 17    |  Input     | Control  |
-  | Ground       | 18-25 |  Power     |          |
-  */
 }
