@@ -31,7 +31,6 @@ DeviceBridge::Storage::StorageInterface _eeprom = DeviceBridge::Storage::SpiEepr
   3
 );
 
-
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(SERIAL_BAUD);  
