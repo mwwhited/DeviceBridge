@@ -17,9 +17,8 @@ private:
     SemaphoreHandle_t _spiMutex;
     TaskHandle_t _taskHandle;
     
-    // Storage instances
-    SdFat _sd;
-    SdFile _currentFile;
+    // Storage instances  
+    File _currentFile;
     W25Q128Manager _eeprom;
     
     // Storage status

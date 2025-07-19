@@ -6,12 +6,12 @@
 namespace DeviceBridge::Common {
 
 // Data structure for parallel port to file manager communication
-struct DataChunk {
+struct __attribute__((packed)) DataChunk {
   uint8_t data[256];  // Reduced from 512 to 256 bytes to fit in RAM
   uint16_t length;
   uint32_t timestamp;
-  bool isNewFile;
-  bool isEndOfFile;
+  uint8_t isNewFile;    // Use uint8_t instead of bool for consistent size
+  uint8_t isEndOfFile;  // Use uint8_t instead of bool for consistent size
 };
 
 // Display message types for user feedback

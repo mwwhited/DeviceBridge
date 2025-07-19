@@ -120,7 +120,7 @@ void FileSystemManager::runTask() {
 
 bool FileSystemManager::initializeSD() {
     if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
-        bool result = _sd.begin(Common::Pins::SD_CS);
+        bool result = SD.begin(Common::Pins::SD_CS);
         xSemaphoreGive(_spiMutex);
         return result;
     }
@@ -137,7 +137,8 @@ bool FileSystemManager::createNewFile() {
     switch (_activeStorage) {
         case Common::StorageType::SD_CARD:
             if (_sdAvailable && xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
-                bool result = _currentFile.open(_currentFilename, O_CREAT | O_WRITE | O_TRUNC);
+                _currentFile = SD.open(_currentFilename, FILE_WRITE);
+                bool result = (_currentFile != 0);
                 xSemaphoreGive(_spiMutex);
                 return result;
             }
@@ -161,9 +162,9 @@ bool FileSystemManager::createNewFile() {
 bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
     switch (_activeStorage) {
         case Common::StorageType::SD_CARD:
-            if (_currentFile.isOpen() && xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
+            if (_currentFile && xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
                 size_t written = _currentFile.write(chunk.data, chunk.length);
-                _currentFile.sync(); // Ensure data is written
+                _currentFile.flush(); // Ensure data is written
                 xSemaphoreGive(_spiMutex);
                 
                 if (written == chunk.length) {
@@ -191,7 +192,7 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
 bool FileSystemManager::closeCurrentFile() {
     switch (_activeStorage) {
         case Common::StorageType::SD_CARD:
-            if (_currentFile.isOpen() && xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
+            if (_currentFile && xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
                 _currentFile.close();
                 xSemaphoreGive(_spiMutex);
                 return true;
