@@ -52,3 +52,66 @@
 - Implement file type detection algorithm
 - Add button input handling for user interface
 - Optimize memory usage and stack sizes
+
+## 2025-07-19 - Component-Based Architecture
+
+### Added
+- **Component-Based Design**: Separated monolithic main.cpp into discrete component classes
+- **Component Managers**:
+  - ParallelPortManager - LPT data capture with file boundary detection
+  - FileSystemManager - Unified storage interface (SD/EEPROM/Serial)
+  - DisplayManager - LCD interface with menu system and button handling  
+  - TimeManager - RTC integration and time services
+  - SystemManager - System coordination, monitoring, and configuration
+
+- **Common Infrastructure**:
+  - Common/Types.h - Shared data structures for inter-component communication
+  - Common/Config.h - System configuration constants and pin definitions
+  - ARCHITECTURE.md - Design decisions and system documentation
+
+- **Enhanced main.cpp**:
+  - Component lifecycle management (initialize → start → monitor)
+  - Robust error handling with descriptive serial output
+  - Clean separation of hardware initialization and component coordination
+  - Proper FreeRTOS object verification
+
+### Changed
+- **main.cpp**: Complete refactor from inline task functions to component orchestration
+- **Pin Definitions**: Centralized in Common/Config.h with proper namespace organization
+- **Error Handling**: Enhanced with component-level error reporting and recovery
+- **Memory Management**: Static allocation strategy for all components
+
+### Architecture Benefits
+- **Maintainability**: Clear separation of concerns between subsystems
+- **Testability**: Components can be unit tested independently
+- **Scalability**: Easy to add new components or modify existing ones
+- **Debugging**: Component-level isolation simplifies troubleshooting
+- **Code Reuse**: Components are self-contained and reusable
+
+### Hardware-Specific Updates
+- **OSEPP LCD Keypad Shield v1**: Button mapping and analog value constants
+- **Winbond 25Q128FVSG**: Structure prepared for 16MB SPI Flash filesystem
+- **Arduino Mega 2560**: Pin assignments verified and organized by function
+
+### File Structure
+```
+src/
+├── main.cpp (184 lines) - System initialization and component coordination
+├── Common/ - Shared infrastructure
+│   ├── Types.h - Inter-component communication structures  
+│   └── Config.h - System configuration and pin definitions
+├── Components/ - Component manager classes (~1200 lines total)
+│   ├── ParallelPortManager.h/cpp - LPT data capture
+│   ├── FileSystemManager.h/cpp - Storage operations
+│   ├── DisplayManager.h/cpp - LCD and user interface
+│   ├── TimeManager.h/cpp - RTC and time services
+│   └── SystemManager.h/cpp - System monitoring and coordination
+├── Parallel/ - Hardware abstraction (existing, enhanced)
+└── User/ - User interface (existing, enhanced)
+```
+
+### Memory Usage Optimization
+- **Static Allocation**: All components created at startup (no dynamic allocation)
+- **Stack Sizing**: Component-specific stack sizes based on actual usage
+- **Queue Management**: Centralized queue creation with proper error checking
+- **Resource Protection**: Mutex usage optimized for minimal contention

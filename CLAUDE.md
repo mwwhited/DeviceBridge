@@ -3,6 +3,14 @@
 ## Project Context
 **Device Bridge** - Arduino Mega 2560 project for bridging Tektronix TDS2024 oscilloscope parallel port to modern USB/storage
 
+### Hardware Specifications (CONFIRMED)
+- **MCU**: Arduino Mega 2560 (ATmega2560, 8KB SRAM, 256KB Flash)
+- **LCD Shield**: OSEPP LCD Keypad Shield (revision 1) - 16x2 LCD with 6 buttons
+- **EEPROM**: Winbond 25Q128FVSG (128Mbit = 16MB SPI Flash)
+- **RTC**: DS1307 on data logger shield
+- **SD Card**: Via data logger shield (SPI interface)
+- **Parallel Port**: Custom breakout for DB-25 connector to TDS2024
+
 ## Architecture Decisions
 
 ### FreeRTOS Task Design
@@ -102,8 +110,75 @@ Available for heap: ~500 bytes
 4. **Error Recovery**: Design for graceful degradation from the start
 5. **Documentation**: Critical for embedded systems - hardware details change frequently
 
+## Current Implementation Status (2025-07-19)
+
+### Component Architecture - COMPLETED ✅
+Created clean component-based architecture:
+- **Components/ParallelPortManager** - LPT data capture with file boundary detection
+- **Components/FileSystemManager** - Unified storage interface (SD/EEPROM/Serial)
+- **Components/DisplayManager** - LCD interface with menu system and button handling
+- **Components/TimeManager** - RTC integration and time services
+- **Components/SystemManager** - System coordination, monitoring, and configuration
+
+### FreeRTOS Integration - COMPLETED ✅
+- Task-based architecture with priority scheduling
+- Inter-task communication via queues (DataChunk, DisplayMessage, SystemCommand)
+- Resource protection with mutexes (SPI, I2C, Serial)
+- Component lifecycle management
+- System health monitoring
+
+### File Structure - COMPLETED ✅
+```
+src/
+├── main.cpp - System initialization and component coordination
+├── Common/ - Shared types and configuration constants
+│   ├── Types.h - Data structures for inter-component communication
+│   └── Config.h - System configuration and pin definitions
+├── Components/ - Component manager classes
+│   ├── ParallelPortManager.h/cpp - LPT data capture
+│   ├── FileSystemManager.h/cpp - Storage operations  
+│   ├── DisplayManager.h/cpp - LCD and user interface
+│   ├── TimeManager.h/cpp - RTC and time services
+│   └── SystemManager.h/cpp - System monitoring
+├── Parallel/ - Hardware abstraction (existing)
+│   ├── Port.h/cpp - LPT port management
+│   ├── Control.h/cpp - Control signal management
+│   ├── Status.h/cpp - Status signal management
+│   └── Data.h/cpp - Data line management
+└── User/ - User interface (existing, enhanced)
+    └── Display.h/cpp - LCD display control
+```
+
+### Hardware Integration Status
+- **Parallel Port**: ✅ Existing implementation working, enhanced for FreeRTOS
+- **LCD Display**: ✅ Enhanced with button handling for OSEPP LCD Keypad Shield v1
+- **SD Card**: ✅ Implemented via SdFat library with mutex protection
+- **EEPROM (W25Q128FVSG)**: 🚧 Structure ready, needs filesystem implementation
+- **RTC (DS1307)**: ✅ Basic implementation, needs time setting features
+
+### Next Critical Tasks
+1. **Complete main.cpp refactoring** - Convert old task functions to component initialization
+2. **EEPROM filesystem integration** - Implement W25Q128FVSG support with wear leveling
+3. **Button mapping verification** - Confirm OSEPP shield v1 button analog values
+4. **File type detection** - Add header-based file format detection
+5. **Hardware testing** - Test with actual TDS2024 oscilloscope
+
+### Memory Management Strategy
+- **Static allocation**: All components allocated in main.cpp (no dynamic allocation)
+- **Task stacks**: Conservative sizing (256-512 bytes) for 8KB SRAM limit
+- **Queue memory**: ~4.5KB total for inter-task communication
+- **Available heap**: ~700 bytes remaining for temporary allocations
+
+### Key Design Decisions Made
+- **Component managers over service classes**: Better resource ownership model
+- **Queue-based communication**: Decoupled inter-task messaging  
+- **Mutex-protected hardware**: Prevents SPI/I2C bus conflicts
+- **Timeout-based file detection**: 2-second idle = end of file
+- **Graceful storage degradation**: SD → EEPROM → Serial fallback
+
 ## Key Files to Monitor
 - `platformio.ini` - Dependencies and build configuration
-- `main.cpp` - Core task implementation  
-- `Parallel/Port.cpp` - Interrupt handling and data capture
-- `User/Display.cpp` - User interface and feedback
+- `main.cpp` - System initialization and component coordination
+- `Components/*.cpp` - Component implementations
+- `Common/Config.h` - System configuration and pin mappings
+- `Common/Types.h` - Inter-component communication structures
