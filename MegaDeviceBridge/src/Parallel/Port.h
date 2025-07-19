@@ -38,7 +38,7 @@ namespace DeviceBridge::Parallel
     bool hasData();
     bool isAlmostFull();
     bool isFull();
-    uint16_t readData(uint8_t buffer[], uint16_t index = 0, uint16_t lenght = 0);
+    uint16_t readData(uint8_t buffer[], uint16_t index = 0, uint16_t length = 0);
   };
 
   /*

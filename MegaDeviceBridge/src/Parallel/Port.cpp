@@ -16,8 +16,8 @@ namespace DeviceBridge::Parallel
       Data data) : _control(control),
                             _status(status),
                             _data(data),
-                            _whichIsr(_isrSeed++),
-                            _buffer()
+                            _buffer(),
+                            _whichIsr(_isrSeed++)
   {
   }
 
@@ -102,25 +102,20 @@ namespace DeviceBridge::Parallel
     return _buffer.isFull();
   }
 
-  uint16_t Port::readData(uint8_t buffer[], uint16_t index = 0, uint16_t lenght = 0)
+  uint16_t Port::readData(uint8_t buffer[], uint16_t index, uint16_t length)
   {
-    uint16_t size = sizeof(buffer);
-    if (lenght == 0) // if length is 0 use input buffer size
-      lenght = size;
-
-    if ((lenght + index) > size) // if index with length is greater than buffer than scale to fit
-      lenght = size - index;
-
-    if (lenght > size) // still invalid
-      return 0;
+    // Note: sizeof(buffer) gives size of pointer, not array
+    // For Arduino, we'll use the length parameter properly
+    if (length == 0) // if length is 0, assume we want to fill the buffer
+      length = 512; // Default chunk size
 
     uint16_t cnt = 0;
-    for (; index < lenght; index++)
+    for (uint16_t i = 0; i < length; i++)
     {
       uint8_t element;
       if (_buffer.lockedPop(element))
       {
-        buffer[index] = element;
+        buffer[index + i] = element;
         cnt++;
       }
       else

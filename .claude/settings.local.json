@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(pio check:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(pio test:*)",
+      "Bash(mv:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:osepp.com)",
+      "WebFetch(domain:wiki.dfrobot.com)",
+      "WebFetch(domain:arduino.stackexchange.com)",
+      "Bash(pio run:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": []
+  }
+}
