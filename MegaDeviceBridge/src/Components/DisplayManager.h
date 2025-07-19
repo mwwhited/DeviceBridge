@@ -71,6 +71,7 @@ public:
     
     // Message processing (called by other components)
     void displayMessage(Common::DisplayMessage::Type type, const char* message, const char* line2 = nullptr);
+    void displayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message, const __FlashStringHelper* line2 = nullptr);
     
     // Status inquiry
     bool isShowingMenu() const { return _inMenu; }

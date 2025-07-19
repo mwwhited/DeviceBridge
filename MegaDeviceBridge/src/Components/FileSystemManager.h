@@ -46,6 +46,7 @@ private:
     // Storage management
     bool switchStorage(Common::StorageType newType);
     void sendDisplayMessage(Common::DisplayMessage::Type type, const char* message);
+    void sendDisplayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message);
     
     // File naming
     void generateFilename(char* buffer, size_t bufferSize);

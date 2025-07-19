@@ -41,6 +41,7 @@ private:
     // Error handling
     void handleError(Common::ErrorCode error);
     void sendDisplayMessage(Common::DisplayMessage::Type type, const char* message);
+    void sendDisplayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message);
     
 public:
     SystemManager();

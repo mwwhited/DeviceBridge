@@ -104,48 +104,27 @@ void SystemManager::processStorageSelectCommand(uint8_t value) {
 
 void SystemManager::processFileTypeCommand(uint8_t value) {
     if (_fileSystemManager == nullptr) return;
+
+    if (value > Common::FileType::BINARY) return;  // avoid out-of-bounds
+
+    Common::FileType fileType(static_cast<Common::FileType::Value>(value));
     
-    Common::FileType fileType;
-    const char* message;
-    
-    switch (value) {
-        case 0:
-            fileType = Common::FileType::AUTO_DETECT;
-            message = "Type: Auto";
-            break;
-        case 1:
-            fileType = Common::FileType::BINARY;
-            message = "Type: Binary";
-            break;
-        case 2:
-            fileType = Common::FileType::BITMAP;
-            message = "Type: Bitmap";
-            break;
-        case 3:
-            fileType = Common::FileType::PNG;
-            message = "Type: PNG";
-            break;
-        case 4:
-            fileType = Common::FileType::TEXT;
-            message = "Type: Text";
-            break;
-        default:
-            return;
-    }
-    
+    // Display type name from PROGMEM
+    sendDisplayMessage(Common::DisplayMessage::INFO, fileType.toString());
+
+    // Apply the selected file type
     _fileSystemManager->setFileType(fileType);
-    sendDisplayMessage(Common::DisplayMessage::INFO, message);
 }
 
 void SystemManager::processTimeSetCommand(const char* data) {
     // TODO: Parse time string and set RTC
     // Format expected: "HH:MM:SS" or "DD/MM/YYYY HH:MM"
-    sendDisplayMessage(Common::DisplayMessage::INFO, "Time Set (TODO)");
+    sendDisplayMessage(Common::DisplayMessage::INFO, F("Time Set (TODO)"));
 }
 
 void SystemManager::processConfigSaveCommand() {
     // TODO: Save configuration to EEPROM
-    sendDisplayMessage(Common::DisplayMessage::INFO, "Config Saved");
+    sendDisplayMessage(Common::DisplayMessage::INFO, F("Config Saved"));
 }
 
 void SystemManager::monitorSystemHealth() {
@@ -239,26 +218,31 @@ void SystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const 
         _displayManager->displayMessage(type, message);
     }
 }
+void SystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message) {
+    if (_displayManager) {
+        _displayManager->displayMessage(type, message);
+    }
+}
 
 void SystemManager::printSystemInfo() {
     Serial.print(F("=== Device Bridge System Info ===\r\n"));
-    Serial.print("Status: ");
+    Serial.print(F("Status: "));
     Serial.print((int)_systemStatus);
-    Serial.print("\r\n");
+    Serial.print(F("\r\n"));
     Serial.print(F("Uptime: "));
     Serial.print(_uptimeSeconds);
-    Serial.print(" seconds\r\n");
-    Serial.print("Total Errors: ");
+    Serial.print(F(" seconds\r\n"));
+    Serial.print(F("Total Errors: "));
     Serial.print(_errorCount);
-    Serial.print("\r\n");
-    Serial.print("Commands Processed: ");
+    Serial.print(F("\r\n"));
+    Serial.print(F("Commands Processed: "));
     Serial.print(_commandsProcessed);
-    Serial.print("\r\n");
+    Serial.print(F("\r\n"));
 }
 
 void SystemManager::printMemoryInfo() {
     Serial.print(F("=== Memory Info ===\r\n"));
-    Serial.print("Free SRAM: ");
+    Serial.print(F("Free SRAM: "));
     Serial.print(freeRam());
     Serial.print(F(" bytes\r\n"));
 }

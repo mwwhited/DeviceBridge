@@ -30,49 +30,49 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
     
-    Serial.println("=== Build Verification Test ===");
+    Serial.println(F("=== Build Verification Test ==="));
     
     bool allPassed = true;
     
-    Serial.print("Testing data structures... ");
+    Serial.print(F("Testing data structures... "));
     if (verify_data_structures()) {
-        Serial.println("PASS");
+        Serial.println(F("PASS"));
     } else {
-        Serial.println("FAIL");
+        Serial.println(F("FAIL"));
         allPassed = false;
     }
     
-    Serial.print("Testing pin assignments... ");
+    Serial.print(F("Testing pin assignments... "));
     if (verify_pin_assignments()) {
-        Serial.println("PASS");
+        Serial.println(F("PASS"));
     } else {
-        Serial.println("FAIL");
+        Serial.println(F("FAIL"));
         allPassed = false;
     }
     
-    Serial.print("Testing component creation... ");
+    Serial.print(F("Testing component creation... "));
     if (verify_component_creation()) {
-        Serial.println("PASS");
+        Serial.println(F("PASS"));
     } else {
-        Serial.println("FAIL");
+        Serial.println(F("FAIL"));
         allPassed = false;
     }
     
-    Serial.print("Testing memory usage... ");
+    Serial.print(F("Testing memory usage... "));
     if (verify_memory_usage()) {
-        Serial.println("PASS");
+        Serial.println(F("PASS"));
     } else {
-        Serial.println("FAIL");
+        Serial.println(F("FAIL"));
         allPassed = false;
     }
     
-    Serial.println("========================");
+    Serial.println(F("========================"));
     if (allPassed) {
-        Serial.println("BUILD VERIFICATION: ALL TESTS PASSED");
+        Serial.println(F("BUILD VERIFICATION: ALL TESTS PASSED"));
     } else {
-        Serial.println("BUILD VERIFICATION: SOME TESTS FAILED");
+        Serial.println(F("BUILD VERIFICATION: SOME TESTS FAILED"));
     }
-    Serial.println("========================");
+    Serial.println(F("========================"));
 }
 
 void loop() {

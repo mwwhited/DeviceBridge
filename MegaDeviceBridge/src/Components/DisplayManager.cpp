@@ -1,6 +1,7 @@
 #include "DisplayManager.h"
 #include "TimeManager.h"
 #include "SystemManager.h"
+#include "../Common/Types.h"
 #include <string.h>
 #include <Arduino.h>
 
@@ -111,7 +112,7 @@ void DisplayManager::showMainScreen() {
 void DisplayManager::showTimeDisplay(const char* timeStr) {
     _display.clear();
     _display.setCursor(0, 0);
-    _display.print("Device Bridge");
+    _display.print(F("Device Bridge"));
     _display.setCursor(0, 1);
     _display.print(timeStr);
 }
@@ -121,7 +122,7 @@ void DisplayManager::showMenuScreen() {
     _display.setCursor(0, 0);
     _display.print(getMenuTitle(_menuState));
     _display.setCursor(0, 1);
-    _display.print(">");
+    _display.print(F(">"));
     _display.print(getMenuOption(_menuState, _menuSelection));
 }
 
@@ -255,7 +256,7 @@ void DisplayManager::showMessage(const char* message, const char* line2) {
 void DisplayManager::showError(const char* error) {
     _display.clear();
     _display.setCursor(0, 0);
-    _display.print("ERROR:");
+    _display.print(F("ERROR:"));
     _display.setCursor(0, 1);
     _display.print(error);
     
@@ -294,6 +295,23 @@ void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const cha
     
     processMessage(msg);
 }
+void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message, const __FlashStringHelper* line2) {
+    Common::DisplayMessage msg;
+    msg.type = type;
+
+    // Copy from flash (PROGMEM) to RAM buffer
+    strncpy_P(msg.message, (PGM_P)message, sizeof(msg.message) - 1);
+    msg.message[sizeof(msg.message) - 1] = '\0';
+
+    if (line2) {
+        strncpy_P(msg.line2, (PGM_P)line2, sizeof(msg.line2) - 1);
+        msg.line2[sizeof(msg.line2) - 1] = '\0';
+    } else {
+        msg.line2[0] = '\0';
+    }
+
+    processMessage(msg);
+}
 
 const char* DisplayManager::getMenuTitle(MenuState state) {
     switch (state) {
@@ -327,15 +345,8 @@ const char* DisplayManager::getMenuOption(MenuState state, uint8_t option) {
             break;
             
         case FILETYPE_MENU:
-            switch (option) {
-                case 0: return "Auto";
-                case 1: return "Binary";
-                case 2: return "Bitmap";
-                case 3: return "PNG";
-                case 4: return "Text";
-                default: return "Option";
-            }
-            break;
+            if (option > Common::FileType::BINARY) return "Option";
+            return (Common::FileType(static_cast<Common::FileType::Value>(option))).toSimple();
             
         case CONFIG_MENU:
             switch (option) {
@@ -354,7 +365,7 @@ uint8_t DisplayManager::getMenuOptionCount(MenuState state) {
     switch (state) {
         case MAIN_MENU: return 3;
         case STORAGE_MENU: return 4;
-        case FILETYPE_MENU: return 5;
+        case FILETYPE_MENU: return Common::FileType::BINARY + 1; // Count of FileType enum values
         case CONFIG_MENU: return 2;
         default: return 1;
     }

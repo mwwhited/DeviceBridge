@@ -43,7 +43,7 @@ bool FileSystemManager::initialize() {
         _activeStorage = Common::StorageType::EEPROM;
     } else {
         _activeStorage = Common::StorageType::SERIAL_TRANSFER;
-        sendDisplayMessage(Common::DisplayMessage::ERROR, "No Storage!");
+        sendDisplayMessage(Common::DisplayMessage::ERROR, F("No Storage!"));
     }
     
     return _sdAvailable || _eepromAvailable;
@@ -63,17 +63,17 @@ void FileSystemManager::processDataChunk(const Common::DataChunk& chunk) {
     if (chunk.isNewFile) {
         closeCurrentFile();
         if (!createNewFile()) {
-            sendDisplayMessage(Common::DisplayMessage::ERROR, "File Create Failed");
+            sendDisplayMessage(Common::DisplayMessage::ERROR, F("File Create Failed"));
             return;
         }
-        sendDisplayMessage(Common::DisplayMessage::STATUS, "Storing...");
+        sendDisplayMessage(Common::DisplayMessage::STATUS, F("Storing..."));
     }
     
     // Write data
     if (chunk.length > 0) {
         if (!writeDataChunk(chunk)) {
             _writeErrors++;
-            sendDisplayMessage(Common::DisplayMessage::ERROR, "Write Failed");
+            sendDisplayMessage(Common::DisplayMessage::ERROR, F("Write Failed"));
         }
     }
     
@@ -84,7 +84,7 @@ void FileSystemManager::processDataChunk(const Common::DataChunk& chunk) {
             snprintf(message, sizeof(message), "Saved: %s", _currentFilename);
             sendDisplayMessage(Common::DisplayMessage::INFO, message);
         } else {
-            sendDisplayMessage(Common::DisplayMessage::ERROR, "Close Failed");
+            sendDisplayMessage(Common::DisplayMessage::ERROR, F("Close Failed"));
         }
     }
 }
@@ -197,21 +197,16 @@ void FileSystemManager::generateFilename(char* buffer, size_t bufferSize) {
 }
 
 const char* FileSystemManager::getFileExtension() const {
-    switch (_fileType) {
-        case Common::FileType::BITMAP:
-            return ".bmp";
-        case Common::FileType::PNG:
-            return ".png";
-        case Common::FileType::TEXT:
-            return ".txt";
-        case Common::FileType::BINARY:
-        case Common::FileType::AUTO_DETECT:
-        default:
-            return Common::FileSystem::DEFAULT_FILE_EXTENSION;
-    }
+    return _fileType.getFileExtension();
 }
 
 void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const char* message) {
+    if (_displayManager) {
+        _displayManager->displayMessage(type, message);
+    }
+}
+
+void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message) {
     if (_displayManager) {
         _displayManager->displayMessage(type, message);
     }
