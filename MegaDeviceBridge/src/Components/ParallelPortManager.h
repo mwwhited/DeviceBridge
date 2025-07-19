@@ -52,6 +52,10 @@ public:
     uint32_t getTotalBytesReceived() const;
     uint32_t getFilesReceived() const;
     
+    // Debug methods
+    uint32_t getInterruptCount() const;
+    uint32_t getDataCount() const;
+    
 private:
     // Statistics tracking
     uint32_t _totalBytesReceived;

@@ -17,33 +17,33 @@ namespace DeviceBridge::Parallel
                             _status(status),
                             _data(data),
                             _buffer(),
-                            _whichIsr(_isrSeed++)
+                            _whichIsr(_isrSeed++),
+                            _interruptCount(0),
+                            _dataCount(0)
   {
   }
 
   void Port::handleInterrupt()
   {
-    // TODO: should probaly have 2ms spin
-
-    // if interrupt fell but strobe is high then it was a glitch so ignore
-    if (_control.getStrobeValue())
-      return;
-
-    // TODO: job status events
-    // TODO: set/push timeout for lpt read
-    // TODO: set read status, clear on timeout
-    // TODO: is it possible to detect new write?
-
-    // TODO: if buffer is full do error instead
-    //  if (_buffer.isFull()){
-    //    _status.setError();
-    //  }
-
+    // Count all interrupt calls for debugging
+    _interruptCount++;
+    
+    // TDS2024 strobe pulses are very fast - on FALLING edge, capture data immediately
+    // Don't check strobe state as it returns to HIGH before we can read it
+    
+    // Count valid data captures
+    _dataCount++;
+    
+    // Set busy to indicate we're processing
     _status.setBusy();
+    
+    // Read the data byte from parallel port
     uint8_t value = _data.readValue();
+    
+    // Set acknowledge to confirm data received
     _status.setAck();
 
-    // Note: write value to ring buffer
+    // Store data in ring buffer for processing
     _buffer.push(value);
   }
 

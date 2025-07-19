@@ -28,6 +28,10 @@ namespace DeviceBridge::Parallel
     static void isr2();
     static Port *_instance2;
     
+    // Debug counters
+    volatile uint32_t _interruptCount;
+    volatile uint32_t _dataCount;
+    
   public:
     Port(
         Control control,
@@ -39,6 +43,10 @@ namespace DeviceBridge::Parallel
     bool isAlmostFull();
     bool isFull();
     uint16_t readData(uint8_t buffer[], uint16_t index = 0, uint16_t length = 0);
+    
+    // Debug methods
+    uint32_t getInterruptCount() const { return _interruptCount; }
+    uint32_t getDataCount() const { return _dataCount; }
   };
 
   /*

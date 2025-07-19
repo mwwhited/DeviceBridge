@@ -152,4 +152,12 @@ uint32_t ParallelPortManager::getFilesReceived() const {
     return _filesReceived;
 }
 
+uint32_t ParallelPortManager::getInterruptCount() const {
+    return _port.getInterruptCount();
+}
+
+uint32_t ParallelPortManager::getDataCount() const {
+    return _port.getDataCount();
+}
+
 } // namespace DeviceBridge::Components

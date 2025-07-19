@@ -296,6 +296,14 @@ void ConfigurationManager::printParallelPortStatus() {
         Serial.print(F("Buffer Level: "));
         Serial.print(_parallelPortManager->getBufferLevel());
         Serial.print(F(" bytes\r\n"));
+        
+        Serial.print(F("Interrupt Count: "));
+        Serial.print(_parallelPortManager->getInterruptCount());
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("Data Count: "));
+        Serial.print(_parallelPortManager->getDataCount());
+        Serial.print(F("\r\n"));
     }
     
     // Read raw parallel port pin states
