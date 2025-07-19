@@ -126,8 +126,8 @@ void SystemManager::logSystemStatus() {
         _timeManager->getFormattedDateTime(timeMessage, sizeof(timeMessage));
     }
 
-    // Read analog value for button debugging
-    int buttonAnalog = analogRead(Common::Pins::LCD_BUTTONS);
+    // Read analog value for button debugging (10-bit: 0-1023)
+    int16_t buttonAnalog = analogRead(Common::Pins::LCD_BUTTONS);
 
     Serial.print(F("Uptime: "));
     Serial.print(_uptimeSeconds);

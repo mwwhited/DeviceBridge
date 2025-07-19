@@ -32,6 +32,7 @@ private:
     void printHelpMenu();
     void printDetailedStatus();
     void printCurrentTime();
+    void printButtonStatus();
     
     // Timing for updates
     unsigned long _lastCommandCheck;

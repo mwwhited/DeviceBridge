@@ -63,6 +63,7 @@ namespace Pins {
   constexpr uint8_t LCD_D5 = 5;
   constexpr uint8_t LCD_D6 = 6;
   constexpr uint8_t LCD_D7 = 7;
+  constexpr uint8_t LCD_BUTTONS = A0;  // OSEPP analog button input
 
   // Storage pins
   constexpr uint8_t SD_CS = 10;

@@ -44,6 +44,7 @@
 - EEPROM (W25Q128): Available and initialized  
 - RTC (DS1307): Available with valid time
 - LCD Display: Operational
+- OSEPP Buttons: All 6 buttons calibrated and working (RIGHT:0, UP:100, DOWN:256, LEFT:410, SELECT:641, NONE:1023)
 - Parallel Port: Ready for TDS2024
 - Memory: 4972 bytes free (60.7% available) - excellent efficiency
 

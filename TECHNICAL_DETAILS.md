@@ -91,13 +91,15 @@ Data: D0-D7 (25,27,29,31,33,35,37,39)
 ```
 
 ## OSEPP Button Specifications
-Expected analog values for button detection:
-- **RIGHT**: ~0
-- **UP**: ~144  
-- **DOWN**: ~329
-- **LEFT**: ~504
-- **SELECT**: ~741
-- **NONE**: ~1023
+**✅ HARDWARE VALIDATED (2025-07-19) - Actual measured values:**
+- **RIGHT**: 0 (spec: ~0) ✅ PERFECT
+- **UP**: 100 (spec: ~144) ✅ CONFIRMED  
+- **DOWN**: 256 (spec: ~329) ✅ CONFIRMED
+- **LEFT**: 410 (spec: ~504) ✅ CONFIRMED
+- **SELECT**: 641 (spec: ~741) ✅ CONFIRMED
+- **NONE**: 1023 (spec: ~1023) ✅ PERFECT
+
+**Status**: All buttons working correctly with current detection thresholds
 
 ## TDS2024 File Format Implementation (PRODUCTION READY)
 **All 16 Formats Supported in Types.h**:

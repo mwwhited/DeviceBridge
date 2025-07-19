@@ -78,6 +78,12 @@ void ConfigurationManager::processCommand(const String& command) {
     } else if (command.equalsIgnoreCase(F("time"))) {
         printCurrentTime();
         
+    } else if (command.equalsIgnoreCase(F("buttons"))) {
+        printButtonStatus();
+        
+    } else if (command.equalsIgnoreCase(F("parallel")) || command.equalsIgnoreCase(F("lpt"))) {
+        printParallelPortStatus();
+        
     } else if (command.equalsIgnoreCase(F("restart")) || command.equalsIgnoreCase(F("reset"))) {
         Serial.print(F("Restarting system...\r\n"));
         delay(100);
@@ -102,6 +108,9 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("\r\nTime Commands:\r\n"));
     Serial.print(F("  time              - Show current time\r\n"));
     Serial.print(F("  time set YYYY-MM-DD HH:MM - Set RTC time\r\n"));
+    Serial.print(F("\r\nDebug Commands:\r\n"));
+    Serial.print(F("  buttons           - Show button analog values\r\n"));
+    Serial.print(F("  parallel/lpt      - Show parallel port status\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
     Serial.print(F("  storage eeprom    - Use EEPROM storage\r\n"));
@@ -240,6 +249,32 @@ void ConfigurationManager::handleStorageCommand(const String& command) {
     } else {
         Serial.print(F("FileSystemManager not available\r\n"));
     }
+}
+
+void ConfigurationManager::printButtonStatus() {
+    int16_t analogValue = analogRead(Common::Pins::LCD_BUTTONS);
+    
+    Serial.print(F("Button Analog Value: "));
+    Serial.print(analogValue);
+    Serial.print(F(" ("));
+    
+    // Interpret button based on expected OSEPP values
+    if (analogValue < 50) {
+        Serial.print(F("RIGHT"));
+    } else if (analogValue < 200) {
+        Serial.print(F("UP"));
+    } else if (analogValue < 400) {
+        Serial.print(F("DOWN"));
+    } else if (analogValue < 600) {
+        Serial.print(F("LEFT"));
+    } else if (analogValue < 850) {
+        Serial.print(F("SELECT"));
+    } else {
+        Serial.print(F("NONE"));
+    }
+    
+    Serial.print(F(")\r\n"));
+    Serial.print(F("Expected values: RIGHT(~0), UP(~144), DOWN(~329), LEFT(~504), SELECT(~741), NONE(~1023)\r\n"));
 }
 
 void ConfigurationManager::handleHeartbeatCommand(const String& command) {
