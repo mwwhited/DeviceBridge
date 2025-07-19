@@ -84,6 +84,9 @@ void ConfigurationManager::processCommand(const String& command) {
     } else if (command.equalsIgnoreCase(F("parallel")) || command.equalsIgnoreCase(F("lpt"))) {
         printParallelPortStatus();
         
+    } else if (command.equalsIgnoreCase(F("testint")) || command.equalsIgnoreCase(F("testinterrupt"))) {
+        testInterruptPin();
+        
     } else if (command.equalsIgnoreCase(F("restart")) || command.equalsIgnoreCase(F("reset"))) {
         Serial.print(F("Restarting system...\r\n"));
         delay(100);
@@ -111,6 +114,7 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("\r\nDebug Commands:\r\n"));
     Serial.print(F("  buttons           - Show button analog values\r\n"));
     Serial.print(F("  parallel/lpt      - Show parallel port status\r\n"));
+    Serial.print(F("  testint           - Test interrupt pin response\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
     Serial.print(F("  storage eeprom    - Use EEPROM storage\r\n"));
@@ -275,6 +279,97 @@ void ConfigurationManager::printButtonStatus() {
     
     Serial.print(F(")\r\n"));
     Serial.print(F("Expected values: RIGHT(~0), UP(~144), DOWN(~329), LEFT(~504), SELECT(~741), NONE(~1023)\r\n"));
+}
+
+void ConfigurationManager::printParallelPortStatus() {
+    Serial.print(F("\r\n=== Parallel Port Status ===\r\n"));
+    
+    if (_parallelPortManager) {
+        Serial.print(F("Total Bytes Received: "));
+        Serial.print(_parallelPortManager->getTotalBytesReceived());
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("Files Received: "));
+        Serial.print(_parallelPortManager->getFilesReceived());
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("Buffer Level: "));
+        Serial.print(_parallelPortManager->getBufferLevel());
+        Serial.print(F(" bytes\r\n"));
+    }
+    
+    // Read raw parallel port pin states
+    Serial.print(F("\r\nPin States:\r\n"));
+    Serial.print(F("  Strobe (pin 18): "));
+    Serial.print(digitalRead(Common::Pins::LPT_STROBE));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("  Data pins (D0-D7): "));
+    for (int i = 0; i < 8; i++) {
+        uint8_t dataPins[] = {Common::Pins::LPT_D0, Common::Pins::LPT_D1, Common::Pins::LPT_D2, 
+                              Common::Pins::LPT_D3, Common::Pins::LPT_D4, Common::Pins::LPT_D5, 
+                              Common::Pins::LPT_D6, Common::Pins::LPT_D7};
+        Serial.print(digitalRead(dataPins[i]));
+    }
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("\r\nStatus pins:\r\n"));
+    Serial.print(F("  Ack (pin 41): "));
+    Serial.print(digitalRead(Common::Pins::LPT_ACK));
+    Serial.print(F("\r\n"));
+    Serial.print(F("  Busy (pin 43): "));
+    Serial.print(digitalRead(Common::Pins::LPT_BUSY));
+    Serial.print(F("\r\n"));
+    Serial.print(F("  Error (pin 24): "));
+    Serial.print(digitalRead(Common::Pins::LPT_ERROR));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("============================\r\n\r\n"));
+}
+
+void ConfigurationManager::testInterruptPin() {
+    Serial.print(F("\r\n=== Testing Interrupt Pin ===\r\n"));
+    Serial.print(F("Monitoring strobe pin (18) for 10 seconds...\r\n"));
+    Serial.print(F("Press PRINT on TDS2024 to test interrupt response.\r\n"));
+    
+    uint32_t startTime = millis();
+    uint32_t lastCheck = startTime;
+    int lastStrobeState = digitalRead(Common::Pins::LPT_STROBE);
+    int strobeChanges = 0;
+    
+    while (millis() - startTime < 10000) {  // 10 second test
+        int currentStrobeState = digitalRead(Common::Pins::LPT_STROBE);
+        
+        // Check for strobe state changes
+        if (currentStrobeState != lastStrobeState) {
+            strobeChanges++;
+            Serial.print(F("Strobe changed to: "));
+            Serial.print(currentStrobeState);
+            Serial.print(F(" (count: "));
+            Serial.print(strobeChanges);
+            Serial.print(F(")\r\n"));
+            lastStrobeState = currentStrobeState;
+        }
+        
+        // Update every second
+        if (millis() - lastCheck >= 1000) {
+            Serial.print(F("."));
+            lastCheck = millis();
+        }
+    }
+    
+    Serial.print(F("\r\n"));
+    Serial.print(F("Test complete. Strobe changes detected: "));
+    Serial.print(strobeChanges);
+    Serial.print(F("\r\n"));
+    
+    if (_parallelPortManager) {
+        Serial.print(F("Buffer level after test: "));
+        Serial.print(_parallelPortManager->getBufferLevel());
+        Serial.print(F(" bytes\r\n"));
+    }
+    
+    Serial.print(F("==============================\r\n\r\n"));
 }
 
 void ConfigurationManager::handleHeartbeatCommand(const String& command) {

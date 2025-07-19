@@ -33,6 +33,8 @@ private:
     void printDetailedStatus();
     void printCurrentTime();
     void printButtonStatus();
+    void printParallelPortStatus();
+    void testInterruptPin();
     
     // Timing for updates
     unsigned long _lastCommandCheck;
