@@ -2,15 +2,12 @@
 
 #include <Arduino.h>
 #include <SPI.h>
-#include <Arduino_FreeRTOS.h>
-#include <semphr.h>
 #include "../Common/Config.h"
 
 namespace DeviceBridge::Components {
 
 class W25Q128Manager {
 private:
-    SemaphoreHandle_t _spiMutex;
     uint8_t _csPin;
     bool _initialized;
     
@@ -62,7 +59,7 @@ private:
     uint32_t readJedecId();
     
 public:
-    W25Q128Manager(uint8_t csPin, SemaphoreHandle_t spiMutex);
+    W25Q128Manager(uint8_t csPin);
     ~W25Q128Manager();
     
     // Lifecycle

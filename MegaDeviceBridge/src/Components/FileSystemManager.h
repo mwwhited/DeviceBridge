@@ -1,8 +1,6 @@
 #pragma once
 
-#include <Arduino_FreeRTOS.h>
-#include <queue.h>
-#include <semphr.h>
+#include <Arduino.h>
 #include <SD.h>
 #include "W25Q128Manager.h"
 #include "../Common/Types.h"
@@ -10,12 +8,12 @@
 
 namespace DeviceBridge::Components {
 
+// Forward declaration for callback
+class DisplayManager;
+
 class FileSystemManager {
 private:
-    QueueHandle_t _dataQueue;
-    QueueHandle_t _displayQueue;
-    SemaphoreHandle_t _spiMutex;
-    TaskHandle_t _taskHandle;
+    DisplayManager* _displayManager;
     
     // Storage instances  
     File _currentFile;
@@ -37,12 +35,6 @@ private:
     char _currentFilename[Common::Limits::MAX_FILENAME_LENGTH];
     Common::FileType _fileType;
     
-    // Task function (static for FreeRTOS)
-    static void taskFunction(void* pvParameters);
-    
-    // Instance handling for task function
-    void runTask();
-    
     // Storage operations
     bool initializeSD();
     bool initializeEEPROM();
@@ -59,13 +51,19 @@ private:
     const char* getFileExtension() const;
     
 public:
-    FileSystemManager(QueueHandle_t dataQueue, QueueHandle_t displayQueue, SemaphoreHandle_t spiMutex);
+    FileSystemManager();
     ~FileSystemManager();
+    
+    // Set callback for display messages
+    void setDisplayManager(DisplayManager* manager) { _displayManager = manager; }
     
     // Lifecycle management
     bool initialize();
-    bool start();
+    void update();  // Called from main loop
     void stop();
+    
+    // Data processing (called by ParallelPortManager)
+    void processDataChunk(const Common::DataChunk& chunk);
     
     // Configuration
     void setPreferredStorage(Common::StorageType storage) { _preferredStorage = storage; }
@@ -75,7 +73,6 @@ public:
     Common::StorageType getActiveStorage() const { return _activeStorage; }
     bool isSDAvailable() const { return _sdAvailable; }
     bool isEEPROMAvailable() const { return _eepromAvailable; }
-    TaskHandle_t getTaskHandle() const { return _taskHandle; }
     
     // Statistics
     uint32_t getFilesStored() const { return _fileCounter; }

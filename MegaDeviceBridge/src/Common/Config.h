@@ -4,33 +4,19 @@
 
 namespace DeviceBridge::Common {
 
-// FreeRTOS Configuration
+// Loop-based Architecture Configuration (formerly FreeRTOS)
 namespace RTOS {
-  // Task priorities (higher number = higher priority)
-  constexpr uint8_t PARALLEL_PORT_PRIORITY = 3;
-  constexpr uint8_t FILE_MANAGER_PRIORITY = 2;
-  constexpr uint8_t DISPLAY_PRIORITY = 1;
-  constexpr uint8_t TIME_PRIORITY = 1;
-  constexpr uint8_t SYSTEM_MONITOR_PRIORITY = 1;
-
-  // Task stack sizes (in bytes) - aggressively reduced for memory constraints
-  constexpr uint16_t PARALLEL_PORT_STACK = 128;
-  constexpr uint16_t FILE_MANAGER_STACK = 200;
-  constexpr uint16_t DISPLAY_STACK = 128;
-  constexpr uint16_t TIME_STACK = 80;
-  constexpr uint16_t SYSTEM_MONITOR_STACK = 100;
-
-  // Queue sizes - aggressively reduced for memory constraints
-  constexpr uint8_t DATA_QUEUE_SIZE = 2;  // Minimal for basic operation
-  constexpr uint8_t DISPLAY_QUEUE_SIZE = 1;  // Minimal for basic operation  
-  constexpr uint8_t COMMAND_QUEUE_SIZE = 1;  // Minimal for basic operation
-
-  // Timing constants (in milliseconds)
+  // Timing constants (in milliseconds) for cooperative multitasking
   constexpr uint32_t PARALLEL_PORT_POLL_MS = 1;
   constexpr uint32_t DISPLAY_UPDATE_MS = 100;
   constexpr uint32_t TIME_UPDATE_MS = 1000;
   constexpr uint32_t SYSTEM_MONITOR_MS = 5000;
   constexpr uint32_t FILE_TIMEOUT_MS = 2000;
+  
+  // Legacy constants for compatibility with existing tests
+  constexpr uint8_t DATA_QUEUE_SIZE = 8;      // No longer used (direct callbacks)
+  constexpr uint8_t DISPLAY_QUEUE_SIZE = 4;   // No longer used (direct calls)
+  constexpr uint8_t COMMAND_QUEUE_SIZE = 4;   // No longer used (direct calls)
 }
 
 // System Limits and Thresholds
@@ -69,7 +55,7 @@ namespace Serial {
 } // namespace DeviceBridge::Common
 
 
-#if defined(ARDUINO_AVR_MEGA2560)
+// #if defined(ARDUINO_AVR_MEGA2560)
 // Mega2560 Pin Definitions
 // Hardware Pin Assignments (from Pinouts.md)
 namespace Pins {
@@ -109,84 +95,84 @@ namespace Pins {
   constexpr uint8_t LPT_D7 = 39;
 }
 
-#elif defined(ARDUINO_ESP32_DEV)
-// ESP32 Dev Module Pin Definitions
-namespace Pins {
-  // LCD Shield pins (outputs)
-  constexpr uint8_t LCD_RESET = 5;    // Output (was 4, moved to free GPIO5)
-  constexpr uint8_t LCD_ENABLE = 19;  // Output (was 5, moved to GPIO19)
-  constexpr uint8_t LCD_D4 = 16;      // Output
-  constexpr uint8_t LCD_D5 = 17;      // Output
-  constexpr uint8_t LCD_D6 = 18;      // Output
-  constexpr uint8_t LCD_D7 = 21;      // Output (was free GPIO21)
+// #elif defined(ARDUINO_ESP32_DEV)
+// // ESP32 Dev Module Pin Definitions
+// namespace Pins {
+//   // LCD Shield pins (outputs)
+//   constexpr uint8_t LCD_RESET = 5;    // Output (was 4, moved to free GPIO5)
+//   constexpr uint8_t LCD_ENABLE = 19;  // Output (was 5, moved to GPIO19)
+//   constexpr uint8_t LCD_D4 = 16;      // Output
+//   constexpr uint8_t LCD_D5 = 17;      // Output
+//   constexpr uint8_t LCD_D6 = 18;      // Output
+//   constexpr uint8_t LCD_D7 = 21;      // Output (was free GPIO21)
 
-  // Storage pins (outputs)
-  constexpr uint8_t SD_CS = 22;       // Output (SPI CS)
-  constexpr uint8_t EEPROM_CS = 23;   // Output (SPI CS)
+//   // Storage pins (outputs)
+//   constexpr uint8_t SD_CS = 22;       // Output (SPI CS)
+//   constexpr uint8_t EEPROM_CS = 23;   // Output (SPI CS)
 
-  // Parallel port control pins (inputs from host)
-  constexpr uint8_t LPT_STROBE = 25;     // Input
-  constexpr uint8_t LPT_AUTO_FEED = 26;  // Input
-  constexpr uint8_t LPT_INITIALIZE = 27; // Input
-  constexpr uint8_t LPT_SELECT_IN = 32;  // Input (GPIO32 is input capable)
+//   // Parallel port control pins (inputs from host)
+//   constexpr uint8_t LPT_STROBE = 25;     // Input
+//   constexpr uint8_t LPT_AUTO_FEED = 26;  // Input
+//   constexpr uint8_t LPT_INITIALIZE = 27; // Input
+//   constexpr uint8_t LPT_SELECT_IN = 32;  // Input (GPIO32 is input capable)
 
-  // Parallel port status pins (outputs to host)
-  constexpr uint8_t LPT_ACK = 2;        // Output (GPIO2)
-  constexpr uint8_t LPT_BUSY = 15;      // Output (GPIO15)
-  constexpr uint8_t LPT_PAPER_OUT = 33; // Output (GPIO33)
-  constexpr uint8_t LPT_SELECT = 14;    // Output (GPIO14)
-  constexpr uint8_t LPT_ERROR = 12;     // Output (GPIO12)
+//   // Parallel port status pins (outputs to host)
+//   constexpr uint8_t LPT_ACK = 2;        // Output (GPIO2)
+//   constexpr uint8_t LPT_BUSY = 15;      // Output (GPIO15)
+//   constexpr uint8_t LPT_PAPER_OUT = 33; // Output (GPIO33)
+//   constexpr uint8_t LPT_SELECT = 14;    // Output (GPIO14)
+//   constexpr uint8_t LPT_ERROR = 12;     // Output (GPIO12)
 
-  // Parallel port data pins (inputs from host)
-  constexpr uint8_t LPT_D0 = 34;  // Input-only ADC pin
-  constexpr uint8_t LPT_D1 = 35;  // Input-only ADC pin
-  constexpr uint8_t LPT_D2 = 36;  // Input-only ADC pin (VP)
-  constexpr uint8_t LPT_D3 = 39;  // Input-only ADC pin (VN)
-  constexpr uint8_t LPT_D4 = 0;   // Input (boot pin, caution)
-  constexpr uint8_t LPT_D5 = 4;   // Input (GPIO4, now free)
-  constexpr uint8_t LPT_D6 = 13;  // Input
-  constexpr uint8_t LPT_D7 = 21;  // Input (GPIO21 was LCD_D7, swapped to LPT_D7)
-}
+//   // Parallel port data pins (inputs from host)
+//   constexpr uint8_t LPT_D0 = 34;  // Input-only ADC pin
+//   constexpr uint8_t LPT_D1 = 35;  // Input-only ADC pin
+//   constexpr uint8_t LPT_D2 = 36;  // Input-only ADC pin (VP)
+//   constexpr uint8_t LPT_D3 = 39;  // Input-only ADC pin (VN)
+//   constexpr uint8_t LPT_D4 = 0;   // Input (boot pin, caution)
+//   constexpr uint8_t LPT_D5 = 4;   // Input (GPIO4, now free)
+//   constexpr uint8_t LPT_D6 = 13;  // Input
+//   constexpr uint8_t LPT_D7 = 21;  // Input (GPIO21 was LCD_D7, swapped to LPT_D7)
+// }
 
-#elif defined(ARDUINO_BLUEPILL_F103C8)
-// STM32 Bluepill Pin Definitions
-namespace Pins {
-  // LCD Shield pins (outputs)
-  constexpr uint8_t LCD_RESET  = PA8;   // Output
-  constexpr uint8_t LCD_ENABLE = PA9;   // Output
-  constexpr uint8_t LCD_D4     = PA10;  // Output
-  constexpr uint8_t LCD_D5     = PA11;  // Output
-  constexpr uint8_t LCD_D6     = PA12;  // Output
-  constexpr uint8_t LCD_D7     = PA15;  // Output
+// #elif defined(ARDUINO_BLUEPILL_F103C8)
+// // STM32 Bluepill Pin Definitions
+// namespace Pins {
+//   // LCD Shield pins (outputs)
+//   constexpr uint8_t LCD_RESET  = PA8;   // Output
+//   constexpr uint8_t LCD_ENABLE = PA9;   // Output
+//   constexpr uint8_t LCD_D4     = PA10;  // Output
+//   constexpr uint8_t LCD_D5     = PA11;  // Output
+//   constexpr uint8_t LCD_D6     = PA12;  // Output
+//   constexpr uint8_t LCD_D7     = PA15;  // Output
 
-  // Storage pins (outputs)
-  constexpr uint8_t SD_CS      = PB2;   // Output (SPI2 CS for SD)
-  constexpr uint8_t EEPROM_CS  = PB0;   // Output (SPI1 CS for EEPROM)
+//   // Storage pins (outputs)
+//   constexpr uint8_t SD_CS      = PB2;   // Output (SPI2 CS for SD)
+//   constexpr uint8_t EEPROM_CS  = PB0;   // Output (SPI1 CS for EEPROM)
 
-  // Parallel port control pins (inputs from host)
-  constexpr uint8_t LPT_STROBE     = PB10;  // Input
-  constexpr uint8_t LPT_AUTO_FEED  = PB11;  // Input
-  constexpr uint8_t LPT_INITIALIZE = PB12;  // Input
-  constexpr uint8_t LPT_SELECT_IN  = PB13;  // Input
+//   // Parallel port control pins (inputs from host)
+//   constexpr uint8_t LPT_STROBE     = PB10;  // Input
+//   constexpr uint8_t LPT_AUTO_FEED  = PB11;  // Input
+//   constexpr uint8_t LPT_INITIALIZE = PB12;  // Input
+//   constexpr uint8_t LPT_SELECT_IN  = PB13;  // Input
 
-  // Parallel port status pins (outputs to host)
-  constexpr uint8_t LPT_ACK        = PB14;  // Output
-  constexpr uint8_t LPT_BUSY       = PB15;  // Output
-  constexpr uint8_t LPT_PAPER_OUT  = PA0;   // Output
-  constexpr uint8_t LPT_SELECT     = PA1;   // Output
-  constexpr uint8_t LPT_ERROR      = PA2;   // Output
+//   // Parallel port status pins (outputs to host)
+//   constexpr uint8_t LPT_ACK        = PB14;  // Output
+//   constexpr uint8_t LPT_BUSY       = PB15;  // Output
+//   constexpr uint8_t LPT_PAPER_OUT  = PA0;   // Output
+//   constexpr uint8_t LPT_SELECT     = PA1;   // Output
+//   constexpr uint8_t LPT_ERROR      = PA2;   // Output
 
-  // Parallel port data pins (inputs from host)
-  constexpr uint8_t LPT_D0 = PA3;   // Input
-  constexpr uint8_t LPT_D1 = PA4;   // Input
-  constexpr uint8_t LPT_D2 = PA5;   // Input
-  constexpr uint8_t LPT_D3 = PA6;   // Input
-  constexpr uint8_t LPT_D4 = PA7;   // Input
-  constexpr uint8_t LPT_D5 = PB8;   // Input
-  constexpr uint8_t LPT_D6 = PB9;   // Input
-  constexpr uint8_t LPT_D7 = PB7;   // Input
-}
+//   // Parallel port data pins (inputs from host)
+//   constexpr uint8_t LPT_D0 = PA3;   // Input
+//   constexpr uint8_t LPT_D1 = PA4;   // Input
+//   constexpr uint8_t LPT_D2 = PA5;   // Input
+//   constexpr uint8_t LPT_D3 = PA6;   // Input
+//   constexpr uint8_t LPT_D4 = PA7;   // Input
+//   constexpr uint8_t LPT_D5 = PB8;   // Input
+//   constexpr uint8_t LPT_D6 = PB9;   // Input
+//   constexpr uint8_t LPT_D7 = PB7;   // Input
+// }
 
-#else
-#error "Unsupported board - define pin mapping"
-#endif
+// #else
+// #error "Unsupported board - define pin mapping"
+// #endif

@@ -1,19 +1,21 @@
 #include "ParallelPortManager.h"
+#include "FileSystemManager.h"
 #include <string.h>
 
 namespace DeviceBridge::Components {
 
-ParallelPortManager::ParallelPortManager(Parallel::Port& port, QueueHandle_t dataQueue)
+ParallelPortManager::ParallelPortManager(Parallel::Port& port)
     : _port(port)
-    , _dataQueue(dataQueue)
-    , _taskHandle(nullptr)
+    , _fileSystemManager(nullptr)
     , _fileInProgress(false)
     , _idleCounter(0)
     , _lastDataTime(0)
+    , _chunkIndex(0)
     , _totalBytesReceived(0)
     , _filesReceived(0)
     , _currentFileBytes(0)
 {
+    memset(&_currentChunk, 0, sizeof(_currentChunk));
 }
 
 ParallelPortManager::~ParallelPortManager() {
@@ -25,92 +27,90 @@ bool ParallelPortManager::initialize() {
     return true;
 }
 
-bool ParallelPortManager::start() {
-    if (_taskHandle != nullptr) {
-        return false; // Already running
-    }
-    
-    BaseType_t result = xTaskCreate(
-        taskFunction,
-        "ParallelPort",
-        Common::RTOS::PARALLEL_PORT_STACK,
-        this,
-        Common::RTOS::PARALLEL_PORT_PRIORITY,
-        &_taskHandle
-    );
-    
-    return result == pdPASS;
+void ParallelPortManager::update() {
+    processData();
 }
 
 void ParallelPortManager::stop() {
-    if (_taskHandle != nullptr) {
-        vTaskDelete(_taskHandle);
-        _taskHandle = nullptr;
-    }
+    _fileInProgress = false;
+    _idleCounter = 0;
+    _chunkIndex = 0;
 }
 
-void ParallelPortManager::taskFunction(void* pvParameters) {
-    ParallelPortManager* manager = static_cast<ParallelPortManager*>(pvParameters);
-    manager->runTask();
-}
-
-void ParallelPortManager::runTask() {
-    Common::DataChunk chunk;
-    TickType_t lastWakeTime = xTaskGetTickCount();
+void ParallelPortManager::processData() {
+    bool hasData = _port.hasData();
     
-    for (;;) {
-        bool hasData = _port.hasData();
+    if (hasData) {
+        _idleCounter = 0;
+        _lastDataTime = millis();
         
-        if (hasData) {
-            _idleCounter = 0;
-            _lastDataTime = xTaskGetTickCount();
-            
-            // Check for new file start
-            if (detectNewFile()) {
-                chunk.isNewFile = true;
-                _fileInProgress = true;
-                _currentFileBytes = 0;
-                _filesReceived++;
-            } else {
-                chunk.isNewFile = false;
-            }
-            
-            // Read available data
-            chunk.length = _port.readData(chunk.data, 0, sizeof(chunk.data));
-            chunk.timestamp = xTaskGetTickCount();
-            chunk.isEndOfFile = false;
-            
-            if (chunk.length > 0) {
-                _totalBytesReceived += chunk.length;
-                _currentFileBytes += chunk.length;
-                
-                // Send data to file manager
-                if (xQueueSend(_dataQueue, &chunk, 0) != pdTRUE) {
-                    // Queue full - data loss! This is critical
-                    // TODO: Implement overflow handling
-                }
-            }
+        // Check for new file start
+        if (detectNewFile()) {
+            _currentChunk.isNewFile = 1;
+            _fileInProgress = true;
+            _currentFileBytes = 0;
+            _filesReceived++;
+            _chunkIndex = 0;
         } else {
-            _idleCounter++;
-            
-            // Check for end of file
-            if (detectEndOfFile()) {
-                chunk.isEndOfFile = true;
-                chunk.isNewFile = false;
-                chunk.length = 0;
-                chunk.timestamp = xTaskGetTickCount();
-                
-                xQueueSend(_dataQueue, &chunk, portMAX_DELAY);
-                
-                _fileInProgress = false;
-                _idleCounter = 0;
-                _currentFileBytes = 0;
-            }
+            _currentChunk.isNewFile = 0;
         }
         
-        // Maintain precise timing
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(Common::RTOS::PARALLEL_PORT_POLL_MS));
+        // Read available data into current chunk
+        if (_chunkIndex < sizeof(_currentChunk.data)) {
+            uint16_t bytesToRead = sizeof(_currentChunk.data) - _chunkIndex;
+            uint16_t bytesRead = _port.readData(_currentChunk.data, _chunkIndex, bytesToRead);
+            
+            if (bytesRead > 0) {
+                _chunkIndex += bytesRead;
+                _totalBytesReceived += bytesRead;
+                _currentFileBytes += bytesRead;
+                
+                // If chunk is full, send it
+                if (_chunkIndex >= sizeof(_currentChunk.data)) {
+                    sendChunk();
+                }
+            }
+        }
+    } else {
+        _idleCounter++;
+        
+        // Check for end of file
+        if (detectEndOfFile()) {
+            // Send partial chunk if any data remains
+            if (_chunkIndex > 0) {
+                sendChunk();
+            }
+            
+            // Send end-of-file marker
+            _currentChunk.isEndOfFile = 1;
+            _currentChunk.isNewFile = 0;
+            _currentChunk.length = 0;
+            _currentChunk.timestamp = millis();
+            
+            if (_fileSystemManager) {
+                _fileSystemManager->processDataChunk(_currentChunk);
+            }
+            
+            _fileInProgress = false;
+            _idleCounter = 0;
+            _currentFileBytes = 0;
+            _chunkIndex = 0;
+        }
     }
+}
+
+void ParallelPortManager::sendChunk() {
+    _currentChunk.length = _chunkIndex;
+    _currentChunk.timestamp = millis();
+    _currentChunk.isEndOfFile = 0;
+    
+    if (_fileSystemManager) {
+        _fileSystemManager->processDataChunk(_currentChunk);
+    }
+    
+    // Reset chunk for next data
+    _chunkIndex = 0;
+    _currentChunk.isNewFile = 0;
 }
 
 bool ParallelPortManager::detectNewFile() {
@@ -124,8 +124,12 @@ bool ParallelPortManager::detectEndOfFile() {
         return false;
     }
     
-    uint32_t idleTime = _idleCounter * Common::RTOS::PARALLEL_PORT_POLL_MS;
-    return idleTime >= Common::RTOS::FILE_TIMEOUT_MS;
+    // Use millis() based timing for loop-based architecture
+    const uint32_t FILE_TIMEOUT_MS = 2000;  // 2 second timeout
+    uint32_t currentTime = millis();
+    uint32_t timeSinceLastData = currentTime - _lastDataTime;
+    
+    return timeSinceLastData >= FILE_TIMEOUT_MS;
 }
 
 uint16_t ParallelPortManager::getBufferLevel() const {

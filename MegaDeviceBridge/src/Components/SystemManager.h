@@ -1,8 +1,6 @@
 #pragma once
 
-#include <Arduino_FreeRTOS.h>
-#include <queue.h>
-#include <semphr.h>
+#include <Arduino.h>
 #include "../Common/Types.h"
 #include "../Common/Config.h"
 
@@ -16,10 +14,7 @@ class TimeManager;
 
 class SystemManager {
 private:
-    QueueHandle_t _commandQueue;
-    QueueHandle_t _displayQueue;
-    SemaphoreHandle_t _serialMutex;
-    TaskHandle_t _taskHandle;
+    DisplayManager* _displayManager;
     
     // Component references
     ParallelPortManager* _parallelPortManager;
@@ -31,11 +26,7 @@ private:
     Common::SystemStatus _systemStatus;
     Common::ErrorCode _lastError;
     
-    // Task function (static for FreeRTOS)
-    static void taskFunction(void* pvParameters);
-    
-    // Instance handling for task function
-    void runTask();
+    // System management
     
     // Command processing
     void processCommand(const Common::SystemCommand& cmd);
@@ -55,7 +46,7 @@ private:
     void sendDisplayMessage(Common::DisplayMessage::Type type, const char* message);
     
 public:
-    SystemManager(QueueHandle_t commandQueue, QueueHandle_t displayQueue, SemaphoreHandle_t serialMutex);
+    SystemManager();
     ~SystemManager();
     
     // Component registration
@@ -66,8 +57,11 @@ public:
     
     // Lifecycle management
     bool initialize();
-    bool start();
+    void update();  // Called from main loop
     void stop();
+    
+    // Command processing (called by other components)
+    void processSystemCommand(const Common::SystemCommand& cmd);
     
     // System control
     void setSystemStatus(Common::SystemStatus status);
@@ -76,7 +70,6 @@ public:
     // Status inquiry
     Common::SystemStatus getSystemStatus() const { return _systemStatus; }
     Common::ErrorCode getLastError() const { return _lastError; }
-    TaskHandle_t getTaskHandle() const { return _taskHandle; }
     
     // Statistics and monitoring
     void printSystemInfo();

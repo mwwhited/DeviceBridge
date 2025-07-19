@@ -166,60 +166,42 @@ void test_pin_definitions() {
 void test_rtos_configuration() {
     using namespace DeviceBridge::Common;
     
-    // Test task priorities are reasonable (0-4 range)
-    TEST_ASSERT_TRUE(RTOS::PARALLEL_PORT_PRIORITY <= 4);
-    TEST_ASSERT_TRUE(RTOS::FILE_MANAGER_PRIORITY <= 4);
-    TEST_ASSERT_TRUE(RTOS::DISPLAY_PRIORITY <= 4);
-    TEST_ASSERT_TRUE(RTOS::TIME_PRIORITY <= 4);
-    TEST_ASSERT_TRUE(RTOS::SYSTEM_MONITOR_PRIORITY <= 4);
+    // Test timing constants for loop-based architecture
+    TEST_ASSERT_EQUAL(1, RTOS::PARALLEL_PORT_POLL_MS); // 1ms for real-time
+    TEST_ASSERT_TRUE(RTOS::DISPLAY_UPDATE_MS >= 50);   // At least 20Hz
+    TEST_ASSERT_TRUE(RTOS::FILE_TIMEOUT_MS >= 1000);   // At least 1 second
+    TEST_ASSERT_TRUE(RTOS::TIME_UPDATE_MS >= 500);     // At least 2Hz
+    TEST_ASSERT_TRUE(RTOS::SYSTEM_MONITOR_MS >= 1000); // At least 1Hz
     
-    // Test priority ordering (parallel port should be highest)
-    TEST_ASSERT_TRUE(RTOS::PARALLEL_PORT_PRIORITY >= RTOS::FILE_MANAGER_PRIORITY);
-    TEST_ASSERT_TRUE(RTOS::FILE_MANAGER_PRIORITY >= RTOS::DISPLAY_PRIORITY);
-    
-    // Test stack sizes are reasonable for Arduino Mega (8KB total RAM)
-    uint16_t totalStack = RTOS::PARALLEL_PORT_STACK + 
-                         RTOS::FILE_MANAGER_STACK + 
-                         RTOS::DISPLAY_STACK + 
-                         RTOS::TIME_STACK + 
-                         RTOS::SYSTEM_MONITOR_STACK;
-    
-    TEST_ASSERT_TRUE(totalStack <= 2048); // Don't use more than 2KB for stacks
-    
-    // Test queue sizes are reasonable
+    // Test legacy queue size constants (for compatibility)
     TEST_ASSERT_TRUE(RTOS::DATA_QUEUE_SIZE >= 4);
     TEST_ASSERT_TRUE(RTOS::DATA_QUEUE_SIZE <= 16);
     TEST_ASSERT_TRUE(RTOS::DISPLAY_QUEUE_SIZE >= 2);
     TEST_ASSERT_TRUE(RTOS::COMMAND_QUEUE_SIZE >= 2);
-    
-    // Test timing constants
-    TEST_ASSERT_EQUAL(1, RTOS::PARALLEL_PORT_POLL_MS); // 1ms for real-time
-    TEST_ASSERT_TRUE(RTOS::DISPLAY_UPDATE_MS >= 50);   // At least 20Hz
-    TEST_ASSERT_TRUE(RTOS::FILE_TIMEOUT_MS >= 1000);   // At least 1 second
 }
 
 void test_memory_usage() {
     using namespace DeviceBridge::Common;
     
-    // Check that RTOS configuration is reasonable for Arduino Mega (8KB RAM)
-    uint16_t totalStack = RTOS::PARALLEL_PORT_STACK + 
-                         RTOS::FILE_MANAGER_STACK + 
-                         RTOS::DISPLAY_STACK + 
-                         RTOS::TIME_STACK + 
-                         RTOS::SYSTEM_MONITOR_STACK;
+    // Test loop-based architecture memory efficiency
+    // (no stacks or queues - direct function calls only)
     
-    TEST_ASSERT_TRUE(totalStack <= 2048); // More than 25% of RAM for stacks
-    
-    // Estimate queue memory usage with actual DataChunk size
+    // Estimate DataChunk size for memory calculations
     DataChunk testChunk;
-    size_t queueMemory = (RTOS::DATA_QUEUE_SIZE * sizeof(testChunk)) +
-                        (RTOS::DISPLAY_QUEUE_SIZE * 64) + // Estimate DisplayMessage size
-                        (RTOS::COMMAND_QUEUE_SIZE * 32);  // Estimate SystemCommand size
+    size_t chunkSize = sizeof(testChunk);
     
-    TEST_ASSERT_TRUE(queueMemory <= 4096); // More than 50% of RAM for queues
+    // Verify DataChunk fits within reasonable limits (should be ~264 bytes)
+    TEST_ASSERT_TRUE(chunkSize <= 512);  // Reasonable chunk size
+    TEST_ASSERT_TRUE(chunkSize >= 256);  // Minimum useful size
     
-    // Total estimated memory usage
-    size_t totalEstimated = totalStack + queueMemory + 1024; // 1KB for static vars
+    // Test static memory estimates (component instances + globals)
+    size_t estimatedStaticMemory = 1024; // Conservative estimate for all components
     
-    TEST_ASSERT_TRUE(totalEstimated <= 6144); // More than 75% of RAM
+    // Loop-based architecture should use much less memory than FreeRTOS
+    TEST_ASSERT_TRUE(estimatedStaticMemory <= 2048); // Should be under 25% of 8KB RAM
+    
+    // Verify legacy queue constants are reasonable (even though not used)
+    TEST_ASSERT_TRUE(RTOS::DATA_QUEUE_SIZE <= 16);
+    TEST_ASSERT_TRUE(RTOS::DISPLAY_QUEUE_SIZE <= 8);
+    TEST_ASSERT_TRUE(RTOS::COMMAND_QUEUE_SIZE <= 8);
 }

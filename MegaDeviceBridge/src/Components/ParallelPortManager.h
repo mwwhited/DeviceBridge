@@ -1,47 +1,52 @@
 #pragma once
 
-#include <Arduino_FreeRTOS.h>
-#include <queue.h>
+#include <Arduino.h>
 #include "../Parallel/Port.h"
 #include "../Common/Types.h"
 #include "../Common/Config.h"
 
 namespace DeviceBridge::Components {
 
+// Forward declaration for callback
+class FileSystemManager;
+
 class ParallelPortManager {
 private:
     Parallel::Port& _port;
-    QueueHandle_t _dataQueue;
-    TaskHandle_t _taskHandle;
+    FileSystemManager* _fileSystemManager;
     
     // File detection state
     bool _fileInProgress;
     uint32_t _idleCounter;
     uint32_t _lastDataTime;
     
-    // Task function (static for FreeRTOS)
-    static void taskFunction(void* pvParameters);
-    
-    // Instance handling for task function
-    void runTask();
+    // Data buffer for loop-based processing
+    Common::DataChunk _currentChunk;
+    uint16_t _chunkIndex;
     
     // File boundary detection
     bool detectNewFile();
     bool detectEndOfFile();
     
+    // Data processing
+    void processData();
+    void sendChunk();
+    
 public:
-    ParallelPortManager(Parallel::Port& port, QueueHandle_t dataQueue);
+    ParallelPortManager(Parallel::Port& port);
     ~ParallelPortManager();
+    
+    // Set callback for data delivery
+    void setFileSystemManager(FileSystemManager* manager) { _fileSystemManager = manager; }
     
     // Lifecycle management
     bool initialize();
-    bool start();
+    void update();  // Called from main loop
     void stop();
     
     // Status inquiry
     bool isReceiving() const { return _fileInProgress; }
     uint16_t getBufferLevel() const;
-    TaskHandle_t getTaskHandle() const { return _taskHandle; }
     
     // Statistics
     uint32_t getTotalBytesReceived() const;
