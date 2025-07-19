@@ -335,17 +335,11 @@ const char* DisplayManager::getMenuOption(MenuState state, uint8_t option) {
             break;
             
         case STORAGE_MENU:
-            switch (option) {
-                case 0: return "Auto";
-                case 1: return "SD Card";
-                case 2: return "EEPROM";
-                case 3: return "Serial";
-                default: return "Option";
-            }
-            break;
+            if (option >= Common::StorageType::Count) return "Option";
+            return (Common::StorageType(static_cast<Common::StorageType::Value>(option))).toSimple();
             
         case FILETYPE_MENU:
-            if (option > Common::FileType::BINARY) return "Option";
+            if (option >= Common::FileType::Count) return "Option";
             return (Common::FileType(static_cast<Common::FileType::Value>(option))).toSimple();
             
         case CONFIG_MENU:
@@ -364,8 +358,8 @@ const char* DisplayManager::getMenuOption(MenuState state, uint8_t option) {
 uint8_t DisplayManager::getMenuOptionCount(MenuState state) {
     switch (state) {
         case MAIN_MENU: return 3;
-        case STORAGE_MENU: return 4;
-        case FILETYPE_MENU: return Common::FileType::BINARY + 1; // Count of FileType enum values
+        case STORAGE_MENU: return Common::StorageType::Count;
+        case FILETYPE_MENU: return Common::FileType::Count;
         case CONFIG_MENU: return 2;
         default: return 1;
     }

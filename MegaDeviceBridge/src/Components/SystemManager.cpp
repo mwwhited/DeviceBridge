@@ -73,33 +73,11 @@ void SystemManager::processSystemCommand(const Common::SystemCommand& cmd) {
 
 void SystemManager::processStorageSelectCommand(uint8_t value) {
     if (_fileSystemManager == nullptr) return;
+    if (value >= Common::StorageType::Count) return;  // avoid out-of-bounds
     
-    Common::StorageType storageType;
-    const char* message;
-    
-    switch (value) {
-        case 0:
-            storageType = Common::StorageType::AUTO_SELECT;
-            message = "Storage: Auto";
-            break;
-        case 1:
-            storageType = Common::StorageType::SD_CARD;
-            message = "Storage: SD";
-            break;
-        case 2:
-            storageType = Common::StorageType::EEPROM;
-            message = "Storage: EEPROM";
-            break;
-        case 3:
-            storageType = Common::StorageType::SERIAL_TRANSFER;
-            message = "Storage: Serial";
-            break;
-        default:
-            return;
-    }
-    
+    Common::StorageType storageType = Common::StorageType(static_cast<Common::StorageType::Value>(value));    
     _fileSystemManager->setStorageType(storageType);
-    sendDisplayMessage(Common::DisplayMessage::INFO, message);
+    sendDisplayMessage(Common::DisplayMessage::INFO, storageType.toString());
 }
 
 void SystemManager::processFileTypeCommand(uint8_t value) {

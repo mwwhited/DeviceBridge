@@ -41,11 +41,41 @@ struct SystemCommand {
 };
 
 // Storage types for file operations
-enum class StorageType {
-  SD_CARD,
-  EEPROM,
-  SERIAL_TRANSFER,
-  AUTO_SELECT
+struct StorageType {
+    enum Value {
+      SD_CARD,
+      EEPROM,
+      SERIAL_TRANSFER,
+      AUTO_SELECT
+    };
+
+    static const int8_t Count = AUTO_SELECT+1;  // Number of storage types
+
+    Value value;
+
+    // Constructor
+    constexpr StorageType(Value v) : value(v) {}
+
+    // Get human-readable name
+    const char* toString() const {
+        switch (value) {
+            case SD_CARD:          return "Storage: SD Card";
+            case EEPROM:           return "Storage: EEPROM";
+            case SERIAL_TRANSFER:  return "Storage: Serial Transfer";
+            case AUTO_SELECT:      return "Storage: Auto Select";
+            default:               return "Storage: Unknown";
+        }
+    }
+
+    const char* toSimple() const {
+        switch (value) {
+            case SD_CARD:          return "SD Card";
+            case EEPROM:           return "EEPROM";
+            case SERIAL_TRANSFER:  return "Serial Transfer";
+            case AUTO_SELECT:      return "Auto Select";
+            default:               return "Unknown";
+        }
+    }
 };
 
 // File types for detection/override (TDS2024 Compatible)
@@ -66,9 +96,11 @@ struct FileType {
         BUBBLEJET,      // Canon Bubble Jet printer
         EPSON_DOT,      // Epson Dot Matrix
         EPSON_C60,      // Epson Color C60
-        EPSON_C80,       // Epson Color C80
+        EPSON_C80,      // Epson Color C80
         BINARY,         // Raw data capture
     };
+
+    static const int8_t Count = BINARY+1;  // Number of storage types
 
     Value value;
 

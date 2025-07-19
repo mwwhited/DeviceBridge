@@ -68,9 +68,9 @@ public:
     void processDataChunk(const Common::DataChunk& chunk);
     
     // Configuration
-    void setPreferredStorage(Common::StorageType storage) { _preferredStorage = storage; }
+    void setPreferredStorage(Common::StorageType storage) { _preferredStorage.value = storage.value; }
     void setStorageType(Common::StorageType type);
-    void setFileType(Common::FileType type) { _fileType = type; }
+    void setFileType(Common::FileType type) { _fileType.value = type.value; }
     
     // Status inquiry
     Common::StorageType getActiveStorage() const { return _activeStorage; }

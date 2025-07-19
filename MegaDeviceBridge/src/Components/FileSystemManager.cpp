@@ -33,9 +33,9 @@ bool FileSystemManager::initialize() {
     _eepromAvailable = initializeEEPROM();
     
     // Select initial storage type
-    if (_preferredStorage == Common::StorageType::SD_CARD && _sdAvailable) {
+    if (_preferredStorage.value == Common::StorageType::SD_CARD && _sdAvailable) {
         _activeStorage = Common::StorageType::SD_CARD;
-    } else if (_preferredStorage == Common::StorageType::EEPROM && _eepromAvailable) {
+    } else if (_preferredStorage.value == Common::StorageType::EEPROM && _eepromAvailable) {
         _activeStorage = Common::StorageType::EEPROM;
     } else if (_sdAvailable) {
         _activeStorage = Common::StorageType::SD_CARD;
@@ -100,7 +100,7 @@ bool FileSystemManager::initializeEEPROM() {
 bool FileSystemManager::createNewFile() {
     generateFilename(_currentFilename, sizeof(_currentFilename));
     
-    switch (_activeStorage) {
+    switch (_activeStorage.value) {
         case Common::StorageType::SD_CARD:
             if (_sdAvailable) {
                 _currentFile = SD.open(_currentFilename, FILE_WRITE);
@@ -133,7 +133,7 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
         return false;
     }
     
-    switch (_activeStorage) {
+    switch (_activeStorage.value) {
         case Common::StorageType::SD_CARD:
             if (_currentFile) {
                 size_t written = _currentFile.write(chunk.data, chunk.length);
@@ -168,7 +168,7 @@ bool FileSystemManager::closeCurrentFile() {
     
     bool result = true;
     
-    switch (_activeStorage) {
+    switch (_activeStorage.value) {
         case Common::StorageType::SD_CARD:
             if (_currentFile) {
                 _currentFile.close();
@@ -213,23 +213,23 @@ void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, co
 }
 
 void FileSystemManager::setStorageType(Common::StorageType type) {
-    if (_activeStorage != type) {
+    if (_activeStorage.value != type.value) {
         closeCurrentFile(); // Close any open file before switching
-        _activeStorage = type;
+        _activeStorage.value = type.value;
         
         // Verify the new storage type is available
-        switch (type) {
+        switch (type.value) {
             case Common::StorageType::SD_CARD:
                 if (!_sdAvailable) {
-                    sendDisplayMessage(Common::DisplayMessage::ERROR, "SD Not Available");
-                    _activeStorage = Common::StorageType::SERIAL_TRANSFER;
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Not Available"));
+                    _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
                 }
                 break;
                 
             case Common::StorageType::EEPROM:
                 if (!_eepromAvailable) {
-                    sendDisplayMessage(Common::DisplayMessage::ERROR, "EEPROM Not Available");
-                    _activeStorage = Common::StorageType::SERIAL_TRANSFER;
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, F("EEPROM Not Available"));
+                    _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
                 }
                 break;
                 
@@ -239,11 +239,11 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
                 
             case Common::StorageType::AUTO_SELECT:
                 if (_sdAvailable) {
-                    _activeStorage = Common::StorageType::SD_CARD;
+                    _activeStorage.value = Common::StorageType::SD_CARD;
                 } else if (_eepromAvailable) {
-                    _activeStorage = Common::StorageType::EEPROM;
+                    _activeStorage.value = Common::StorageType::EEPROM;
                 } else {
-                    _activeStorage = Common::StorageType::SERIAL_TRANSFER;
+                    _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
                 }
                 break;
         }
