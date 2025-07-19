@@ -36,6 +36,8 @@ private:
     void printParallelPortStatus();
     void testInterruptPin();
     void printLastFileInfo();
+    void printStorageStatus();
+    void handleTestWriteCommand(const String& command);
     
     // Timing for updates
     unsigned long _lastCommandCheck;

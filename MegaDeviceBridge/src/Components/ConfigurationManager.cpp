@@ -72,6 +72,12 @@ void ConfigurationManager::processCommand(const String& command) {
     } else if (command.startsWith(F("storage "))) {
         handleStorageCommand(command);
         
+    } else if (command.equalsIgnoreCase(F("storage"))) {
+        printStorageStatus();
+        
+    } else if (command.equalsIgnoreCase(F("testwrite")) || command.startsWith(F("testwrite "))) {
+        handleTestWriteCommand(command);
+        
     } else if (command.startsWith(F("heartbeat "))) {
         handleHeartbeatCommand(command);
         
@@ -120,10 +126,12 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  testint           - Test interrupt pin response\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
+    Serial.print(F("  storage           - Show storage device status\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
     Serial.print(F("  storage eeprom    - Use EEPROM storage\r\n"));
     Serial.print(F("  storage serial    - Use serial transfer\r\n"));
     Serial.print(F("  storage auto      - Auto-select storage\r\n"));
+    Serial.print(F("  testwrite         - Write test file to current storage\r\n"));
     Serial.print(F("\r\nSystem Commands:\r\n"));
     Serial.print(F("  heartbeat on/off  - Enable/disable serial heartbeat\r\n"));
     Serial.print(F("  restart/reset     - Restart the system\r\n"));
@@ -382,6 +390,117 @@ void ConfigurationManager::testInterruptPin() {
     }
     
     Serial.print(F("==============================\r\n\r\n"));
+}
+
+void ConfigurationManager::printStorageStatus() {
+    Serial.print(F("\r\n=== Storage Device Status ===\r\n"));
+    
+    if (_fileSystemManager) {
+        Serial.print(F("SD Card: "));
+        Serial.print(_fileSystemManager->isSDAvailable() ? F("Available") : F("Not Available"));
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("EEPROM: "));
+        Serial.print(_fileSystemManager->isEEPROMAvailable() ? F("Available") : F("Not Available"));
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("Active Storage: "));
+        Serial.print(_fileSystemManager->getActiveStorage().toSimple());
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("Files Stored: "));
+        Serial.print(_fileSystemManager->getFilesStored());
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("Total Bytes Written: "));
+        Serial.print(_fileSystemManager->getTotalBytesWritten());
+        Serial.print(F(" bytes\r\n"));
+        
+        Serial.print(F("Write Errors: "));
+        Serial.print(_fileSystemManager->getWriteErrors());
+        Serial.print(F("\r\n"));
+    } else {
+        Serial.print(F("FileSystemManager not available\r\n"));
+    }
+    
+    if (_systemManager) {
+        Serial.print(F("Free Memory: "));
+        Serial.print(_systemManager->getFreeMemory());
+        Serial.print(F(" bytes\r\n"));
+    }
+    
+    Serial.print(F("=============================\r\n\r\n"));
+}
+
+void ConfigurationManager::handleTestWriteCommand(const String& command) {
+    Serial.print(F("\r\n=== Test File Write ===\r\n"));
+    
+    if (!_fileSystemManager) {
+        Serial.print(F("FileSystemManager not available\r\n"));
+        return;
+    }
+    
+    // Create test data with timestamp
+    char testData[64];
+    if (_timeManager && _timeManager->isRTCAvailable()) {
+        char timeBuffer[32];
+        _timeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
+        snprintf(testData, sizeof(testData), "TEST %s - Memory: %d bytes free", 
+                timeBuffer, _systemManager ? _systemManager->getFreeMemory() : 0);
+    } else {
+        snprintf(testData, sizeof(testData), "TEST %lu - Memory: %d bytes free", 
+                millis(), _systemManager ? _systemManager->getFreeMemory() : 0);
+    }
+    
+    Serial.print(F("Test Data: "));
+    Serial.print(testData);
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Current Storage: "));
+    Serial.print(_fileSystemManager->getActiveStorage().toSimple());
+    Serial.print(F("\r\n"));
+    
+    // Create a test data chunk to simulate file write
+    Common::DataChunk testChunk;
+    memset(&testChunk, 0, sizeof(testChunk));
+    
+    // Set up test chunk as new file
+    testChunk.isNewFile = 1;
+    testChunk.isEndOfFile = 0;
+    testChunk.length = strlen(testData);
+    testChunk.timestamp = millis();
+    
+    // Copy test data to chunk
+    strncpy((char*)testChunk.data, testData, sizeof(testChunk.data) - 1);
+    
+    Serial.print(F("Writing test file...\r\n"));
+    
+    // Process the chunk (creates new file)
+    _fileSystemManager->processDataChunk(testChunk);
+    
+    // Check write status after first chunk
+    Serial.print(F("Write errors after data chunk: "));
+    Serial.print(_fileSystemManager->getWriteErrors());
+    Serial.print(F("\r\n"));
+    
+    // Create end-of-file chunk
+    Common::DataChunk endChunk;
+    memset(&endChunk, 0, sizeof(endChunk));
+    endChunk.isNewFile = 0;
+    endChunk.isEndOfFile = 1;
+    endChunk.length = 0;
+    endChunk.timestamp = millis();
+    
+    // Process end chunk (closes file)
+    _fileSystemManager->processDataChunk(endChunk);
+    
+    // Check final status
+    Serial.print(F("Write errors after close: "));
+    Serial.print(_fileSystemManager->getWriteErrors());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Test write completed.\r\n"));
+    Serial.print(F("=======================\r\n\r\n"));
 }
 
 void ConfigurationManager::printLastFileInfo() {

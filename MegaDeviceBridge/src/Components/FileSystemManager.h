@@ -8,12 +8,14 @@
 
 namespace DeviceBridge::Components {
 
-// Forward declaration for callback
+// Forward declarations for callbacks
 class DisplayManager;
+class TimeManager;
 
 class FileSystemManager {
 private:
     DisplayManager* _displayManager;
+    TimeManager* _timeManager;
     
     // Storage instances  
     File _currentFile;
@@ -51,6 +53,7 @@ private:
     
     // File naming
     void generateFilename(char* buffer, size_t bufferSize);
+    void generateTimestampFilename(char* buffer, size_t bufferSize);
     const char* getFileExtension() const;
     
     // File type detection
@@ -62,6 +65,7 @@ public:
     
     // Set callback for display messages
     void setDisplayManager(DisplayManager* manager) { _displayManager = manager; }
+    void setTimeManager(TimeManager* manager) { _timeManager = manager; }
     
     // Lifecycle management
     bool initialize();

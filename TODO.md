@@ -76,6 +76,19 @@
 - [x] **Parallel Port Interrupt System** - FALLING edge trigger working perfectly
 - [x] **File Information System** - Complete file tracking with auto-detection
 - [x] **Debug and Diagnostic Tools** - Comprehensive serial commands for troubleshooting
+- [x] **Enhanced Storage Commands** - `storage` status and `testwrite` diagnostic commands
+- [x] **File Type Detection Enhancement** - Dual tracking (requested vs detected)
+- [x] **Memory Monitoring** - Real-time SRAM usage tracking in storage status
+- [x] **Timestamp Filename Format** - Implemented yyyyMMddHHmmss.ext format
+
+### **CURRENT PRIORITY: SD Card Write Issue Investigation** ⚠️ (2025-07-19)
+- **Status**: ACTIVE INVESTIGATION
+- **Problem**: Files show "Saved:" but don't appear on SD card despite hardware validation passing
+- **Tools Implemented**: Enhanced `storage` and `testwrite` commands for diagnostics
+- **Next Actions**: 
+  1. Build and test timestamp filename changes
+  2. Use enhanced debugging tools to isolate SD card write issue
+  3. Verify new yyyyMMddHHmmss.ext filename format
 
 ### **System Validation** (Medium Priority)
 - [ ] **Menu Navigation Testing** - Verify LCD button navigation with calibrated values

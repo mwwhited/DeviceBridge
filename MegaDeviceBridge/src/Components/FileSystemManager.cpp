@@ -1,5 +1,6 @@
 #include "FileSystemManager.h"
 #include "DisplayManager.h"
+#include "TimeManager.h"
 #include <string.h>
 #include <stdio.h>
 #include <Arduino.h>
@@ -8,6 +9,7 @@ namespace DeviceBridge::Components {
 
 FileSystemManager::FileSystemManager()
     : _displayManager(nullptr)
+    , _timeManager(nullptr)
     , _eeprom(Common::Pins::EEPROM_CS)
     , _sdAvailable(false)
     , _eepromAvailable(false)
@@ -197,11 +199,33 @@ bool FileSystemManager::closeCurrentFile() {
 }
 
 void FileSystemManager::generateFilename(char* buffer, size_t bufferSize) {
+    // Use timestamp-based filename format: yyyyMMddHHmmss.ext
+    generateTimestampFilename(buffer, bufferSize);
+}
+
+void FileSystemManager::generateTimestampFilename(char* buffer, size_t bufferSize) {
     const char* extension = getFileExtension();
-    snprintf(buffer, bufferSize, "%s%04lu%s", 
-             Common::FileSystem::DEFAULT_FILE_PREFIX, 
-             _fileCounter++, 
-             extension);
+    
+    if (_timeManager && _timeManager->isRTCAvailable()) {
+        // Get formatted datetime and parse it for compact format
+        char dateTimeBuffer[32];
+        _timeManager->getFormattedDateTime(dateTimeBuffer, sizeof(dateTimeBuffer));
+        
+        // Parse the formatted string to extract components
+        // Expected format from getFormattedDateTime: "2025-07-19 19:30:45"
+        int year, month, day, hour, minute, second;
+        if (sscanf(dateTimeBuffer, "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &minute, &second) == 6) {
+            // Format: yyyyMMddHHmmss.ext  
+            snprintf(buffer, bufferSize, "%04d%02d%02d%02d%02d%02d%s",
+                     year, month, day, hour, minute, second, extension);
+        } else {
+            // If parsing fails, fallback to millis
+            snprintf(buffer, bufferSize, "%lu%s", millis(), extension);
+        }
+    } else {
+        // Fallback to millis-based timestamp if no RTC
+        snprintf(buffer, bufferSize, "%lu%s", millis(), extension);
+    }
 }
 
 const char* FileSystemManager::getFileExtension() const {

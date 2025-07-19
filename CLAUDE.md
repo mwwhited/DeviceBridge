@@ -53,25 +53,61 @@ Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port
 - `status` - Detailed component status with heartbeat state
 - `time` - Show current time
 - `time set YYYY-MM-DD HH:MM` - Set RTC time
+- `storage` - **NEW**: Show all storage device status and statistics
 - `storage sd/eeprom/serial/auto` - Change storage preference
+- `testwrite` - **NEW**: Write test file to current storage with timestamp
 - `heartbeat on/off/status` - Control serial status messages (default: OFF)
 - `buttons` - Show button analog values for calibration
 - `parallel/lpt` - Show parallel port status and debug counters
 - `testint` - Test interrupt detection for 10 seconds
-- `files/lastfile` - **NEW**: Show last saved file details with format detection
+- `files/lastfile` - Show last saved file details with format detection
 - `restart/reset` - Software reset
 - `help` - Show command menu
+
+**Latest Enhancements**:
+- **Storage Status**: Complete storage device monitoring with byte counts
+- **Test File Writing**: Diagnostic tool for SD card write issues
+- **Dual File Type Tracking**: Shows both requested and detected file types
+- **Memory Monitoring**: Real-time SRAM usage in storage status
+- **Timestamp Filenames**: New yyyyMMddHHmmss.ext format implemented
 
 **Key Features**:
 - **Clean Serial Output**: No status spam by default (heartbeat OFF)
 - **ConfigurationManager Component**: Proper architecture, not in main.cpp
-- **File Information**: Complete file tracking with auto-detection
+- **Enhanced Debugging**: Storage, file, and memory diagnostics
 - **Debug Capabilities**: Interrupt counters, button values, pin states
 - **Multiple Command Syntax**: Flexible command parsing
+
+## Current Investigation: SD Card Write Issue ⚠️ (2025-07-19)
+
+### Problem Description
+- **Symptom**: Device shows "Saved:" message but files don't appear on SD card
+- **Status**: Hardware validation passes - SD card detected and accessible
+- **File System**: FAT32 (formatted on computer, mounts successfully)
+- **Memory**: 11.3% RAM usage - no memory overflow
+- **Error Count**: 0 write errors reported by FileSystemManager
+
+### Debugging Tools Implemented ✅
+- **Enhanced Storage Command**: Shows all device status, byte counts, error counts
+- **Test File Writer**: `testwrite` command creates diagnostic test files
+- **Memory Monitoring**: Real-time SRAM tracking to detect overflow
+- **File Info Display**: Shows both requested and detected file types
+- **Detailed Error Tracking**: Write error counting and reporting
+
+### Latest Technical Updates ✅
+- **Timestamp Filenames**: New yyyyMMddHHmmss.ext format implemented
+- **File Type Detection**: Enhanced auto-detection with dual tracking
+- **Storage Status**: Complete monitoring of all storage devices
+- **Memory Diagnostics**: Free RAM tracking in storage status command
+
+### Next Steps
+1. **Test Timestamp Filenames**: Build and validate new format
+2. **Resolve SD Write Issue**: Use enhanced debugging to isolate problem
+3. **Storage Failover Test**: Verify automatic SD → EEPROM → Serial switching
 
 ## Documentation Status: CURRENT ✅
 - **ARCHITECTURE.md**: Loop-based architecture documented
 - **TECHNICAL_DETAILS.md**: Production implementation details
 - **DEVELOPMENT_GUIDELINES.md**: Proven patterns and rules
-- **TODO.md**: Current tasks and final phase work
-- All documentation reflects production-deployed state
+- **CLAUDE.md**: Current status with latest debugging enhancements
+- All documentation reflects production-deployed state with recent debugging updates

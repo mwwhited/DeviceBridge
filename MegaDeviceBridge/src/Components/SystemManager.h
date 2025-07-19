@@ -71,6 +71,7 @@ public:
     uint32_t getUptimeSeconds() const { return _uptimeSeconds; }
     uint16_t getErrorCount() const { return _errorCount; }
     uint32_t getCommandsProcessed() const { return _commandsProcessed; }
+    uint16_t getFreeMemory() const;
     
     // Statistics and monitoring
     void printSystemInfo();

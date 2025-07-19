@@ -254,6 +254,11 @@ uint16_t SystemManager::freeRam() {
     return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
 
+uint16_t SystemManager::getFreeMemory() const {
+    int v;
+    return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+
 
 void SystemManager::setComponentManagers(
     ParallelPortManager* parallelPort,
