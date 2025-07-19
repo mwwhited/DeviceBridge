@@ -47,13 +47,25 @@ enum class StorageType {
   AUTO_SELECT
 };
 
-// File types for detection/override
+// File types for detection/override (TDS2024 Compatible)
 enum class FileType {
-  AUTO_DETECT,
-  BINARY,
-  BITMAP,
-  PNG,
-  TEXT
+  AUTO_DETECT,    // Detect from data headers (recommended)
+  BINARY,         // Raw data capture
+  BMP,           // Bitmap images (most common from TDS2024)
+  PCX,           // PC Paintbrush format
+  TIFF,          // Tagged Image File Format
+  RLE,           // Run-Length Encoded images  
+  EPSIMAGE,      // Encapsulated PostScript images
+  DPU411,        // Printer format
+  DPU412,        // Printer format
+  DPU3445,       // Printer format
+  THINKJET,      // HP ThinkJet printer
+  DESKJET,       // HP DeskJet printer
+  LASERJET,      // HP LaserJet printer
+  BUBBLEJET,     // Canon Bubble Jet printer
+  EPSON_DOT,     // Epson Dot Matrix
+  EPSON_C60,     // Epson Color C60
+  EPSON_C80      // Epson Color C80
 };
 
 // System status enumeration
