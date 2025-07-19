@@ -11,7 +11,8 @@
       "WebFetch(domain:osepp.com)",
       "WebFetch(domain:wiki.dfrobot.com)",
       "WebFetch(domain:arduino.stackexchange.com)",
-      "Bash(pio run:*)"
+      "Bash(pio run:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

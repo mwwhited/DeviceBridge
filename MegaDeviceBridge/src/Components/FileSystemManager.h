@@ -34,6 +34,7 @@ private:
     uint32_t _fileCounter;
     char _currentFilename[Common::Limits::MAX_FILENAME_LENGTH];
     Common::FileType _fileType;
+    bool _isFileOpen;
     
     // Storage operations
     bool initializeSD();
@@ -67,21 +68,25 @@ public:
     
     // Configuration
     void setPreferredStorage(Common::StorageType storage) { _preferredStorage = storage; }
+    void setStorageType(Common::StorageType type);
     void setFileType(Common::FileType type) { _fileType = type; }
     
     // Status inquiry
     Common::StorageType getActiveStorage() const { return _activeStorage; }
+    Common::FileType getFileType() const { return _fileType; }
     bool isSDAvailable() const { return _sdAvailable; }
     bool isEEPROMAvailable() const { return _eepromAvailable; }
     
     // Statistics
     uint32_t getFilesStored() const { return _fileCounter; }
     const char* getCurrentFilename() const { return _currentFilename; }
+    uint32_t getTotalBytesWritten() const { return _totalBytesWritten; }
+    uint16_t getWriteErrors() const { return _writeErrors; }
     
 private:
     // Statistics
     uint32_t _totalBytesWritten;
-    uint32_t _writeErrors;
+    uint16_t _writeErrors;
 };
 
 } // namespace DeviceBridge::Components

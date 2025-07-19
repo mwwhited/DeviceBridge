@@ -50,4 +50,24 @@ namespace DeviceBridge::User
         _lcd.setCursor(0, 1);
         _lcd.print(line2);
     }
+    
+    void Display::clear()
+    {
+        _lcd.clear();
+    }
+    
+    void Display::setCursor(uint8_t col, uint8_t row)
+    {
+        _lcd.setCursor(col, row);
+    }
+    
+    void Display::print(const char* text)
+    {
+        _lcd.print(text);
+    }
+    
+    void Display::print(const __FlashStringHelper* text)
+    {
+        _lcd.print(text);
+    }
 }

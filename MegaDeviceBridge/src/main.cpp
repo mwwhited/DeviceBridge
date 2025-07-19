@@ -98,36 +98,35 @@ void setup()
   displayManager->setTimeManager(timeManager);
   displayManager->setSystemManager(systemManager);
   
-  systemManager->setParallelPortManager(parallelPortManager);
-  systemManager->setFileSystemManager(fileSystemManager);
-  systemManager->setDisplayManager(displayManager);
-  systemManager->setTimeManager(timeManager);
+  systemManager->setComponentManagers(parallelPortManager, fileSystemManager, 
+                                     displayManager, timeManager);
   
   // Initialize all components
   Serial.print(F("Initializing components...\r\n"));
   
   if (!parallelPortManager->initialize()) {
-    Serial.print("WARNING: Parallel port initialization failed\r\n");
+    Serial.print(F("WARNING: Parallel port initialization failed\r\n"));
   }
   
   if (!fileSystemManager->initialize()) {
-    Serial.print("WARNING: File system initialization failed\r\n");
+    Serial.print(F("WARNING: File system initialization failed\r\n"));
   }
   
   if (!displayManager->initialize()) {
-    Serial.print("WARNING: Display initialization failed\r\n");
+    Serial.print(F("WARNING: Display initialization failed\r\n"));
   }
   
   if (!timeManager->initialize()) {
-    Serial.print("WARNING: Time manager initialization failed\r\n");
+    Serial.print(F("WARNING: Time manager initialization failed\r\n"));
   }
   
   if (!systemManager->initialize()) {
-    Serial.print("WARNING: System manager initialization failed\r\n");
+    Serial.print(F("WARNING: System manager initialization failed\r\n"));
   }
   
   Serial.print(F("All systems initialized successfully!\r\n"));
-  Serial.print(F("Starting cooperative multitasking loop...\r\n"));
+  Serial.print(F("Device Bridge ready for operation.\r\n"));
+  Serial.print(F("Connect TDS2024 to parallel port and use LCD buttons for control.\r\n"));
   
   // Initialize timing
   lastParallelUpdate = millis();

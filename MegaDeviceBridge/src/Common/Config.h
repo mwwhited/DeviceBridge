@@ -89,3 +89,5 @@ namespace Pins {
   constexpr uint8_t LPT_D6 = 37;
   constexpr uint8_t LPT_D7 = 39;
 }
+
+} // namespace DeviceBridge::Common

@@ -14,8 +14,6 @@ class TimeManager;
 
 class SystemManager {
 private:
-    DisplayManager* _displayManager;
-    
     // Component references
     ParallelPortManager* _parallelPortManager;
     FileSystemManager* _fileSystemManager;
@@ -26,7 +24,8 @@ private:
     Common::SystemStatus _systemStatus;
     Common::ErrorCode _lastError;
     
-    // System management
+    // Timing for updates
+    unsigned long _lastSystemCheck;
     
     // Command processing
     void processCommand(const Common::SystemCommand& cmd);
@@ -37,8 +36,6 @@ private:
     
     // System monitoring
     void monitorSystemHealth();
-    void checkTaskStacks();
-    void checkQueueLevels();
     void logSystemStatus();
     
     // Error handling
@@ -70,32 +67,24 @@ public:
     // Status inquiry
     Common::SystemStatus getSystemStatus() const { return _systemStatus; }
     Common::ErrorCode getLastError() const { return _lastError; }
+    uint32_t getUptimeSeconds() const { return _uptimeSeconds; }
+    uint16_t getErrorCount() const { return _errorCount; }
+    uint32_t getCommandsProcessed() const { return _commandsProcessed; }
     
     // Statistics and monitoring
     void printSystemInfo();
-    void printTaskInfo();
     void printMemoryInfo();
+    uint16_t freeRam();
+    
+    // Component management
+    void setComponentManagers(ParallelPortManager* ppm, FileSystemManager* fsm, 
+                             DisplayManager* dm, TimeManager* tm);
     
 private:
     // Statistics tracking
     uint32_t _uptimeSeconds;
     uint32_t _errorCount;
     uint32_t _commandsProcessed;
-    
-    // Health monitoring
-    struct TaskHealth {
-        TaskHandle_t handle;
-        const char* name;
-        UBaseType_t lastHighWaterMark;
-        bool healthy;
-    };
-    
-    static constexpr uint8_t MAX_MONITORED_TASKS = 8;
-    TaskHealth _monitoredTasks[MAX_MONITORED_TASKS];
-    uint8_t _monitoredTaskCount;
-    
-    void addTaskToMonitor(TaskHandle_t handle, const char* name);
-    void checkTaskHealth(TaskHealth& task);
 };
 
 } // namespace DeviceBridge::Components

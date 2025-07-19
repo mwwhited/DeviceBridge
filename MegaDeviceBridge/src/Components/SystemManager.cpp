@@ -74,7 +74,7 @@ void SystemManager::processSystemCommand(const Common::SystemCommand& cmd) {
 void SystemManager::processStorageSelectCommand(uint8_t value) {
     if (_fileSystemManager == nullptr) return;
     
-    Common::StorageType::Type storageType;
+    Common::StorageType storageType;
     const char* message;
     
     switch (value) {
@@ -105,7 +105,7 @@ void SystemManager::processStorageSelectCommand(uint8_t value) {
 void SystemManager::processFileTypeCommand(uint8_t value) {
     if (_fileSystemManager == nullptr) return;
     
-    Common::FileType::Type fileType;
+    Common::FileType fileType;
     const char* message;
     
     switch (value) {
@@ -162,7 +162,7 @@ void SystemManager::logSystemStatus() {
     Serial.print(F("\r\n"));
 }
 
-void SystemManager::setSystemStatus(Common::SystemStatus::Type status) {
+void SystemManager::setSystemStatus(Common::SystemStatus status) {
     _systemStatus = status;
     
     const char* statusMessage;
@@ -193,13 +193,13 @@ void SystemManager::setSystemStatus(Common::SystemStatus::Type status) {
     sendDisplayMessage(Common::DisplayMessage::STATUS, statusMessage);
 }
 
-void SystemManager::reportError(Common::ErrorCode::Type error) {
+void SystemManager::reportError(Common::ErrorCode error) {
     _lastError = error;
     _errorCount++;
     handleError(error);
 }
 
-void SystemManager::handleError(Common::ErrorCode::Type error) {
+void SystemManager::handleError(Common::ErrorCode error) {
     const char* errorMessage;
     
     switch (error) {
@@ -269,25 +269,6 @@ uint16_t SystemManager::freeRam() {
     return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
 
-Common::SystemStatus::Type SystemManager::getSystemStatus() const {
-    return _systemStatus;
-}
-
-uint32_t SystemManager::getUptimeSeconds() const {
-    return _uptimeSeconds;
-}
-
-uint16_t SystemManager::getErrorCount() const {
-    return _errorCount;
-}
-
-uint32_t SystemManager::getCommandsProcessed() const {
-    return _commandsProcessed;
-}
-
-Common::ErrorCode::Type SystemManager::getLastError() const {
-    return _lastError;
-}
 
 void SystemManager::setComponentManagers(
     ParallelPortManager* parallelPort,

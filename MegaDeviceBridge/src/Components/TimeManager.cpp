@@ -139,17 +139,6 @@ void TimeManager::getFormattedDateTime(char* buffer, size_t bufferSize) {
     formatDateTime(buffer, bufferSize);
 }
 
-bool TimeManager::isRTCAvailable() const {
-    return _rtcAvailable;
-}
-
-bool TimeManager::isTimeValid() const {
-    return _timeValid;
-}
-
-void TimeManager::setDisplayManager(DisplayManager* manager) {
-    _displayManager = manager;
-}
 
 void TimeManager::padNumber(char* buffer, uint8_t number, uint8_t digits) {
     if (digits == 2) {

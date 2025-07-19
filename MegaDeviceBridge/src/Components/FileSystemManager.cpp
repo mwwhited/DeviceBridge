@@ -217,7 +217,7 @@ void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, co
     }
 }
 
-void FileSystemManager::setStorageType(Common::StorageType::Type type) {
+void FileSystemManager::setStorageType(Common::StorageType type) {
     if (_activeStorage != type) {
         closeCurrentFile(); // Close any open file before switching
         _activeStorage = type;
@@ -253,38 +253,6 @@ void FileSystemManager::setStorageType(Common::StorageType::Type type) {
                 break;
         }
     }
-}
-
-void FileSystemManager::setFileType(Common::FileType::Type type) {
-    _fileType = type;
-}
-
-Common::StorageType::Type FileSystemManager::getActiveStorage() const {
-    return _activeStorage;
-}
-
-Common::FileType::Type FileSystemManager::getFileType() const {
-    return _fileType;
-}
-
-bool FileSystemManager::isSDAvailable() const {
-    return _sdAvailable;
-}
-
-bool FileSystemManager::isEEPROMAvailable() const {
-    return _eepromAvailable;
-}
-
-uint32_t FileSystemManager::getTotalBytesWritten() const {
-    return _totalBytesWritten;
-}
-
-uint16_t FileSystemManager::getWriteErrors() const {
-    return _writeErrors;
-}
-
-void FileSystemManager::setDisplayManager(DisplayManager* manager) {
-    _displayManager = manager;
 }
 
 } // namespace DeviceBridge::Components

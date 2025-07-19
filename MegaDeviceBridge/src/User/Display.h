@@ -22,5 +22,11 @@ namespace DeviceBridge::User
         void updateStatus(const char* message);
         void showTime(const char* timeStr);
         void showMenu(const char* line1, const char* line2);
+        
+        // LCD control methods
+        void clear();
+        void setCursor(uint8_t col, uint8_t row);
+        void print(const char* text);
+        void print(const __FlashStringHelper* text);
     };
 }
