@@ -224,7 +224,7 @@ void SystemManager::checkTaskHealth(TaskHealth& task) {
             Serial.print(task.name);
             Serial.print(" - ");
             Serial.print(highWaterMark);
-            Serial.println(" bytes remaining");
+            Serial.print(" bytes remaining\r\n");
             xSemaphoreGive(_serialMutex);
         }
     } else {
@@ -244,7 +244,7 @@ void SystemManager::checkQueueLevels() {
         if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             Serial.print("WARNING: Queue nearly full - ");
             Serial.print(dataQueueLevel);
-            Serial.println(" messages waiting");
+            Serial.print(" messages waiting\r\n");
             xSemaphoreGive(_serialMutex);
         }
     }
@@ -257,7 +257,7 @@ void SystemManager::logSystemStatus() {
         Serial.print("s, Errors: ");
         Serial.print(_errorCount);
         Serial.print(", Commands: ");
-        Serial.println(_commandsProcessed);
+        Serial.print(_commandsProcessed); Serial.print("\r\n");
         xSemaphoreGive(_serialMutex);
     }
 }
@@ -356,23 +356,23 @@ void SystemManager::addTaskToMonitor(TaskHandle_t handle, const char* name) {
 
 void SystemManager::printSystemInfo() {
     if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.println("=== Device Bridge System Info ===");
+        Serial.print("=== Device Bridge System Info ===\r\n");
         Serial.print("Status: ");
-        Serial.println((int)_systemStatus);
+        Serial.print((int)_systemStatus); Serial.print("\r\n");
         Serial.print("Uptime: ");
         Serial.print(_uptimeSeconds);
-        Serial.println(" seconds");
+        Serial.print(" seconds\r\n");
         Serial.print("Total Errors: ");
-        Serial.println(_errorCount);
+        Serial.print(_errorCount); Serial.print("\r\n");
         Serial.print("Commands Processed: ");
-        Serial.println(_commandsProcessed);
+        Serial.print(_commandsProcessed); Serial.print("\r\n");
         xSemaphoreGive(_serialMutex);
     }
 }
 
 void SystemManager::printTaskInfo() {
     if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.println("=== Task Health Info ===");
+        Serial.print("=== Task Health Info ===\r\n");
         for (uint8_t i = 0; i < _monitoredTaskCount; i++) {
             Serial.print(i);
             Serial.print(": ");
@@ -380,7 +380,7 @@ void SystemManager::printTaskInfo() {
             Serial.print(" - Stack: ");
             Serial.print(_monitoredTasks[i].lastHighWaterMark);
             Serial.print(" bytes, Health: ");
-            Serial.println(_monitoredTasks[i].healthy ? "OK" : "ERROR");
+            Serial.print(_monitoredTasks[i].healthy ? "OK\r\n" : "ERROR\r\n");
         }
         xSemaphoreGive(_serialMutex);
     }
@@ -388,13 +388,13 @@ void SystemManager::printTaskInfo() {
 
 void SystemManager::printMemoryInfo() {
     if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.println("=== Memory Info ===");
+        Serial.print("=== Memory Info ===\r\n");
         Serial.print("Free Heap: ");
         Serial.print(xPortGetFreeHeapSize());
-        Serial.println(" bytes");
+        Serial.print(" bytes\r\n");
         Serial.print("Min Free Heap: ");
         Serial.print(xPortGetMinimumEverFreeHeapSize());
-        Serial.println(" bytes");
+        Serial.print(" bytes\r\n");
         xSemaphoreGive(_serialMutex);
     }
 }

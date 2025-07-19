@@ -1,1 +1,1 @@
-pio run -t upload
+pio run -t upload -e megaatmega2560

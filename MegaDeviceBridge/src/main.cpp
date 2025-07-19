@@ -71,7 +71,7 @@ void setup()
   Serial.begin(DeviceBridge::Common::Serial::BAUD_RATE);
   while (!Serial) { delay(10); }
   
-  Serial.println("Device Bridge Initializing...");
+  Serial.print("Device Bridge Initializing...\r\n");
   
   // Initialize hardware
   printerPort.initialize();
@@ -95,7 +95,7 @@ void setup()
   // Verify FreeRTOS objects created successfully
   if (!dataQueue || !displayQueue || !commandQueue || 
       !spiMutex || !i2cMutex || !serialMutex) {
-    Serial.println("FATAL: Failed to create FreeRTOS objects");
+    Serial.print("FATAL: Failed to create FreeRTOS objects\r\n");
     while(1) { delay(1000); }
   }
   
@@ -109,7 +109,7 @@ void setup()
   // Verify component creation
   if (!parallelPortManager || !fileSystemManager || !displayManager || 
       !timeManager || !systemManager) {
-    Serial.println("FATAL: Failed to create component managers");
+    Serial.print("FATAL: Failed to create component managers\r\n");
     while(1) { delay(1000); }
   }
   
@@ -120,70 +120,70 @@ void setup()
   systemManager->setTimeManager(timeManager);
   
   // Initialize all components
-  Serial.println("Initializing components...");
+  Serial.print("Initializing components...\r\n");
   
   if (!parallelPortManager->initialize()) {
-    Serial.println("WARNING: Parallel port initialization failed");
+    Serial.print("WARNING: Parallel port initialization failed\r\n");
   }
   
   if (!fileSystemManager->initialize()) {
-    Serial.println("WARNING: File system initialization failed");
+    Serial.print("WARNING: File system initialization failed\r\n");
   }
   
   if (!displayManager->initialize()) {
-    Serial.println("WARNING: Display initialization failed");
+    Serial.print("WARNING: Display initialization failed\r\n");
   }
   
   if (!timeManager->initialize()) {
-    Serial.println("WARNING: Time manager initialization failed");
+    Serial.print("WARNING: Time manager initialization failed\r\n");
   }
   
   if (!systemManager->initialize()) {
-    Serial.println("WARNING: System manager initialization failed");
+    Serial.print("WARNING: System manager initialization failed\r\n");
   }
   
   // Start all component tasks
-  Serial.println("Starting component tasks...");
+  Serial.print("Starting component tasks...\r\n");
   
   if (!parallelPortManager->start()) {
-    Serial.println("FATAL: Failed to start parallel port task");
+    Serial.print("FATAL: Failed to start parallel port task\r\n");
     while(1) { delay(1000); }
   }
   
   if (!fileSystemManager->start()) {
-    Serial.println("FATAL: Failed to start file manager task");
+    Serial.print("FATAL: Failed to start file manager task\r\n");
     while(1) { delay(1000); }
   }
   
   if (!displayManager->start()) {
-    Serial.println("FATAL: Failed to start display task");
+    Serial.print("FATAL: Failed to start display task\r\n");
     while(1) { delay(1000); }
   }
   
   if (!timeManager->start()) {
-    Serial.println("FATAL: Failed to start time manager task");
+    Serial.print("FATAL: Failed to start time manager task\r\n");
     while(1) { delay(1000); }
   }
   
   if (!systemManager->start()) {
-    Serial.println("FATAL: Failed to start system manager task");
+    Serial.print("FATAL: Failed to start system manager task\r\n");
     while(1) { delay(1000); }
   }
   
-  Serial.println("All systems initialized successfully!");
-  Serial.println("Starting FreeRTOS scheduler...");
+  Serial.print("All systems initialized successfully!\r\n");
+  Serial.print("Starting FreeRTOS scheduler...\r\n");
   
   // Start FreeRTOS scheduler - this never returns
   vTaskStartScheduler();
   
   // Should never reach here
-  Serial.println("FATAL: FreeRTOS scheduler failed to start");
+  Serial.print("FATAL: FreeRTOS scheduler failed to start\r\n");
   while(1) { delay(1000); }
 }
 
 void loop()
 {
   // FreeRTOS scheduler handles execution, this should never be reached
-  Serial.println("ERROR: Reached Arduino loop() - FreeRTOS scheduler problem!");
+  Serial.print("ERROR: Reached Arduino loop() - FreeRTOS scheduler problem!\r\n");
   delay(1000);
 }

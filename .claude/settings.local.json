@@ -5,7 +5,9 @@
       "Bash(pio check:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(pio test:*)"
+      "Bash(pio test:*)",
+      "Bash(mv:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
