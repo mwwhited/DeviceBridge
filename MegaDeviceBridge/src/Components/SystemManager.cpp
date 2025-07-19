@@ -49,10 +49,7 @@ bool SystemManager::start() {
         &_taskHandle
     );
     
-    if (result == pdPASS) {
-        // Add self to monitoring
-        addTaskToMonitor(_taskHandle, "SystemManager");
-    }
+    // Skip self-monitoring during startup to avoid circular issues
     
     return result == pdPASS;
 }
@@ -70,6 +67,12 @@ void SystemManager::taskFunction(void* pvParameters) {
 }
 
 void SystemManager::runTask() {
+    // Debug: Signal that SystemManager task is actually running
+    if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        Serial.print(F("SystemManager task started and running\r\n"));
+        xSemaphoreGive(_serialMutex);
+    }
+    
     Common::SystemCommand cmd;
     TickType_t lastWakeTime = xTaskGetTickCount();
     uint32_t monitorCounter = 0;
@@ -220,11 +223,11 @@ void SystemManager::checkTaskHealth(TaskHealth& task) {
         handleError(Common::ErrorCode::HARDWARE_ERROR);
         
         if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            Serial.print("WARNING: Low stack on task ");
+            Serial.print(F("WARNING: Low stack on task "));
             Serial.print(task.name);
-            Serial.print(" - ");
+            Serial.print(F(" - "));
             Serial.print(highWaterMark);
-            Serial.print(" bytes remaining\r\n");
+            Serial.print(F(" bytes remaining\r\n"));
             xSemaphoreGive(_serialMutex);
         }
     } else {
@@ -242,9 +245,9 @@ void SystemManager::checkQueueLevels() {
         handleError(Common::ErrorCode::BUFFER_OVERFLOW);
         
         if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            Serial.print("WARNING: Queue nearly full - ");
+            Serial.print(F("WARNING: Queue nearly full - "));
             Serial.print(dataQueueLevel);
-            Serial.print(" messages waiting\r\n");
+            Serial.print(F(" messages waiting\r\n"));
             xSemaphoreGive(_serialMutex);
         }
     }
@@ -252,11 +255,11 @@ void SystemManager::checkQueueLevels() {
 
 void SystemManager::logSystemStatus() {
     if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        Serial.print("Uptime: ");
+        Serial.print(F("Uptime: "));
         Serial.print(_uptimeSeconds);
-        Serial.print("s, Errors: ");
+        Serial.print(F("s, Errors: "));
         Serial.print(_errorCount);
-        Serial.print(", Commands: ");
+        Serial.print(F(", Commands: "));
         Serial.print(_commandsProcessed); Serial.print("\r\n");
         xSemaphoreGive(_serialMutex);
     }
@@ -356,10 +359,10 @@ void SystemManager::addTaskToMonitor(TaskHandle_t handle, const char* name) {
 
 void SystemManager::printSystemInfo() {
     if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.print("=== Device Bridge System Info ===\r\n");
+        Serial.print(F("=== Device Bridge System Info ===\r\n"));
         Serial.print("Status: ");
         Serial.print((int)_systemStatus); Serial.print("\r\n");
-        Serial.print("Uptime: ");
+        Serial.print(F("Uptime: "));
         Serial.print(_uptimeSeconds);
         Serial.print(" seconds\r\n");
         Serial.print("Total Errors: ");
@@ -372,7 +375,7 @@ void SystemManager::printSystemInfo() {
 
 void SystemManager::printTaskInfo() {
     if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.print("=== Task Health Info ===\r\n");
+        Serial.print(F("=== Task Health Info ===\r\n"));
         for (uint8_t i = 0; i < _monitoredTaskCount; i++) {
             Serial.print(i);
             Serial.print(": ");
@@ -388,13 +391,13 @@ void SystemManager::printTaskInfo() {
 
 void SystemManager::printMemoryInfo() {
     if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.print("=== Memory Info ===\r\n");
+        Serial.print(F("=== Memory Info ===\r\n"));
         Serial.print("Free Heap: ");
         Serial.print(xPortGetFreeHeapSize());
-        Serial.print(" bytes\r\n");
+        Serial.print(F(" bytes\r\n"));
         Serial.print("Min Free Heap: ");
         Serial.print(xPortGetMinimumEverFreeHeapSize());
-        Serial.print(" bytes\r\n");
+        Serial.print(F(" bytes\r\n"));
         xSemaphoreGive(_serialMutex);
     }
 }

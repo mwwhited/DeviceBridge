@@ -71,7 +71,7 @@ void setup()
   Serial.begin(DeviceBridge::Common::Serial::BAUD_RATE);
   while (!Serial) { delay(10); }
   
-  Serial.print("Device Bridge Initializing...\r\n");
+  Serial.print(F("Device Bridge Initializing...\r\n"));
   
   // Initialize hardware
   printerPort.initialize();
@@ -95,7 +95,7 @@ void setup()
   // Verify FreeRTOS objects created successfully
   if (!dataQueue || !displayQueue || !commandQueue || 
       !spiMutex || !i2cMutex || !serialMutex) {
-    Serial.print("FATAL: Failed to create FreeRTOS objects\r\n");
+    Serial.print(F("FATAL: Failed to create FreeRTOS objects\r\n"));
     while(1) { delay(1000); }
   }
   
@@ -109,7 +109,7 @@ void setup()
   // Verify component creation
   if (!parallelPortManager || !fileSystemManager || !displayManager || 
       !timeManager || !systemManager) {
-    Serial.print("FATAL: Failed to create component managers\r\n");
+    Serial.print(F("FATAL: Failed to create component managers\r\n"));
     while(1) { delay(1000); }
   }
   
@@ -120,7 +120,7 @@ void setup()
   systemManager->setTimeManager(timeManager);
   
   // Initialize all components
-  Serial.print("Initializing components...\r\n");
+  Serial.print(F("Initializing components...\r\n"));
   
   if (!parallelPortManager->initialize()) {
     Serial.print("WARNING: Parallel port initialization failed\r\n");
@@ -143,77 +143,63 @@ void setup()
   }
   
   // Start all component tasks
-  Serial.print("Starting component tasks...\r\n");
+  Serial.print(F("Starting component tasks...\r\n"));
   
-  Serial.print("Starting parallel port manager...\r\n");
+  Serial.print(F("Starting parallel port manager...\r\n"));
   if (!parallelPortManager->start()) {
-    Serial.print("FATAL: Failed to start parallel port task\r\n");
+    Serial.print(F("FATAL: Failed to start parallel port task\r\n"));
     while(1) { delay(1000); }
   }
-  Serial.print("Parallel port manager started OK\r\n");
+  Serial.print(F("Parallel port manager started OK\r\n"));
   
-  Serial.print("Starting file system manager...\r\n");
+  Serial.print(F("Starting file system manager...\r\n"));
   if (!fileSystemManager->start()) {
-    Serial.print("FATAL: Failed to start file manager task\r\n");
+    Serial.print(F("FATAL: Failed to start file manager task\r\n"));
     while(1) { delay(1000); }
   }
-  Serial.print("File system manager started OK\r\n");
+  Serial.print(F("File system manager started OK\r\n"));
   
-  Serial.print("Starting display manager...\r\n");
+  Serial.print(F("Starting display manager...\r\n"));
   if (!displayManager->start()) {
-    Serial.print("FATAL: Failed to start display task\r\n");
+    Serial.print(F("FATAL: Failed to start display task\r\n"));
     while(1) { delay(1000); }
   }
-  Serial.print("Display manager started OK\r\n");
+  Serial.print(F("Display manager started OK\r\n"));
   
-  Serial.print("Starting time manager...\r\n");
+  Serial.print(F("Starting time manager...\r\n"));
   if (!timeManager->start()) {
-    Serial.print("FATAL: Failed to start time manager task\r\n");
+    Serial.print(F("FATAL: Failed to start time manager task\r\n"));
     while(1) { delay(1000); }
   }
-  Serial.print("Time manager started OK\r\n");
+  Serial.print(F("Time manager started OK\r\n"));
   
-  Serial.print("Starting system manager...\r\n");
+  Serial.print(F("Starting system manager...\r\n"));
   if (!systemManager->start()) {
-    Serial.print("FATAL: Failed to start system manager task\r\n");
+    Serial.print(F("FATAL: Failed to start system manager task\r\n"));
     while(1) { delay(1000); }
   }
-  Serial.print("System manager started OK\r\n");
+  Serial.print(F("System manager started OK\r\n"));
   
-  Serial.print("All systems initialized successfully!\r\n");
-  Serial.print("Starting FreeRTOS scheduler...\r\n");
-  
-  // Quick button test before starting scheduler
-  Serial.print("Testing button input on A0...\r\n");
-  for (int i = 0; i < 5; i++) {
-    int buttonValue = analogRead(A0);
-    Serial.print("A0 reading ");
-    Serial.print(i);
-    Serial.print(": ");
-    Serial.print(buttonValue);
-    Serial.print("\r\n");
-    delay(500);
-  }
-  Serial.print("Button test complete. Press any button now for 3 seconds...\r\n");
-  for (int i = 0; i < 6; i++) {
-    int buttonValue = analogRead(A0);
-    Serial.print("A0: ");
-    Serial.print(buttonValue);
-    Serial.print("\r\n");
-    delay(500);
-  }
+  Serial.print(F("About to print success message...\r\n"));
+  delay(100);
+  Serial.print(F("All systems initialized successfully!\r\n"));
+  delay(100);
+  Serial.print(F("About to start scheduler...\r\n"));
+  delay(100);
+  Serial.print(F("Starting FreeRTOS scheduler...\r\n"));
+  delay(100);
   
   // Start FreeRTOS scheduler - this never returns
   vTaskStartScheduler();
   
   // Should never reach here
-  Serial.print("FATAL: FreeRTOS scheduler failed to start\r\n");
+  Serial.print(F("FATAL: FreeRTOS scheduler failed to start\r\n"));
   while(1) { delay(1000); }
 }
 
 void loop()
 {
   // FreeRTOS scheduler handles execution, this should never be reached
-  Serial.print("ERROR: Reached Arduino loop() - FreeRTOS scheduler problem!\r\n");
+  Serial.print(F("ERROR: Reached Arduino loop() - FreeRTOS scheduler problem!\r\n"));
   delay(1000);
 }

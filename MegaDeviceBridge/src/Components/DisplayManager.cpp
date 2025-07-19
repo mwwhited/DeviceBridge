@@ -158,14 +158,30 @@ uint16_t DisplayManager::readButtons() {
     // Debug: Output button value changes to serial (with debouncing)
     static int lastReportedValue = -1;
     static uint32_t lastReportTime = 0;
+    static bool startupReporting = true;
+    static uint8_t startupCount = 0;
     uint32_t currentTime = xTaskGetTickCount();
+    
+    // During startup, report first 10 readings for calibration
+    if (startupReporting && startupCount < 10) {
+        Serial.print(F("Startup A0["));
+        Serial.print(startupCount);
+        Serial.print(F("]: "));
+        Serial.print(buttonValue);
+        Serial.print(F("\r\n"));
+        startupCount++;
+        if (startupCount >= 10) {
+            startupReporting = false;
+            Serial.print(F("Press buttons now - values will be reported\r\n"));
+        }
+    }
     
     // Report value changes with some debouncing (every 200ms max)
     if (abs(buttonValue - lastReportedValue) > 10 && 
         (currentTime - lastReportTime) > pdMS_TO_TICKS(200)) {
-        Serial.print("Button A0 value: ");
+        Serial.print(F("Button A0 value: "));
         Serial.print(buttonValue);
-        Serial.print("\r\n");
+        Serial.print(F("\r\n"));
         lastReportedValue = buttonValue;
         lastReportTime = currentTime;
     }
