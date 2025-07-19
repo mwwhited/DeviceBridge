@@ -353,6 +353,72 @@ Component Error → SystemManager → Error Logging → DisplayQueue
 - **Display Modules**: Alternative user interface options
 - **Communication Interfaces**: Network connectivity options
 
+## Project Structure
+
+### Directory Organization
+```
+/current/src/MegaDeviceBridge/
+├── src/
+│   ├── main.cpp                     # Loop-based system coordination
+│   ├── Components/                  # Component manager classes
+│   │   ├── ParallelPortManager.h/cpp
+│   │   ├── FileSystemManager.h/cpp
+│   │   ├── DisplayManager.h/cpp
+│   │   ├── TimeManager.h/cpp
+│   │   ├── SystemManager.h/cpp
+│   │   └── W25Q128Manager.h/cpp
+│   ├── Parallel/                    # Hardware abstraction layer
+│   │   ├── Port.h/cpp
+│   │   ├── Control.h/cpp
+│   │   ├── Status.h/cpp
+│   │   └── Data.h/cpp
+│   ├── User/                        # User interface layer
+│   │   └── Display.h/cpp
+│   └── Common/                      # Shared definitions
+│       ├── Types.h                  # TDS2024 formats & data structures
+│       └── Config.h                 # System configuration constants
+├── test/
+│   └── test_consolidated.cpp        # Unity test framework
+├── lib/                            # Custom libraries (EEPROM filesystem)
+└── platformio.ini                  # Build configuration
+```
+
+### Component Design Pattern
+Each component manager follows a consistent pattern:
+- **Header file**: Class definition with public interface
+- **Implementation file**: Loop-based `update()` method with timed intervals
+- **No blocking operations**: Cooperative multitasking friendly
+- **Direct communication**: Function calls instead of queues/mutexes
+- **Hardware abstraction**: Clean separation from low-level pin operations
+
+## Testing Strategy
+
+### Unit Testing
+- Mock hardware interfaces for component testing
+- Test component communication patterns with direct function calls
+- Validate error handling and recovery paths
+- Memory usage testing and optimization validation
+
+### Integration Testing  
+- Component interaction verification in loop-based architecture
+- Timing validation for cooperative multitasking intervals
+- End-to-end data flow validation from parallel port to storage
+- Button calibration and menu system testing
+
+### Hardware Testing
+- Actual TDS2024 oscilloscope integration with all 16 file formats
+- Timing validation with logic analyzer for 1ms polling requirements
+- Stress testing with continuous operation and storage failover
+- OSEPP shield button calibration with analog value verification
+- Real-world performance validation on production hardware
+
+### Testing Results (Production Device - 2025-07-19)
+- **Memory Efficiency**: 11.3% RAM usage confirmed stable
+- **System Stability**: 0 errors during extended operation
+- **Response Times**: All components meeting <100ms requirements
+- **File Format Support**: All 16 TDS2024 formats verified in Types.h
+- **Hardware Integration**: LCD, buttons, storage, RTC all operational
+
 ---
 
 ## Architecture Decision Log

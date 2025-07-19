@@ -47,6 +47,16 @@ Arduino Mega 2560 Device Bridge converting Tektronix TDS2024 oscilloscope parall
 - **Rule**: ALWAYS use F("text") for Arduino string literals
 - **Status**: Applied throughout codebase successfully
 
+### File Detection Strategy
+**Problem**: No explicit "start/end of file" signals from TDS2024
+**Solution**: Timeout-based detection (2 seconds of idle = end of file)
+
+**Implementation Details**:
+- **New File**: First data after idle period
+- **Data Stream**: Continuous data with <1ms gaps  
+- **End of File**: 2000ms timeout without data (2000 polling cycles)
+- **Header Analysis**: Automatic format detection based on data patterns
+
 ### Component Architecture (Loop-Based) - OPERATIONAL
 1. **ParallelPortManager** - LPT data capture via callbacks
 2. **FileSystemManager** - Storage operations (SD/EEPROM/Serial) with TDS2024 format support
@@ -72,6 +82,20 @@ Uptime: 10s, Errors: 0, Commands: 0
 - **System Stability**: 0 errors, consistent uptime tracking
 - **Response Time**: <100ms for all user interactions
 
+## Storage Architecture
+**Primary**: SD card (preferred for high capacity and speed)
+**Secondary**: W25Q128 EEPROM (16MB reliable flash storage)
+**Tertiary**: Serial transfer to PC (real-time streaming fallback)
+
+**Failover Strategy**: Graceful degradation - if SD fails → try EEPROM → try serial transfer
+
+## Error Handling Philosophy
+- **Graceful Degradation**: Continue operation with reduced functionality
+- **Component Isolation**: Errors in one component don't crash the system
+- **User Feedback**: Display shows error messages immediately via LCD
+- **Recovery Mechanisms**: Components designed to restart after errors
+- **Queue Monitoring**: System tracks buffer usage and prevents overflows
+
 ## Final Phase Tasks
 - **Button Calibration**: Verify OSEPP analog values for menu navigation
 - **TDS2024 Integration**: Test with real oscilloscope for data capture validation
@@ -81,4 +105,15 @@ Uptime: 10s, Errors: 0, Commands: 0
 - `src/main.cpp` - Loop-based system coordination (production ready)
 - `src/Components/*.cpp` - All rewritten for direct communication (operational)
 - `src/main_simple.cpp` - Simple test version (archived)
+- `platformio.ini` - Build configuration and dependencies (no FreeRTOS)
+- `Common/Config.h` - System configuration and pin mappings
+- `Common/Types.h` - TDS2024 file formats and data structures
 - See `TECHNICAL_DETAILS.md` and `DEVELOPMENT_GUIDELINES.md` for implementation details
+
+## Lessons Learned
+1. **Arduino Memory Management**: 8KB RAM requires extreme optimization - loop-based is superior to FreeRTOS
+2. **Interrupt Handling**: Keep processing minimal, use cooperative scheduling for data handling
+3. **Hardware Sharing**: SPI bus conflicts eliminated through sequential component updates
+4. **Error Recovery**: Design for graceful degradation from the start - storage failover essential
+5. **Documentation**: Critical for embedded systems - hardware details and constraints must be tracked
+6. **F() Macro**: Essential for Arduino - all string literals must be in Flash memory, not RAM

@@ -71,21 +71,30 @@
 - [ ] Test menu system navigation with calibrated buttons
 - [ ] Test system recovery from error conditions
 - [ ] Validate timing requirements for high-throughput capture
+- [ ] Implement file type detection based on header bytes (beyond current auto-detection)
+- [ ] Add file compression for storage efficiency
+- [ ] Optimize parallel port read performance with hardware features
+- [ ] Add hardware flow control support for parallel port communication
+- [ ] Test SD card reliability under continuous writes and storage stress
 
 ### **Documentation Maintenance** (Low Priority)
 - [ ] Create user manual for LCD menu system operation
 - [ ] Document button calibration procedures
 - [ ] Document troubleshooting procedures for hardware issues
 - [ ] Create TDS2024 integration guide with format selection
+- [ ] Add API documentation for component interfaces
+- [ ] Create comprehensive troubleshooting guide for hardware issues
 
 ### Future Enhancements (Backlog)
-- [ ] Implement EEPROM file system operations
-- [ ] Add USB serial transfer protocol
-- [ ] Implement configuration save/restore
-- [ ] Add file type detection algorithms
-- [ ] Optimize memory usage further if needed
-- [ ] Add LED status indicators
+- [ ] Implement EEPROM file system operations with wear leveling
+- [ ] Add USB serial transfer protocol for high-speed data transfer
+- [ ] Implement configuration save/restore to EEPROM
+- [ ] Add enhanced file type detection algorithms beyond header analysis
+- [ ] Optimize memory usage further if needed (currently 11.3% is excellent)
+- [ ] Add LED status indicators for visual feedback
 - [ ] Implement watchdog timer for reliability
+- [ ] Add web interface for remote management via ESP32 module
+- [ ] Implement automatic file naming with timestamps (partially implemented)
 
 ## Development Notes
 
