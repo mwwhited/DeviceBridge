@@ -1,15 +1,14 @@
 #include "FileSystemManager.h"
+#include "DisplayManager.h"
 #include <string.h>
 #include <stdio.h>
+#include <Arduino.h>
 
 namespace DeviceBridge::Components {
 
-FileSystemManager::FileSystemManager(QueueHandle_t dataQueue, QueueHandle_t displayQueue, SemaphoreHandle_t spiMutex)
-    : _dataQueue(dataQueue)
-    , _displayQueue(displayQueue)
-    , _spiMutex(spiMutex)
-    , _taskHandle(nullptr)
-    , _eeprom(Common::Pins::EEPROM_CS, spiMutex)
+FileSystemManager::FileSystemManager()
+    : _displayManager(nullptr)
+    , _eeprom(Common::Pins::EEPROM_CS)
     , _sdAvailable(false)
     , _eepromAvailable(false)
     , _eepromCurrentAddress(0)
@@ -20,6 +19,7 @@ FileSystemManager::FileSystemManager(QueueHandle_t dataQueue, QueueHandle_t disp
     , _fileType(Common::FileType::AUTO_DETECT)
     , _totalBytesWritten(0)
     , _writeErrors(0)
+    , _isFileOpen(false)
 {
     memset(_currentFilename, 0, sizeof(_currentFilename));
 }
@@ -49,82 +49,48 @@ bool FileSystemManager::initialize() {
     return _sdAvailable || _eepromAvailable;
 }
 
-bool FileSystemManager::start() {
-    if (_taskHandle != nullptr) {
-        return false; // Already running
-    }
-    
-    BaseType_t result = xTaskCreate(
-        taskFunction,
-        "FileManager",
-        Common::RTOS::FILE_MANAGER_STACK,
-        this,
-        Common::RTOS::FILE_MANAGER_PRIORITY,
-        &_taskHandle
-    );
-    
-    return result == pdPASS;
+void FileSystemManager::update() {
+    // Periodic storage health check (called from main loop)
+    // Can be used for background maintenance tasks if needed
 }
 
 void FileSystemManager::stop() {
-    if (_taskHandle != nullptr) {
-        // Close any open file first
+    closeCurrentFile();
+}
+
+void FileSystemManager::processDataChunk(const Common::DataChunk& chunk) {
+    // Handle new file
+    if (chunk.isNewFile) {
         closeCurrentFile();
-        vTaskDelete(_taskHandle);
-        _taskHandle = nullptr;
+        if (!createNewFile()) {
+            sendDisplayMessage(Common::DisplayMessage::ERROR, "File Create Failed");
+            return;
+        }
+        sendDisplayMessage(Common::DisplayMessage::STATUS, "Storing...");
     }
-}
-
-void FileSystemManager::taskFunction(void* pvParameters) {
-    FileSystemManager* manager = static_cast<FileSystemManager*>(pvParameters);
-    manager->runTask();
-}
-
-void FileSystemManager::runTask() {
-    Common::DataChunk chunk;
     
-    for (;;) {
-        if (xQueueReceive(_dataQueue, &chunk, portMAX_DELAY) == pdTRUE) {
-            
-            // Handle new file
-            if (chunk.isNewFile) {
-                closeCurrentFile();
-                if (!createNewFile()) {
-                    sendDisplayMessage(Common::DisplayMessage::ERROR, "File Create Failed");
-                    continue;
-                }
-                sendDisplayMessage(Common::DisplayMessage::STATUS, "Storing...");
-            }
-            
-            // Write data
-            if (chunk.length > 0) {
-                if (!writeDataChunk(chunk)) {
-                    _writeErrors++;
-                    sendDisplayMessage(Common::DisplayMessage::ERROR, "Write Failed");
-                }
-            }
-            
-            // Handle end of file
-            if (chunk.isEndOfFile) {
-                if (closeCurrentFile()) {
-                    char message[32];
-                    snprintf(message, sizeof(message), "Saved: %s", _currentFilename);
-                    sendDisplayMessage(Common::DisplayMessage::INFO, message);
-                } else {
-                    sendDisplayMessage(Common::DisplayMessage::ERROR, "Close Failed");
-                }
-            }
+    // Write data
+    if (chunk.length > 0) {
+        if (!writeDataChunk(chunk)) {
+            _writeErrors++;
+            sendDisplayMessage(Common::DisplayMessage::ERROR, "Write Failed");
+        }
+    }
+    
+    // Handle end of file
+    if (chunk.isEndOfFile) {
+        if (closeCurrentFile()) {
+            char message[32];
+            snprintf(message, sizeof(message), "Saved: %s", _currentFilename);
+            sendDisplayMessage(Common::DisplayMessage::INFO, message);
+        } else {
+            sendDisplayMessage(Common::DisplayMessage::ERROR, "Close Failed");
         }
     }
 }
 
 bool FileSystemManager::initializeSD() {
-    if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
-        bool result = SD.begin(Common::Pins::SD_CS);
-        xSemaphoreGive(_spiMutex);
-        return result;
-    }
-    return false;
+    return SD.begin(Common::Pins::SD_CS);
 }
 
 bool FileSystemManager::initializeEEPROM() {
@@ -136,36 +102,42 @@ bool FileSystemManager::createNewFile() {
     
     switch (_activeStorage) {
         case Common::StorageType::SD_CARD:
-            if (_sdAvailable && xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
+            if (_sdAvailable) {
                 _currentFile = SD.open(_currentFilename, FILE_WRITE);
-                bool result = (_currentFile != 0);
-                xSemaphoreGive(_spiMutex);
-                return result;
+                _isFileOpen = (_currentFile != 0);
+                return _isFileOpen;
             }
             break;
             
         case Common::StorageType::EEPROM:
             // TODO: Implement EEPROM file creation
+            _isFileOpen = false;
             return false;
             
         case Common::StorageType::SERIAL_TRANSFER:
             // For serial transfer, we'll send data directly
+            _isFileOpen = true;
             return true;
             
         default:
+            _isFileOpen = false;
             return false;
     }
     
+    _isFileOpen = false;
     return false;
 }
 
 bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
+    if (!_isFileOpen) {
+        return false;
+    }
+    
     switch (_activeStorage) {
         case Common::StorageType::SD_CARD:
-            if (_currentFile && xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
+            if (_currentFile) {
                 size_t written = _currentFile.write(chunk.data, chunk.length);
                 _currentFile.flush(); // Ensure data is written
-                xSemaphoreGive(_spiMutex);
                 
                 if (written == chunk.length) {
                     _totalBytesWritten += chunk.length;
@@ -190,27 +162,30 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
 }
 
 bool FileSystemManager::closeCurrentFile() {
+    if (!_isFileOpen) {
+        return true; // Already closed
+    }
+    
+    bool result = true;
+    
     switch (_activeStorage) {
         case Common::StorageType::SD_CARD:
-            if (_currentFile && xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(Common::FileSystem::SD_TIMEOUT_MS)) == pdTRUE) {
+            if (_currentFile) {
                 _currentFile.close();
-                xSemaphoreGive(_spiMutex);
-                return true;
             }
             break;
             
         case Common::StorageType::EEPROM:
             // TODO: Implement EEPROM file close
-            return false;
+            break;
             
         case Common::StorageType::SERIAL_TRANSFER:
-            return true;
-            
-        default:
-            return false;
+            // Nothing to close for serial transfer
+            break;
     }
     
-    return true; // Consider it closed if file wasn't open
+    _isFileOpen = false;
+    return result;
 }
 
 void FileSystemManager::generateFilename(char* buffer, size_t bufferSize) {
@@ -237,12 +212,79 @@ const char* FileSystemManager::getFileExtension() const {
 }
 
 void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const char* message) {
-    Common::DisplayMessage msg;
-    msg.type = type;
-    strncpy(msg.message, message, sizeof(msg.message) - 1);
-    msg.message[sizeof(msg.message) - 1] = '\0';
-    
-    xQueueSend(_displayQueue, &msg, 0); // Non-blocking
+    if (_displayManager) {
+        _displayManager->displayMessage(type, message);
+    }
+}
+
+void FileSystemManager::setStorageType(Common::StorageType::Type type) {
+    if (_activeStorage != type) {
+        closeCurrentFile(); // Close any open file before switching
+        _activeStorage = type;
+        
+        // Verify the new storage type is available
+        switch (type) {
+            case Common::StorageType::SD_CARD:
+                if (!_sdAvailable) {
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, "SD Not Available");
+                    _activeStorage = Common::StorageType::SERIAL_TRANSFER;
+                }
+                break;
+                
+            case Common::StorageType::EEPROM:
+                if (!_eepromAvailable) {
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, "EEPROM Not Available");
+                    _activeStorage = Common::StorageType::SERIAL_TRANSFER;
+                }
+                break;
+                
+            case Common::StorageType::SERIAL_TRANSFER:
+                // Always available
+                break;
+                
+            case Common::StorageType::AUTO_SELECT:
+                if (_sdAvailable) {
+                    _activeStorage = Common::StorageType::SD_CARD;
+                } else if (_eepromAvailable) {
+                    _activeStorage = Common::StorageType::EEPROM;
+                } else {
+                    _activeStorage = Common::StorageType::SERIAL_TRANSFER;
+                }
+                break;
+        }
+    }
+}
+
+void FileSystemManager::setFileType(Common::FileType::Type type) {
+    _fileType = type;
+}
+
+Common::StorageType::Type FileSystemManager::getActiveStorage() const {
+    return _activeStorage;
+}
+
+Common::FileType::Type FileSystemManager::getFileType() const {
+    return _fileType;
+}
+
+bool FileSystemManager::isSDAvailable() const {
+    return _sdAvailable;
+}
+
+bool FileSystemManager::isEEPROMAvailable() const {
+    return _eepromAvailable;
+}
+
+uint32_t FileSystemManager::getTotalBytesWritten() const {
+    return _totalBytesWritten;
+}
+
+uint16_t FileSystemManager::getWriteErrors() const {
+    return _writeErrors;
+}
+
+void FileSystemManager::setDisplayManager(DisplayManager* manager) {
+    _displayManager = manager;
 }
 
 } // namespace DeviceBridge::Components

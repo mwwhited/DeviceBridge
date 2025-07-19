@@ -1,13 +1,13 @@
 #include "TimeManager.h"
+#include "DisplayManager.h"
 #include <string.h>
 #include <stdio.h>
+#include <Arduino.h>
 
 namespace DeviceBridge::Components {
 
-TimeManager::TimeManager(QueueHandle_t displayQueue, SemaphoreHandle_t i2cMutex)
-    : _displayQueue(displayQueue)
-    , _i2cMutex(i2cMutex)
-    , _taskHandle(nullptr)
+TimeManager::TimeManager()
+    : _displayManager(nullptr)
     , _rtcAvailable(false)
     , _lastTimeUpdate(0)
     , _timeValid(false)
@@ -23,67 +23,31 @@ bool TimeManager::initialize() {
     return _rtcAvailable;
 }
 
-bool TimeManager::start() {
-    if (_taskHandle != nullptr) {
-        return false; // Already running
+void TimeManager::update() {
+    // Update time display periodically (called from main loop)
+    uint32_t currentTime = millis();
+    if (currentTime - _lastTimeUpdate >= Common::RTOS::TIME_UPDATE_MS) {
+        updateTimeDisplay();
+        _lastTimeUpdate = currentTime;
     }
-    
-    BaseType_t result = xTaskCreate(
-        taskFunction,
-        "TimeManager",
-        Common::RTOS::TIME_STACK,
-        this,
-        Common::RTOS::TIME_PRIORITY,
-        &_taskHandle
-    );
-    
-    return result == pdPASS;
 }
 
 void TimeManager::stop() {
-    if (_taskHandle != nullptr) {
-        vTaskDelete(_taskHandle);
-        _taskHandle = nullptr;
-    }
-}
-
-void TimeManager::taskFunction(void* pvParameters) {
-    TimeManager* manager = static_cast<TimeManager*>(pvParameters);
-    manager->runTask();
-}
-
-void TimeManager::runTask() {
-    TickType_t lastWakeTime = xTaskGetTickCount();
-    
-    for (;;) {
-        // Update time display periodically
-        uint32_t currentTime = xTaskGetTickCount();
-        if (currentTime - _lastTimeUpdate >= pdMS_TO_TICKS(Common::RTOS::TIME_UPDATE_MS)) {
-            updateTimeDisplay();
-            _lastTimeUpdate = currentTime;
-        }
-        
-        // Maintain precise timing
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(Common::RTOS::TIME_UPDATE_MS));
-    }
+    // Nothing specific to stop for RTC
 }
 
 bool TimeManager::initializeRTC() {
-    if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        bool result = _rtc.begin();
-        if (result) {
-            // Check if RTC is running and has valid time
-            if (_rtc.isrunning()) {
-                DateTime now = _rtc.now();
-                _timeValid = (now.year() >= 2020 && now.year() <= 2099);
-            } else {
-                _timeValid = false;
-            }
+    bool result = _rtc.begin();
+    if (result) {
+        // Check if RTC is running and has valid time
+        if (_rtc.isrunning()) {
+            DateTime now = _rtc.now();
+            _timeValid = (now.year() >= 2020 && now.year() <= 2099);
+        } else {
+            _timeValid = false;
         }
-        xSemaphoreGive(_i2cMutex);
-        return result;
     }
-    return false;
+    return result;
 }
 
 void TimeManager::updateTimeDisplay() {
@@ -94,13 +58,9 @@ void TimeManager::updateTimeDisplay() {
     char timeBuffer[32];
     formatTime(timeBuffer, sizeof(timeBuffer));
     
-    Common::DisplayMessage msg;
-    msg.type = Common::DisplayMessage::TIME;
-    strncpy(msg.message, timeBuffer, sizeof(msg.message) - 1);
-    msg.message[sizeof(msg.message) - 1] = '\0';
-    msg.line2[0] = '\0';
-    
-    xQueueSend(_displayQueue, &msg, 0); // Non-blocking
+    if (_displayManager) {
+        _displayManager->displayMessage(Common::DisplayMessage::TIME, timeBuffer);
+    }
 }
 
 void TimeManager::formatTime(char* buffer, size_t bufferSize) {
@@ -110,18 +70,12 @@ void TimeManager::formatTime(char* buffer, size_t bufferSize) {
         return;
     }
     
-    if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        DateTime now = _rtc.now();
-        uint8_t hour = now.hour();
-        uint8_t minute = now.minute();
-        uint8_t second = now.second();
-        
-        snprintf(buffer, bufferSize, "Time: %02d:%02d:%02d", hour, minute, second);
-        xSemaphoreGive(_i2cMutex);
-    } else {
-        strncpy(buffer, "Time: I2C Busy", bufferSize - 1);
-        buffer[bufferSize - 1] = '\0';
-    }
+    DateTime now = _rtc.now();
+    uint8_t hour = now.hour();
+    uint8_t minute = now.minute();
+    uint8_t second = now.second();
+    
+    snprintf(buffer, bufferSize, "Time: %02d:%02d:%02d", hour, minute, second);
 }
 
 void TimeManager::formatDateTime(char* buffer, size_t bufferSize) {
@@ -131,21 +85,15 @@ void TimeManager::formatDateTime(char* buffer, size_t bufferSize) {
         return;
     }
     
-    if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        DateTime now = _rtc.now();
-        uint8_t day = now.day();
-        uint8_t month = now.month();
-        uint16_t year = now.year();
-        uint8_t hour = now.hour();
-        uint8_t minute = now.minute();
-        
-        snprintf(buffer, bufferSize, "%02d/%02d/%04d %02d:%02d", 
-                day, month, year, hour, minute);
-        xSemaphoreGive(_i2cMutex);
-    } else {
-        strncpy(buffer, "DateTime: I2C Busy", bufferSize - 1);
-        buffer[bufferSize - 1] = '\0';
-    }
+    DateTime now = _rtc.now();
+    uint8_t day = now.day();
+    uint8_t month = now.month();
+    uint16_t year = now.year();
+    uint8_t hour = now.hour();
+    uint8_t minute = now.minute();
+    
+    snprintf(buffer, bufferSize, "%02d/%02d/%04d %02d:%02d", 
+            day, month, year, hour, minute);
 }
 
 bool TimeManager::setTime(uint8_t hour, uint8_t minute, uint8_t second) {
@@ -153,15 +101,11 @@ bool TimeManager::setTime(uint8_t hour, uint8_t minute, uint8_t second) {
         return false;
     }
     
-    if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        DateTime now = _rtc.now();
-        DateTime newTime(now.year(), now.month(), now.day(), hour, minute, second);
-        _rtc.adjust(newTime);
-        _timeValid = true;
-        xSemaphoreGive(_i2cMutex);
-        return true;
-    }
-    return false;
+    DateTime now = _rtc.now();
+    DateTime newTime(now.year(), now.month(), now.day(), hour, minute, second);
+    _rtc.adjust(newTime);
+    _timeValid = true;
+    return true;
 }
 
 bool TimeManager::setDate(uint8_t day, uint8_t month, uint16_t year) {
@@ -169,26 +113,22 @@ bool TimeManager::setDate(uint8_t day, uint8_t month, uint16_t year) {
         return false;
     }
     
-    if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        DateTime now = _rtc.now();
-        DateTime newDate(year, month, day, now.hour(), now.minute(), now.second());
-        _rtc.adjust(newDate);
-        _timeValid = true;
-        xSemaphoreGive(_i2cMutex);
-        return true;
-    }
-    return false;
+    DateTime now = _rtc.now();
+    DateTime newDate(year, month, day, now.hour(), now.minute(), now.second());
+    _rtc.adjust(newDate);
+    _timeValid = true;
+    return true;
 }
 
 uint32_t TimeManager::getTimestamp() {
     if (!_rtcAvailable || !_timeValid) {
-        // Return system tick count if RTC not available
-        return xTaskGetTickCount();
+        // Return system millis if RTC not available
+        return millis();
     }
     
     // Return Unix timestamp if RTC is available
-    // This is a simplified implementation
-    return xTaskGetTickCount(); // TODO: Implement proper Unix timestamp
+    DateTime now = _rtc.now();
+    return now.unixtime();
 }
 
 void TimeManager::getFormattedTime(char* buffer, size_t bufferSize) {
@@ -197,6 +137,18 @@ void TimeManager::getFormattedTime(char* buffer, size_t bufferSize) {
 
 void TimeManager::getFormattedDateTime(char* buffer, size_t bufferSize) {
     formatDateTime(buffer, bufferSize);
+}
+
+bool TimeManager::isRTCAvailable() const {
+    return _rtcAvailable;
+}
+
+bool TimeManager::isTimeValid() const {
+    return _timeValid;
+}
+
+void TimeManager::setDisplayManager(DisplayManager* manager) {
+    _displayManager = manager;
 }
 
 void TimeManager::padNumber(char* buffer, uint8_t number, uint8_t digits) {

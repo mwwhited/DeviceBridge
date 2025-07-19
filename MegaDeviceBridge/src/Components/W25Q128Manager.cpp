@@ -2,9 +2,8 @@
 
 namespace DeviceBridge::Components {
 
-W25Q128Manager::W25Q128Manager(uint8_t csPin, SemaphoreHandle_t spiMutex)
-    : _spiMutex(spiMutex)
-    , _csPin(csPin)
+W25Q128Manager::W25Q128Manager(uint8_t csPin)
+    : _csPin(csPin)
     , _initialized(false)
 {
 }
@@ -14,10 +13,6 @@ W25Q128Manager::~W25Q128Manager() {
 }
 
 bool W25Q128Manager::initialize() {
-    if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        return false;
-    }
-    
     // Configure CS pin
     pinMode(_csPin, OUTPUT);
     chipSelect(false); // Deselect initially
@@ -27,8 +22,6 @@ bool W25Q128Manager::initialize() {
     
     // Read JEDEC ID to verify chip presence
     uint32_t jedecId = readJedecId();
-    
-    xSemaphoreGive(_spiMutex);
     
     // W25Q128 JEDEC ID should be 0xEF4018 (Winbond, 128Mbit)
     if ((jedecId & 0xFFFFFF) == 0xEF4018) {
@@ -56,7 +49,7 @@ uint8_t W25Q128Manager::readStatus() {
 
 void W25Q128Manager::waitForReady() {
     while (readStatus() & STATUS_BUSY) {
-        vTaskDelay(pdMS_TO_TICKS(1));
+        delay(1);
     }
 }
 
@@ -92,9 +85,7 @@ bool W25Q128Manager::readData(uint32_t address, uint8_t* buffer, uint32_t length
         length = FLASH_SIZE - address; // Clamp to valid range
     }
     
-    if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        return false;
-    }
+    // Note: No mutex needed in loop-based architecture
     
     waitForReady();
     
@@ -109,7 +100,7 @@ bool W25Q128Manager::readData(uint32_t address, uint8_t* buffer, uint32_t length
     }
     
     chipSelect(false);
-    xSemaphoreGive(_spiMutex);
+    // Note: No mutex needed in loop-based architecture
     
     return true;
 }
@@ -125,9 +116,7 @@ bool W25Q128Manager::writePage(uint32_t address, const uint8_t* buffer, uint32_t
         length = PAGE_SIZE - pageOffset;
     }
     
-    if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        return false;
-    }
+    // Note: No mutex needed in loop-based architecture
     
     waitForReady();
     writeEnable();
@@ -145,7 +134,7 @@ bool W25Q128Manager::writePage(uint32_t address, const uint8_t* buffer, uint32_t
     chipSelect(false);
     waitForReady();
     
-    xSemaphoreGive(_spiMutex);
+    // Note: No mutex needed in loop-based architecture
     
     return true;
 }
@@ -158,9 +147,7 @@ bool W25Q128Manager::eraseSector(uint32_t address) {
     // Align to sector boundary
     address = getSectorAddress(address);
     
-    if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(5000)) != pdTRUE) {
-        return false;
-    }
+    // Note: No mutex needed in loop-based architecture
     
     waitForReady();
     writeEnable();
@@ -174,7 +161,7 @@ bool W25Q128Manager::eraseSector(uint32_t address) {
     
     waitForReady(); // Sector erase can take up to 400ms
     
-    xSemaphoreGive(_spiMutex);
+    // Note: No mutex needed in loop-based architecture
     
     return true;
 }
@@ -187,9 +174,7 @@ bool W25Q128Manager::eraseBlock32K(uint32_t address) {
     // Align to 32K boundary
     address = address & ~(BLOCK_32K_SIZE - 1);
     
-    if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(10000)) != pdTRUE) {
-        return false;
-    }
+    // Note: No mutex needed in loop-based architecture
     
     waitForReady();
     writeEnable();
@@ -203,7 +188,7 @@ bool W25Q128Manager::eraseBlock32K(uint32_t address) {
     
     waitForReady(); // Block erase can take up to 1.6s
     
-    xSemaphoreGive(_spiMutex);
+    // Note: No mutex needed in loop-based architecture
     
     return true;
 }
@@ -216,9 +201,7 @@ bool W25Q128Manager::eraseBlock64K(uint32_t address) {
     // Align to 64K boundary
     address = address & ~(BLOCK_64K_SIZE - 1);
     
-    if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(15000)) != pdTRUE) {
-        return false;
-    }
+    // Note: No mutex needed in loop-based architecture
     
     waitForReady();
     writeEnable();
@@ -232,7 +215,7 @@ bool W25Q128Manager::eraseBlock64K(uint32_t address) {
     
     waitForReady(); // Block erase can take up to 2s
     
-    xSemaphoreGive(_spiMutex);
+    // Note: No mutex needed in loop-based architecture
     
     return true;
 }
@@ -242,9 +225,7 @@ bool W25Q128Manager::eraseChip() {
         return false;
     }
     
-    if (xSemaphoreTake(_spiMutex, pdMS_TO_TICKS(60000)) != pdTRUE) {
-        return false;
-    }
+    // Note: No mutex needed in loop-based architecture
     
     waitForReady();
     writeEnable();
@@ -255,7 +236,7 @@ bool W25Q128Manager::eraseChip() {
     
     waitForReady(); // Chip erase can take up to 50s
     
-    xSemaphoreGive(_spiMutex);
+    // Note: No mutex needed in loop-based architecture
     
     return true;
 }

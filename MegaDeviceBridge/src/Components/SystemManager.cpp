@@ -8,21 +8,17 @@
 
 namespace DeviceBridge::Components {
 
-SystemManager::SystemManager(QueueHandle_t commandQueue, QueueHandle_t displayQueue, SemaphoreHandle_t serialMutex)
-    : _commandQueue(commandQueue)
-    , _displayQueue(displayQueue)
-    , _serialMutex(serialMutex)
-    , _taskHandle(nullptr)
-    , _parallelPortManager(nullptr)
+SystemManager::SystemManager()
+    : _parallelPortManager(nullptr)
     , _fileSystemManager(nullptr)
     , _displayManager(nullptr)
     , _timeManager(nullptr)
     , _systemStatus(Common::SystemStatus::INITIALIZING)
     , _lastError(Common::ErrorCode::NONE)
+    , _lastSystemCheck(0)
     , _uptimeSeconds(0)
     , _errorCount(0)
     , _commandsProcessed(0)
-    , _monitoredTaskCount(0)
 {
 }
 
@@ -35,70 +31,21 @@ bool SystemManager::initialize() {
     return true;
 }
 
-bool SystemManager::start() {
-    if (_taskHandle != nullptr) {
-        return false; // Already running
+void SystemManager::update() {
+    // Periodic system monitoring (called from main loop)
+    uint32_t currentTime = millis();
+    if (currentTime - _lastSystemCheck >= Common::RTOS::SYSTEM_MONITOR_MS) {
+        monitorSystemHealth();
+        _lastSystemCheck = currentTime;
+        _uptimeSeconds = currentTime / 1000;
     }
-    
-    BaseType_t result = xTaskCreate(
-        taskFunction,
-        "SystemManager",
-        Common::RTOS::SYSTEM_MONITOR_STACK,
-        this,
-        Common::RTOS::SYSTEM_MONITOR_PRIORITY,
-        &_taskHandle
-    );
-    
-    // Skip self-monitoring during startup to avoid circular issues
-    
-    return result == pdPASS;
 }
 
 void SystemManager::stop() {
-    if (_taskHandle != nullptr) {
-        vTaskDelete(_taskHandle);
-        _taskHandle = nullptr;
-    }
+    // Nothing specific to stop for system manager
 }
 
-void SystemManager::taskFunction(void* pvParameters) {
-    SystemManager* manager = static_cast<SystemManager*>(pvParameters);
-    manager->runTask();
-}
-
-void SystemManager::runTask() {
-    // Debug: Signal that SystemManager task is actually running
-    if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        Serial.print(F("SystemManager task started and running\r\n"));
-        xSemaphoreGive(_serialMutex);
-    }
-    
-    Common::SystemCommand cmd;
-    TickType_t lastWakeTime = xTaskGetTickCount();
-    uint32_t monitorCounter = 0;
-    
-    // System is now ready
-    setSystemStatus(Common::SystemStatus::READY);
-    
-    for (;;) {
-        // Process commands
-        while (xQueueReceive(_commandQueue, &cmd, 0) == pdTRUE) {
-            processCommand(cmd);
-        }
-        
-        // Periodic system monitoring (every 5 cycles = 25 seconds)
-        if (++monitorCounter >= 5) {
-            monitorSystemHealth();
-            monitorCounter = 0;
-            _uptimeSeconds += (Common::RTOS::SYSTEM_MONITOR_MS * 5) / 1000;
-        }
-        
-        // Maintain precise timing
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(Common::RTOS::SYSTEM_MONITOR_MS));
-    }
-}
-
-void SystemManager::processCommand(const Common::SystemCommand& cmd) {
+void SystemManager::processSystemCommand(const Common::SystemCommand& cmd) {
     _commandsProcessed++;
     
     switch (cmd.type) {
@@ -127,38 +74,38 @@ void SystemManager::processCommand(const Common::SystemCommand& cmd) {
 void SystemManager::processStorageSelectCommand(uint8_t value) {
     if (_fileSystemManager == nullptr) return;
     
-    Common::StorageType storageType;
+    Common::StorageType::Type storageType;
     const char* message;
     
     switch (value) {
         case 0:
+            storageType = Common::StorageType::AUTO_SELECT;
+            message = "Storage: Auto";
+            break;
+        case 1:
             storageType = Common::StorageType::SD_CARD;
             message = "Storage: SD";
             break;
-        case 1:
+        case 2:
             storageType = Common::StorageType::EEPROM;
             message = "Storage: EEPROM";
             break;
-        case 2:
+        case 3:
             storageType = Common::StorageType::SERIAL_TRANSFER;
             message = "Storage: Serial";
-            break;
-        case 3:
-            storageType = Common::StorageType::AUTO_SELECT;
-            message = "Storage: Auto";
             break;
         default:
             return;
     }
     
-    _fileSystemManager->setPreferredStorage(storageType);
+    _fileSystemManager->setStorageType(storageType);
     sendDisplayMessage(Common::DisplayMessage::INFO, message);
 }
 
 void SystemManager::processFileTypeCommand(uint8_t value) {
     if (_fileSystemManager == nullptr) return;
     
-    Common::FileType fileType;
+    Common::FileType::Type fileType;
     const char* message;
     
     switch (value) {
@@ -177,6 +124,10 @@ void SystemManager::processFileTypeCommand(uint8_t value) {
         case 3:
             fileType = Common::FileType::PNG;
             message = "Type: PNG";
+            break;
+        case 4:
+            fileType = Common::FileType::TEXT;
+            message = "Type: Text";
             break;
         default:
             return;
@@ -198,74 +149,20 @@ void SystemManager::processConfigSaveCommand() {
 }
 
 void SystemManager::monitorSystemHealth() {
-    checkTaskStacks();
-    checkQueueLevels();
     logSystemStatus();
 }
 
-void SystemManager::checkTaskStacks() {
-    for (uint8_t i = 0; i < _monitoredTaskCount; i++) {
-        checkTaskHealth(_monitoredTasks[i]);
-    }
-}
-
-void SystemManager::checkTaskHealth(TaskHealth& task) {
-    if (task.handle == nullptr) {
-        task.healthy = false;
-        return;
-    }
-    
-    UBaseType_t highWaterMark = uxTaskGetStackHighWaterMark(task.handle);
-    
-    // Check for stack overflow (less than 64 bytes remaining)
-    if (highWaterMark < 64) {
-        task.healthy = false;
-        handleError(Common::ErrorCode::HARDWARE_ERROR);
-        
-        if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            Serial.print(F("WARNING: Low stack on task "));
-            Serial.print(task.name);
-            Serial.print(F(" - "));
-            Serial.print(highWaterMark);
-            Serial.print(F(" bytes remaining\r\n"));
-            xSemaphoreGive(_serialMutex);
-        }
-    } else {
-        task.healthy = true;
-    }
-    
-    task.lastHighWaterMark = highWaterMark;
-}
-
-void SystemManager::checkQueueLevels() {
-    // Check data queue level (most critical)
-    UBaseType_t dataQueueLevel = uxQueueMessagesWaiting(_commandQueue); // TODO: Need reference to data queue
-    
-    if (dataQueueLevel >= Common::Limits::QUEUE_WARNING_THRESHOLD) {
-        handleError(Common::ErrorCode::BUFFER_OVERFLOW);
-        
-        if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            Serial.print(F("WARNING: Queue nearly full - "));
-            Serial.print(dataQueueLevel);
-            Serial.print(F(" messages waiting\r\n"));
-            xSemaphoreGive(_serialMutex);
-        }
-    }
-}
-
 void SystemManager::logSystemStatus() {
-    if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        Serial.print(F("Uptime: "));
-        Serial.print(_uptimeSeconds);
-        Serial.print(F("s, Errors: "));
-        Serial.print(_errorCount);
-        Serial.print(F(", Commands: "));
-        Serial.print(_commandsProcessed); Serial.print("\r\n");
-        xSemaphoreGive(_serialMutex);
-    }
+    Serial.print(F("Uptime: "));
+    Serial.print(_uptimeSeconds);
+    Serial.print(F("s, Errors: "));
+    Serial.print(_errorCount);
+    Serial.print(F(", Commands: "));
+    Serial.print(_commandsProcessed);
+    Serial.print(F("\r\n"));
 }
 
-void SystemManager::setSystemStatus(Common::SystemStatus status) {
+void SystemManager::setSystemStatus(Common::SystemStatus::Type status) {
     _systemStatus = status;
     
     const char* statusMessage;
@@ -296,13 +193,13 @@ void SystemManager::setSystemStatus(Common::SystemStatus status) {
     sendDisplayMessage(Common::DisplayMessage::STATUS, statusMessage);
 }
 
-void SystemManager::reportError(Common::ErrorCode error) {
+void SystemManager::reportError(Common::ErrorCode::Type error) {
     _lastError = error;
     _errorCount++;
     handleError(error);
 }
 
-void SystemManager::handleError(Common::ErrorCode error) {
+void SystemManager::handleError(Common::ErrorCode::Type error) {
     const char* errorMessage;
     
     switch (error) {
@@ -338,68 +235,70 @@ void SystemManager::handleError(Common::ErrorCode error) {
 }
 
 void SystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const char* message) {
-    Common::DisplayMessage msg;
-    msg.type = type;
-    strncpy(msg.message, message, sizeof(msg.message) - 1);
-    msg.message[sizeof(msg.message) - 1] = '\0';
-    msg.line2[0] = '\0';
-    
-    xQueueSend(_displayQueue, &msg, 0); // Non-blocking
-}
-
-void SystemManager::addTaskToMonitor(TaskHandle_t handle, const char* name) {
-    if (_monitoredTaskCount < MAX_MONITORED_TASKS) {
-        _monitoredTasks[_monitoredTaskCount].handle = handle;
-        _monitoredTasks[_monitoredTaskCount].name = name;
-        _monitoredTasks[_monitoredTaskCount].lastHighWaterMark = 0;
-        _monitoredTasks[_monitoredTaskCount].healthy = true;
-        _monitoredTaskCount++;
+    if (_displayManager) {
+        _displayManager->displayMessage(type, message);
     }
 }
 
 void SystemManager::printSystemInfo() {
-    if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.print(F("=== Device Bridge System Info ===\r\n"));
-        Serial.print("Status: ");
-        Serial.print((int)_systemStatus); Serial.print("\r\n");
-        Serial.print(F("Uptime: "));
-        Serial.print(_uptimeSeconds);
-        Serial.print(" seconds\r\n");
-        Serial.print("Total Errors: ");
-        Serial.print(_errorCount); Serial.print("\r\n");
-        Serial.print("Commands Processed: ");
-        Serial.print(_commandsProcessed); Serial.print("\r\n");
-        xSemaphoreGive(_serialMutex);
-    }
-}
-
-void SystemManager::printTaskInfo() {
-    if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.print(F("=== Task Health Info ===\r\n"));
-        for (uint8_t i = 0; i < _monitoredTaskCount; i++) {
-            Serial.print(i);
-            Serial.print(": ");
-            Serial.print(_monitoredTasks[i].name);
-            Serial.print(" - Stack: ");
-            Serial.print(_monitoredTasks[i].lastHighWaterMark);
-            Serial.print(" bytes, Health: ");
-            Serial.print(_monitoredTasks[i].healthy ? "OK\r\n" : "ERROR\r\n");
-        }
-        xSemaphoreGive(_serialMutex);
-    }
+    Serial.print(F("=== Device Bridge System Info ===\r\n"));
+    Serial.print("Status: ");
+    Serial.print((int)_systemStatus);
+    Serial.print("\r\n");
+    Serial.print(F("Uptime: "));
+    Serial.print(_uptimeSeconds);
+    Serial.print(" seconds\r\n");
+    Serial.print("Total Errors: ");
+    Serial.print(_errorCount);
+    Serial.print("\r\n");
+    Serial.print("Commands Processed: ");
+    Serial.print(_commandsProcessed);
+    Serial.print("\r\n");
 }
 
 void SystemManager::printMemoryInfo() {
-    if (xSemaphoreTake(_serialMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        Serial.print(F("=== Memory Info ===\r\n"));
-        Serial.print("Free Heap: ");
-        Serial.print(xPortGetFreeHeapSize());
-        Serial.print(F(" bytes\r\n"));
-        Serial.print("Min Free Heap: ");
-        Serial.print(xPortGetMinimumEverFreeHeapSize());
-        Serial.print(F(" bytes\r\n"));
-        xSemaphoreGive(_serialMutex);
-    }
+    Serial.print(F("=== Memory Info ===\r\n"));
+    Serial.print("Free SRAM: ");
+    Serial.print(freeRam());
+    Serial.print(F(" bytes\r\n"));
+}
+
+uint16_t SystemManager::freeRam() {
+    extern int __heap_start, *__brkval;
+    int v;
+    return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+
+Common::SystemStatus::Type SystemManager::getSystemStatus() const {
+    return _systemStatus;
+}
+
+uint32_t SystemManager::getUptimeSeconds() const {
+    return _uptimeSeconds;
+}
+
+uint16_t SystemManager::getErrorCount() const {
+    return _errorCount;
+}
+
+uint32_t SystemManager::getCommandsProcessed() const {
+    return _commandsProcessed;
+}
+
+Common::ErrorCode::Type SystemManager::getLastError() const {
+    return _lastError;
+}
+
+void SystemManager::setComponentManagers(
+    ParallelPortManager* parallelPort,
+    FileSystemManager* fileSystem,
+    DisplayManager* display,
+    TimeManager* time
+) {
+    _parallelPortManager = parallelPort;
+    _fileSystemManager = fileSystem;
+    _displayManager = display;
+    _timeManager = time;
 }
 
 } // namespace DeviceBridge::Components

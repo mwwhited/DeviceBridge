@@ -1,5 +1,5 @@
 @ECHO OFF
-
+CLS
 REM taskkill /IM putty.exe /F >nul 2>&1
 REM timeout /t 1 >nul
 REM -t upload 

@@ -1,4 +1,6 @@
 #include "DisplayManager.h"
+#include "TimeManager.h"
+#include "SystemManager.h"
 #include <string.h>
 #include <Arduino.h>
 
@@ -12,11 +14,10 @@ constexpr uint16_t BUTTON_LEFT = 504;
 constexpr uint16_t BUTTON_SELECT = 741;
 constexpr uint16_t BUTTON_NONE = 1023;
 
-DisplayManager::DisplayManager(User::Display& display, QueueHandle_t displayQueue, QueueHandle_t commandQueue)
+DisplayManager::DisplayManager(User::Display& display)
     : _display(display)
-    , _displayQueue(displayQueue)
-    , _commandQueue(commandQueue)
-    , _taskHandle(nullptr)
+    , _timeManager(nullptr)
+    , _systemManager(nullptr)
     , _lastMessageTime(0)
     , _showingTime(false)
     , _inMenu(false)
@@ -39,188 +40,134 @@ bool DisplayManager::initialize() {
     return true;
 }
 
-bool DisplayManager::start() {
-    if (_taskHandle != nullptr) {
-        return false; // Already running
+void DisplayManager::update() {
+    // Check for button presses
+    uint16_t buttonValue = readButtons();
+    if (buttonValue != BUTTON_NONE && buttonValue != _lastButtonState) {
+        handleButtonPress(buttonValue);
+        _lastButtonState = buttonValue;
+        _lastButtonTime = millis();
+    } else if (buttonValue == BUTTON_NONE) {
+        _lastButtonState = BUTTON_NONE;
     }
     
-    BaseType_t result = xTaskCreate(
-        taskFunction,
-        "Display",
-        Common::RTOS::DISPLAY_STACK,
-        this,
-        Common::RTOS::DISPLAY_PRIORITY,
-        &_taskHandle
-    );
-    
-    return result == pdPASS;
+    // Update display content
+    updateDisplay();
 }
 
 void DisplayManager::stop() {
-    if (_taskHandle != nullptr) {
-        vTaskDelete(_taskHandle);
-        _taskHandle = nullptr;
-    }
+    _inMenu = false;
+    _showingTime = false;
 }
 
-void DisplayManager::taskFunction(void* pvParameters) {
-    DisplayManager* manager = static_cast<DisplayManager*>(pvParameters);
-    manager->runTask();
-}
-
-void DisplayManager::runTask() {
-    Common::DisplayMessage msg;
-    TickType_t lastWakeTime = xTaskGetTickCount();
-    
-    for (;;) {
-        // Check for new messages
-        while (xQueueReceive(_displayQueue, &msg, 0) == pdTRUE) {
-            processMessage(msg);
-        }
-        
-        // Handle button input
-        uint16_t button = readButtons();
-        if (button != BUTTON_NONE && button != _lastButtonState) {
-            uint32_t currentTime = xTaskGetTickCount();
-            if (currentTime - _lastButtonTime > pdMS_TO_TICKS(BUTTON_DEBOUNCE_MS)) {
-                handleButtonPress(button);
-                _lastButtonTime = currentTime;
+void DisplayManager::updateDisplay() {
+    // Check if we should show time when idle
+    if (!_inMenu && (millis() - _lastMessageTime) > Common::Display::IDLE_TIME_MS) {
+        if (!_showingTime) {
+            _showingTime = true;
+            if (_timeManager) {
+                char timeStr[32];
+                _timeManager->getFormattedTime(timeStr, sizeof(timeStr));
+                showTimeDisplay(timeStr);
             }
         }
-        _lastButtonState = button;
-        
-        // Update display
-        updateDisplay();
-        
-        // Maintain precise timing
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(Common::RTOS::DISPLAY_UPDATE_MS));
     }
 }
 
 void DisplayManager::processMessage(const Common::DisplayMessage& msg) {
-    _lastMessageTime = xTaskGetTickCount();
+    _lastMessageTime = millis();
     _showingTime = false;
     
     switch (msg.type) {
+        case Common::DisplayMessage::STATUS:
+            showMessage(msg.message, msg.line2);
+            break;
+        case Common::DisplayMessage::ERROR:
+            showError(msg.message);
+            break;
+        case Common::DisplayMessage::INFO:
+            showMessage(msg.message, msg.line2);
+            break;
         case Common::DisplayMessage::TIME:
-            if (!_inMenu && (xTaskGetTickCount() - _lastMessageTime) > pdMS_TO_TICKS(Common::Display::IDLE_TIME_MS)) {
-                strncpy(_currentMessage, msg.message, sizeof(_currentMessage) - 1);
-                _showingTime = true;
-            }
+            showTimeDisplay(msg.message);
             break;
-            
         case Common::DisplayMessage::MENU:
-            strncpy(_currentMessage, msg.message, sizeof(_currentMessage) - 1);
-            strncpy(_currentLine2, msg.line2, sizeof(_currentLine2) - 1);
+            showMenuScreen();
             break;
-            
-        default:
-            strncpy(_currentMessage, msg.message, sizeof(_currentMessage) - 1);
-            _currentLine2[0] = '\0';
-            break;
-    }
-    
-    _currentMessage[sizeof(_currentMessage) - 1] = '\0';
-    _currentLine2[sizeof(_currentLine2) - 1] = '\0';
-}
-
-void DisplayManager::updateDisplay() {
-    if (_inMenu) {
-        showMenuScreen();
-    } else if (_showingTime) {
-        showTimeDisplay(_currentMessage);
-    } else {
-        showMainScreen();
     }
 }
 
 void DisplayManager::showMainScreen() {
-    _display.updateStatus(_currentMessage);
+    _display.clear();
+    _display.setCursor(0, 0);
+    _display.print(_currentMessage);
+    
+    if (strlen(_currentLine2) > 0) {
+        _display.setCursor(0, 1);
+        _display.print(_currentLine2);
+    }
 }
 
 void DisplayManager::showTimeDisplay(const char* timeStr) {
-    _display.showTime(timeStr);
+    _display.clear();
+    _display.setCursor(0, 0);
+    _display.print("Device Bridge");
+    _display.setCursor(0, 1);
+    _display.print(timeStr);
 }
 
 void DisplayManager::showMenuScreen() {
-    const char* title = getMenuTitle(_menuState);
-    const char* option = getMenuOption(_menuState, _menuSelection);
-    
-    char line2[32];
-    snprintf(line2, sizeof(line2), ">%s", option);
-    
-    _display.showMenu(title, line2);
+    _display.clear();
+    _display.setCursor(0, 0);
+    _display.print(getMenuTitle(_menuState));
+    _display.setCursor(0, 1);
+    _display.print(">");
+    _display.print(getMenuOption(_menuState, _menuSelection));
 }
 
 uint16_t DisplayManager::readButtons() {
-    int buttonValue = analogRead(A0); // OSEPP LCD shield button pin
+    uint32_t currentTime = millis();
     
-    // Debug: Output button value changes to serial (with debouncing)
-    static int lastReportedValue = -1;
-    static uint32_t lastReportTime = 0;
-    static bool startupReporting = true;
-    static uint8_t startupCount = 0;
-    uint32_t currentTime = xTaskGetTickCount();
-    
-    // During startup, report first 10 readings for calibration
-    if (startupReporting && startupCount < 10) {
-        Serial.print(F("Startup A0["));
-        Serial.print(startupCount);
-        Serial.print(F("]: "));
-        Serial.print(buttonValue);
-        Serial.print(F("\r\n"));
-        startupCount++;
-        if (startupCount >= 10) {
-            startupReporting = false;
-            Serial.print(F("Press buttons now - values will be reported\r\n"));
-        }
+    // Debounce buttons
+    if (currentTime - _lastButtonTime < BUTTON_DEBOUNCE_MS) {
+        return _lastButtonState;
     }
     
-    // Report value changes with some debouncing (every 200ms max)
-    if (abs(buttonValue - lastReportedValue) > 10 && 
-        (currentTime - lastReportTime) > pdMS_TO_TICKS(200)) {
-        Serial.print(F("Button A0 value: "));
-        Serial.print(buttonValue);
-        Serial.print(F("\r\n"));
-        lastReportedValue = buttonValue;
-        lastReportTime = currentTime;
-    }
+    uint16_t buttonValue = analogRead(A0);
     
-    // Map analog values to button constants with tolerance bands
-    if (buttonValue < 50) return BUTTON_RIGHT;        // 0 ± 50
-    if (buttonValue < 194) return BUTTON_UP;          // 144 ± 50  
-    if (buttonValue < 416) return BUTTON_DOWN;        // 329 ± 87
-    if (buttonValue < 622) return BUTTON_LEFT;        // 504 ± 118
-    if (buttonValue < 891) return BUTTON_SELECT;      // 741 ± 150
+    // Tolerance for analog readings
+    if (buttonValue < 50) return BUTTON_RIGHT;
+    if (buttonValue < 200) return BUTTON_UP;
+    if (buttonValue < 400) return BUTTON_DOWN;
+    if (buttonValue < 600) return BUTTON_LEFT;
+    if (buttonValue < 800) return BUTTON_SELECT;
     
-    return BUTTON_NONE; // > 891, should be ~1023
+    return BUTTON_NONE;
 }
 
 void DisplayManager::handleButtonPress(uint16_t button) {
     if (_inMenu) {
         navigateMenu(button);
     } else {
-        // Any button press enters menu from main screen
-        if (button != BUTTON_NONE) {
-            enterMenu();
-        }
+        // Enter menu on any button press when not in menu
+        enterMenu();
     }
 }
 
 void DisplayManager::navigateMenu(uint16_t button) {
-    uint8_t maxOptions = getMenuOptionCount(_menuState);
-    
     switch (button) {
         case BUTTON_UP:
             if (_menuSelection > 0) {
                 _menuSelection--;
             }
+            showMenuScreen();
             break;
             
         case BUTTON_DOWN:
-            if (_menuSelection < maxOptions - 1) {
+            if (_menuSelection < getMenuOptionCount(_menuState) - 1) {
                 _menuSelection++;
             }
+            showMenuScreen();
             break;
             
         case BUTTON_SELECT:
@@ -230,9 +177,6 @@ void DisplayManager::navigateMenu(uint16_t button) {
         case BUTTON_LEFT:
             exitMenu();
             break;
-            
-        default:
-            break;
     }
 }
 
@@ -240,83 +184,117 @@ void DisplayManager::executeMenuSelection() {
     switch (_menuState) {
         case MAIN_MENU:
             switch (_menuSelection) {
-                case 0: _menuState = STORAGE_MENU; break;
-                case 1: _menuState = FILETYPE_MENU; break;
-                case 2: _menuState = CONFIG_MENU; break;
-                case 3: exitMenu(); break;
+                case 0: // Storage
+                    _menuState = STORAGE_MENU;
+                    _menuSelection = 0;
+                    break;
+                case 1: // File Type
+                    _menuState = FILETYPE_MENU;
+                    _menuSelection = 0;
+                    break;
+                case 2: // Config
+                    _menuState = CONFIG_MENU;
+                    _menuSelection = 0;
+                    break;
             }
+            showMenuScreen();
             break;
             
         case STORAGE_MENU:
             sendCommand(Common::SystemCommand::STORAGE_SELECT, _menuSelection);
-            _menuState = MAIN_MENU;
+            exitMenu();
             break;
             
         case FILETYPE_MENU:
             sendCommand(Common::SystemCommand::FILE_TYPE, _menuSelection);
-            _menuState = MAIN_MENU;
+            exitMenu();
             break;
             
         case CONFIG_MENU:
-            // TODO: Implement config options
-            _menuState = MAIN_MENU;
+            sendCommand(Common::SystemCommand::CONFIG_SAVE, _menuSelection);
+            exitMenu();
             break;
     }
-    
-    _menuSelection = 0;
 }
 
 void DisplayManager::sendCommand(Common::SystemCommand::Type type, uint8_t value, const char* data) {
-    Common::SystemCommand cmd;
-    cmd.type = type;
-    cmd.value = value;
-    
-    if (data != nullptr) {
-        strncpy(cmd.data, data, sizeof(cmd.data) - 1);
-        cmd.data[sizeof(cmd.data) - 1] = '\0';
-    } else {
-        cmd.data[0] = '\0';
+    if (_systemManager) {
+        Common::SystemCommand cmd;
+        cmd.type = type;
+        cmd.value = value;
+        if (data) {
+            strncpy(cmd.data, data, sizeof(cmd.data) - 1);
+            cmd.data[sizeof(cmd.data) - 1] = '\0';
+        } else {
+            cmd.data[0] = '\0';
+        }
+        
+        _systemManager->processSystemCommand(cmd);
     }
-    
-    xQueueSend(_commandQueue, &cmd, 0);
-}
-
-void DisplayManager::enterMenu() {
-    _inMenu = true;
-    _menuState = MAIN_MENU;
-    _menuSelection = 0;
-}
-
-void DisplayManager::exitMenu() {
-    _inMenu = false;
-    _showingTime = false;
-    showMessage("Ready");
 }
 
 void DisplayManager::showMessage(const char* message, const char* line2) {
     strncpy(_currentMessage, message, sizeof(_currentMessage) - 1);
     _currentMessage[sizeof(_currentMessage) - 1] = '\0';
     
-    if (line2 != nullptr) {
+    if (line2) {
         strncpy(_currentLine2, line2, sizeof(_currentLine2) - 1);
         _currentLine2[sizeof(_currentLine2) - 1] = '\0';
     } else {
         _currentLine2[0] = '\0';
     }
     
-    _lastMessageTime = xTaskGetTickCount();
+    _lastMessageTime = millis();
     _showingTime = false;
+    
+    if (!_inMenu) {
+        showMainScreen();
+    }
 }
 
 void DisplayManager::showError(const char* error) {
-    showMessage(error);
+    _display.clear();
+    _display.setCursor(0, 0);
+    _display.print("ERROR:");
+    _display.setCursor(0, 1);
+    _display.print(error);
+    
+    _lastMessageTime = millis();
+    _showingTime = false;
 }
 
 void DisplayManager::showStatus(const char* status) {
     showMessage(status);
 }
 
-// Static menu helper functions
+void DisplayManager::enterMenu() {
+    _inMenu = true;
+    _menuState = MAIN_MENU;
+    _menuSelection = 0;
+    showMenuScreen();
+}
+
+void DisplayManager::exitMenu() {
+    _inMenu = false;
+    showMainScreen();
+}
+
+void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const char* message, const char* line2) {
+    Common::DisplayMessage msg;
+    msg.type = type;
+    strncpy(msg.message, message, sizeof(msg.message) - 1);
+    msg.message[sizeof(msg.message) - 1] = '\0';
+    
+    if (line2) {
+        strncpy(msg.line2, line2, sizeof(msg.line2) - 1);
+        msg.line2[sizeof(msg.line2) - 1] = '\0';
+    } else {
+        msg.line2[0] = '\0';
+    }
+    
+    processMessage(msg);
+}
+
 const char* DisplayManager::getMenuTitle(MenuState state) {
     switch (state) {
         case MAIN_MENU: return "Main Menu";
@@ -334,18 +312,19 @@ const char* DisplayManager::getMenuOption(MenuState state, uint8_t option) {
                 case 0: return "Storage";
                 case 1: return "File Type";
                 case 2: return "Config";
-                case 3: return "Exit";
-                default: return "";
+                default: return "Option";
             }
+            break;
             
         case STORAGE_MENU:
             switch (option) {
-                case 0: return "SD Card";
-                case 1: return "EEPROM";
-                case 2: return "Serial";
-                case 3: return "Auto";
-                default: return "";
+                case 0: return "Auto";
+                case 1: return "SD Card";
+                case 2: return "EEPROM";
+                case 3: return "Serial";
+                default: return "Option";
             }
+            break;
             
         case FILETYPE_MENU:
             switch (option) {
@@ -353,29 +332,31 @@ const char* DisplayManager::getMenuOption(MenuState state, uint8_t option) {
                 case 1: return "Binary";
                 case 2: return "Bitmap";
                 case 3: return "PNG";
-                default: return "";
+                case 4: return "Text";
+                default: return "Option";
             }
+            break;
             
         case CONFIG_MENU:
             switch (option) {
-                case 0: return "Set Time";
-                case 1: return "Save Config";
-                case 2: return "Reset";
-                default: return "";
+                case 0: return "Save";
+                case 1: return "Reset";
+                default: return "Option";
             }
+            break;
             
         default:
-            return "";
+            return "Option";
     }
 }
 
 uint8_t DisplayManager::getMenuOptionCount(MenuState state) {
     switch (state) {
-        case MAIN_MENU: return 4;
+        case MAIN_MENU: return 3;
         case STORAGE_MENU: return 4;
-        case FILETYPE_MENU: return 4;
-        case CONFIG_MENU: return 3;
-        default: return 0;
+        case FILETYPE_MENU: return 5;
+        case CONFIG_MENU: return 2;
+        default: return 1;
     }
 }
 
