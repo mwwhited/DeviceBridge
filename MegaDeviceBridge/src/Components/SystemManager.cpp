@@ -110,12 +110,22 @@ void SystemManager::monitorSystemHealth() {
 }
 
 void SystemManager::logSystemStatus() {
+
+    char timeMessage[32]= "MISSING!";
+    if (_timeManager) {
+        //_timeManager->updateTimeDisplay();
+        _timeManager->getFormattedDateTime(timeMessage, sizeof(timeMessage));
+    }
+
     Serial.print(F("Uptime: "));
     Serial.print(_uptimeSeconds);
     Serial.print(F("s, Errors: "));
     Serial.print(_errorCount);
     Serial.print(F(", Commands: "));
     Serial.print(_commandsProcessed);
+    
+    Serial.print(F(", Time: "));
+    Serial.print(timeMessage);
     Serial.print(F("\r\n"));
 }
 

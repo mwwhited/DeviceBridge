@@ -27,7 +27,7 @@ void TimeManager::update() {
     // Update time display periodically (called from main loop)
     uint32_t currentTime = millis();
     if (currentTime - _lastTimeUpdate >= Common::RTOS::TIME_UPDATE_MS) {
-        updateTimeDisplay();
+         updateTimeDisplay();
         _lastTimeUpdate = currentTime;
     }
 }
@@ -80,7 +80,7 @@ void TimeManager::formatTime(char* buffer, size_t bufferSize) {
 
 void TimeManager::formatDateTime(char* buffer, size_t bufferSize) {
     if (!_rtcAvailable || !_timeValid) {
-        strncpy(buffer, "--/--/---- --:--", bufferSize - 1);
+        strncpy(buffer, "yyyy-MM-dd hh:mm:ss", bufferSize - 1);
         buffer[bufferSize - 1] = '\0';
         return;
     }
@@ -91,9 +91,10 @@ void TimeManager::formatDateTime(char* buffer, size_t bufferSize) {
     uint16_t year = now.year();
     uint8_t hour = now.hour();
     uint8_t minute = now.minute();
+    uint8_t second = now.second();
     
-    snprintf(buffer, bufferSize, "%02d/%02d/%04d %02d:%02d", 
-            day, month, year, hour, minute);
+    snprintf(buffer, bufferSize, "%04d-%02d-%02d %02d:%02d:%02d", 
+            year, month, day, hour, minute, second);
 }
 
 bool TimeManager::setTime(uint8_t hour, uint8_t minute, uint8_t second) {

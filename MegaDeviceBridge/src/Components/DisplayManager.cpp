@@ -64,7 +64,8 @@ void DisplayManager::stop() {
 void DisplayManager::updateDisplay() {
     // Check if we should show time when idle
     if (!_inMenu && (millis() - _lastMessageTime) > Common::Display::IDLE_TIME_MS) {
-        if (!_showingTime) {
+        if (!_showingTime) 
+        {
             _showingTime = true;
             if (_timeManager) {
                 char timeStr[32];
@@ -77,7 +78,6 @@ void DisplayManager::updateDisplay() {
 
 void DisplayManager::processMessage(const Common::DisplayMessage& msg) {
     _lastMessageTime = millis();
-    _showingTime = false;
     
     switch (msg.type) {
         case Common::DisplayMessage::STATUS:
@@ -91,6 +91,7 @@ void DisplayManager::processMessage(const Common::DisplayMessage& msg) {
             break;
         case Common::DisplayMessage::TIME:
             showTimeDisplay(msg.message);
+            _showingTime = false;
             break;
         case Common::DisplayMessage::MENU:
             showMenuScreen();

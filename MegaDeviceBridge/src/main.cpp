@@ -59,6 +59,7 @@ unsigned long lastFileSystemUpdate = 0;
 unsigned long lastDisplayUpdate = 0;
 unsigned long lastTimeUpdate = 0;
 unsigned long lastSystemUpdate = 0;
+unsigned long lastHeartbeatUpdate = 0;
 
 // Update intervals (milliseconds)
 const unsigned long PARALLEL_INTERVAL = 1;      // 1ms for real-time data capture
@@ -66,9 +67,14 @@ const unsigned long FILESYSTEM_INTERVAL = 10;   // 10ms for file operations
 const unsigned long DISPLAY_INTERVAL = 100;     // 100ms for display updates
 const unsigned long TIME_INTERVAL = 1000;       // 1s for time operations
 const unsigned long SYSTEM_INTERVAL = 5000;     // 5s for system monitoring
+const unsigned long HEARTBEAT_INTERVAL = 500;   // 500ms for blink heartbeat LED
+
 
 void setup()
 {
+  pinMode(DeviceBridge::Common::Pins::HEARTBEAT, OUTPUT);
+  digitalWrite(DeviceBridge::Common::Pins::HEARTBEAT, LOW); // Start with LED off
+
   Serial.begin(DeviceBridge::Common::Serial::BAUD_RATE);
   while (!Serial) { delay(10); }
   
@@ -168,6 +174,12 @@ void loop()
   if (currentTime - lastSystemUpdate >= SYSTEM_INTERVAL) {
     systemManager->update();
     lastSystemUpdate = currentTime;
+  }
+
+  // Heartbeat manager
+  if (currentTime - lastHeartbeatUpdate >= HEARTBEAT_INTERVAL) {
+    digitalWrite(DeviceBridge::Common::Pins::HEARTBEAT, !digitalRead(DeviceBridge::Common::Pins::HEARTBEAT));
+    lastHeartbeatUpdate = currentTime;
   }
   
   // Small delay to prevent overwhelming the CPU

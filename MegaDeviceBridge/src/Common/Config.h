@@ -53,7 +53,9 @@ namespace Serial {
 }
 
 // Hardware Pin Assignments (from Pinouts.md)
-namespace Pins {
+namespace Pins {  
+  constexpr uint8_t HEARTBEAT = 13;
+
   // LCD Shield pins
   constexpr uint8_t LCD_RESET = 8;
   constexpr uint8_t LCD_ENABLE = 9;
