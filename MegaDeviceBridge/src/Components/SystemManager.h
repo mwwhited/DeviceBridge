@@ -76,6 +76,7 @@ public:
     void printSystemInfo();
     void printMemoryInfo();
     uint16_t freeRam();
+    void validateHardware();  // Hardware validation test
     
     // Component management
     void setComponentManagers(ParallelPortManager* ppm, FileSystemManager* fsm, 

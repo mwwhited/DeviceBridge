@@ -182,6 +182,24 @@ void loop()
     lastHeartbeatUpdate = currentTime;
   }
   
+  // Check for serial commands
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    
+    if (command.equalsIgnoreCase(F("validate")) || command.equalsIgnoreCase(F("test"))) {
+      systemManager->validateHardware();
+    } else if (command.equalsIgnoreCase(F("info"))) {
+      systemManager->printSystemInfo();
+      systemManager->printMemoryInfo();
+    } else if (command.equalsIgnoreCase(F("help"))) {
+      Serial.print(F("\r\nAvailable commands:\r\n"));
+      Serial.print(F("  validate/test - Run hardware validation\r\n"));
+      Serial.print(F("  info - Show system information\r\n"));
+      Serial.print(F("  help - Show this help\r\n\r\n"));
+    }
+  }
+  
   // Small delay to prevent overwhelming the CPU
   delayMicroseconds(100);
 }

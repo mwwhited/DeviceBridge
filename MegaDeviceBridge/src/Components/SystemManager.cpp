@@ -6,6 +6,10 @@
 #include <string.h>
 #include <Arduino.h>
 
+// Memory management globals
+extern int __heap_start;
+extern int *__brkval;
+
 namespace DeviceBridge::Components {
 
 SystemManager::SystemManager()
@@ -236,7 +240,6 @@ void SystemManager::printMemoryInfo() {
 }
 
 uint16_t SystemManager::freeRam() {
-    extern int __heap_start, *__brkval;
     int v;
     return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
@@ -252,6 +255,98 @@ void SystemManager::setComponentManagers(
     _fileSystemManager = fileSystem;
     _displayManager = display;
     _timeManager = time;
+}
+
+void SystemManager::validateHardware() {
+    Serial.print(F("\r\n=== Hardware Validation Test ===\r\n"));
+    
+    bool allComponentsOK = true;
+    
+    // Test FileSystemManager (SD Card, EEPROM)
+    if (_fileSystemManager) {
+        Serial.print(F("FileSystem Manager: "));
+        bool fsOK = true;
+        
+        // Check if FileSystemManager has storage available
+        if (_fileSystemManager->isSDAvailable()) {
+            Serial.print(F("SD-OK "));
+        } else {
+            Serial.print(F("SD-FAIL "));
+            fsOK = false;
+        }
+        
+        if (_fileSystemManager->isEEPROMAvailable()) {
+            Serial.print(F("EEPROM-OK "));
+        } else {
+            Serial.print(F("EEPROM-FAIL "));
+            fsOK = false;
+        }
+        
+        if (fsOK) {
+            Serial.print(F("✅\r\n"));
+        } else {
+            Serial.print(F("❌\r\n"));
+            allComponentsOK = false;
+        }
+    } else {
+        Serial.print(F("FileSystem Manager: NOT INITIALIZED ❌\r\n"));
+        allComponentsOK = false;
+    }
+    
+    // Test TimeManager (RTC)
+    if (_timeManager) {
+        Serial.print(F("Time Manager: "));
+        if (_timeManager->isRTCAvailable()) {
+            Serial.print(F("RTC-OK ✅\r\n"));
+        } else {
+            Serial.print(F("RTC-FAIL ❌\r\n"));
+            allComponentsOK = false;
+        }
+    } else {
+        Serial.print(F("Time Manager: NOT INITIALIZED ❌\r\n"));
+        allComponentsOK = false;
+    }
+    
+    // Test DisplayManager (LCD)
+    if (_displayManager) {
+        Serial.print(F("Display Manager: LCD-OK ✅\r\n"));
+        _displayManager->displayMessage(Common::DisplayMessage::INFO, F("HW Test"));
+    } else {
+        Serial.print(F("Display Manager: NOT INITIALIZED ❌\r\n"));
+        allComponentsOK = false;
+    }
+    
+    // Test ParallelPortManager
+    if (_parallelPortManager) {
+        Serial.print(F("Parallel Port Manager: LPT-OK ✅\r\n"));
+    } else {
+        Serial.print(F("Parallel Port Manager: NOT INITIALIZED ❌\r\n"));
+        allComponentsOK = false;
+    }
+    
+    // Memory test
+    uint16_t freeRAM = freeRam();
+    Serial.print(F("Memory: "));
+    Serial.print(freeRAM);
+    Serial.print(F(" bytes free ("));
+    Serial.print((freeRAM * 100) / 8192);
+    Serial.print(F("% available) "));
+    if (freeRAM > 1000) {
+        Serial.print(F("✅\r\n"));
+    } else {
+        Serial.print(F("⚠️ LOW\r\n"));
+    }
+    
+    // Overall result
+    Serial.print(F("\r\n=== Validation Result ===\r\n"));
+    if (allComponentsOK) {
+        Serial.print(F("✅ ALL HARDWARE OPERATIONAL\r\n"));
+        sendDisplayMessage(Common::DisplayMessage::INFO, F("HW Test PASS"));
+    } else {
+        Serial.print(F("❌ HARDWARE ISSUES DETECTED\r\n"));
+        sendDisplayMessage(Common::DisplayMessage::ERROR, F("HW Test FAIL"));
+    }
+    Serial.print(F("========================\r\n\r\n"));
 }
 
 } // namespace DeviceBridge::Components
