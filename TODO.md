@@ -70,6 +70,15 @@
 - [ ] **File Format Testing** - Test auto-detection with actual TDS2024 file outputs
 - [ ] **Storage Failover Testing** - Verify SD → EEPROM → Serial fallback works
 
+### **Feature Requests from FEATURE_REQUEST.md** (Medium Priority)
+- [ ] **Time Display Optimization** - Remove seconds from time display, update once per minute
+- [ ] **Print Status Display** - Show "PRINTING...{filename}" on LCD when data capture starts
+- [ ] **Save Status Display** - Show "Saving to {device}...{filename}" on LCD during file writes
+- [ ] **Display Update Optimization** - Skip display updates when actively capturing/saving files
+- [ ] **Time Setting Menu** - Add time set command to device menu and serial interface
+- [ ] **Serial Configuration Menu** - Add simple menu to serial port for device configuration
+- [ ] **Serial Test Mode** - Add test button mode accessible from serial port
+
 ### **Optional Enhancements** (Low Priority)  
 - [ ] Test parallel port data capture timing optimization (1ms polling)
 - [ ] Test storage failover mechanisms under stress (SD → EEPROM → Serial)
@@ -90,16 +99,24 @@
 - [ ] Add API documentation for component interfaces
 - [ ] Create comprehensive troubleshooting guide for hardware issues
 
+### **Hardware Enhancements** (Low Priority)
+- [ ] **Interrupt-Based Capture** - If parallel port strobe pin supports interrupts, implement interrupt-driven capture
+- [ ] **Pin Optimization** - Evaluate moving strobe to interrupt-capable pin for better responsiveness
+
 ### Future Enhancements (Backlog)
 - [ ] Implement EEPROM file system operations with wear leveling
 - [ ] Add USB serial transfer protocol for high-speed data transfer
 - [ ] Implement configuration save/restore to EEPROM
 - [ ] Add enhanced file type detection algorithms beyond header analysis
 - [ ] Optimize memory usage further if needed (currently 11.3% is excellent)
-- [ ] Add LED status indicators for visual feedback
+- [ ] Add LED status indicators for visual feedback (heartbeat LED implemented)
 - [ ] Implement watchdog timer for reliability
 - [ ] Add web interface for remote management via ESP32 module
 - [ ] Implement automatic file naming with timestamps (partially implemented)
+
+### **Documentation Reminders** (Ongoing)
+- [ ] Always update ARCHITECTURE.md, CHANGES.md, TODO.md and CLAUDE.md when steps complete
+- [ ] Use PlantUML diagrams (not ASCII art or mermaid) for technical diagrams
 
 ## Development Notes
 
