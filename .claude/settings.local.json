@@ -4,7 +4,8 @@
       "Bash(mkdir:*)",
       "Bash(pio check:*)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(pio test:*)"
     ],
     "deny": []
   }

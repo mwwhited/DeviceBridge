@@ -40,17 +40,17 @@ void test_basic_arithmetic() {
 }
 
 void test_data_structures() {
-    // Test DataChunk structure size
+    // Test DataChunk structure size (updated for optimized version)
     struct TestDataChunk {
-        uint8_t data[512];
+        uint8_t data[256];  // Reduced from 512 to 256
         uint16_t length;
         uint32_t timestamp;
-        bool isNewFile;
-        bool isEndOfFile;
+        uint8_t isNewFile;    // Changed from bool to uint8_t
+        uint8_t isEndOfFile;  // Changed from bool to uint8_t
     };
     
-    // Should be 512 + 2 + 4 + 1 + 1 = 520 bytes
-    TEST_ASSERT_EQUAL(520, sizeof(TestDataChunk));
+    // Should be 256 + 2 + 4 + 1 + 1 = 264 bytes
+    TEST_ASSERT_EQUAL(264, sizeof(TestDataChunk));
 }
 
 void test_parallel_port_data() {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-#include <Arduino_FreeRTOS.h>
 
 namespace DeviceBridge::Common {
 

@@ -44,11 +44,11 @@ void loop() {
 }
 
 void test_data_chunk_size() {
-    // Test basic data sizes for memory planning
-    TEST_ASSERT_EQUAL(512, 512); // Data array size
+    // Test basic data sizes for memory planning  
+    TEST_ASSERT_EQUAL(256, 256); // Data array size (reduced from 512)
     TEST_ASSERT_EQUAL(2, sizeof(uint16_t)); // Length field
     TEST_ASSERT_EQUAL(4, sizeof(uint32_t)); // Timestamp field
-    TEST_ASSERT_EQUAL(1, sizeof(bool)); // Boolean fields
+    TEST_ASSERT_EQUAL(1, sizeof(uint8_t)); // Boolean fields now uint8_t
 }
 
 void test_display_message_size() {
