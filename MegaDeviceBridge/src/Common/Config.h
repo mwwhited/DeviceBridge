@@ -13,17 +13,17 @@ namespace RTOS {
   constexpr uint8_t TIME_PRIORITY = 1;
   constexpr uint8_t SYSTEM_MONITOR_PRIORITY = 1;
 
-  // Task stack sizes (in bytes) - reduced for memory constraints
-  constexpr uint16_t PARALLEL_PORT_STACK = 200;
-  constexpr uint16_t FILE_MANAGER_STACK = 300;
-  constexpr uint16_t DISPLAY_STACK = 200;
-  constexpr uint16_t TIME_STACK = 100;
-  constexpr uint16_t SYSTEM_MONITOR_STACK = 150;
+  // Task stack sizes (in bytes) - aggressively reduced for memory constraints
+  constexpr uint16_t PARALLEL_PORT_STACK = 128;
+  constexpr uint16_t FILE_MANAGER_STACK = 200;
+  constexpr uint16_t DISPLAY_STACK = 128;
+  constexpr uint16_t TIME_STACK = 80;
+  constexpr uint16_t SYSTEM_MONITOR_STACK = 100;
 
-  // Queue sizes - reduced for memory constraints
-  constexpr uint8_t DATA_QUEUE_SIZE = 4;  // Reduced from 8
-  constexpr uint8_t DISPLAY_QUEUE_SIZE = 2;  // Reduced from 4
-  constexpr uint8_t COMMAND_QUEUE_SIZE = 2;  // Reduced from 4
+  // Queue sizes - aggressively reduced for memory constraints
+  constexpr uint8_t DATA_QUEUE_SIZE = 2;  // Minimal for basic operation
+  constexpr uint8_t DISPLAY_QUEUE_SIZE = 1;  // Minimal for basic operation  
+  constexpr uint8_t COMMAND_QUEUE_SIZE = 1;  // Minimal for basic operation
 
   // Timing constants (in milliseconds)
   constexpr uint32_t PARALLEL_PORT_POLL_MS = 1;

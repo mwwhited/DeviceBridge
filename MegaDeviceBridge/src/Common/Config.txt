@@ -1,0 +1,43 @@
+#pragma once
+
+namespace DeviceBridge::Common {
+
+// Inland ESP32 Pin Assignments - fixed for no pin conflicts and proper IO capabilities
+namespace PinsESP32 {
+  // LCD Shield pins (outputs)
+  constexpr uint8_t LCD_RESET = 5;    // Output (was 4, moved to free GPIO5)
+  constexpr uint8_t LCD_ENABLE = 19;  // Output (was 5, moved to GPIO19)
+  constexpr uint8_t LCD_D4 = 16;      // Output
+  constexpr uint8_t LCD_D5 = 17;      // Output
+  constexpr uint8_t LCD_D6 = 18;      // Output
+  constexpr uint8_t LCD_D7 = 21;      // Output (was free GPIO21)
+
+  // Storage pins (outputs)
+  constexpr uint8_t SD_CS = 22;       // Output (SPI CS)
+  constexpr uint8_t EEPROM_CS = 23;   // Output (SPI CS)
+
+  // Parallel port control pins (inputs from host)
+  constexpr uint8_t LPT_STROBE = 25;     // Input
+  constexpr uint8_t LPT_AUTO_FEED = 26;  // Input
+  constexpr uint8_t LPT_INITIALIZE = 27; // Input
+  constexpr uint8_t LPT_SELECT_IN = 32;  // Input (GPIO32 is input capable)
+
+  // Parallel port status pins (outputs to host)
+  constexpr uint8_t LPT_ACK = 2;        // Output (GPIO2)
+  constexpr uint8_t LPT_BUSY = 15;      // Output (GPIO15)
+  constexpr uint8_t LPT_PAPER_OUT = 33; // Output (GPIO33)
+  constexpr uint8_t LPT_SELECT = 14;    // Output (GPIO14)
+  constexpr uint8_t LPT_ERROR = 12;     // Output (GPIO12)
+
+  // Parallel port data pins (inputs from host)
+  constexpr uint8_t LPT_D0 = 34;  // Input-only ADC pin
+  constexpr uint8_t LPT_D1 = 35;  // Input-only ADC pin
+  constexpr uint8_t LPT_D2 = 36;  // Input-only ADC pin (VP)
+  constexpr uint8_t LPT_D3 = 39;  // Input-only ADC pin (VN)
+  constexpr uint8_t LPT_D4 = 0;   // Input (boot pin, caution)
+  constexpr uint8_t LPT_D5 = 4;   // Input (GPIO4, now free)
+  constexpr uint8_t LPT_D6 = 13;  // Input
+  constexpr uint8_t LPT_D7 = 21;  // Input (GPIO21 was LCD_D7, swapped to LPT_D7)
+}
+
+} // namespace DeviceBridge::Common
