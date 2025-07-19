@@ -58,12 +58,17 @@
 - [x] **Complete TDS2024 integration** - All 16 file formats supported
 - [x] **Update documentation** - Architecture and integration fully documented
 
-## Outstanding Tasks (Final Phase)
+## Current Tasks (Final Phase - Production System)
 
-### **Final Hardware Validation** (Medium Priority)
-- [ ] **Calibrate OSEPP button analog values** - Fine-tune expected values (0, 144, 329, 504, 741, 1023)
-- [ ] **Test TDS2024 data capture** - Validate with real oscilloscope for all 16 supported formats
-- [ ] **Hardware component validation** - Confirm SD card, RTC, EEPROM detection in operation
+### **Immediate Tasks** (High Priority)
+- [ ] **OSEPP Button Calibration** - Verify analog values (0, 144, 329, 504, 741, 1023) on real hardware
+- [ ] **TDS2024 Integration Testing** - Connect real oscilloscope and test data capture
+- [ ] **Storage Component Validation** - Confirm SD card, RTC, EEPROM detection working
+
+### **System Validation** (Medium Priority)
+- [ ] **Menu Navigation Testing** - Verify LCD button navigation with calibrated values
+- [ ] **File Format Testing** - Test auto-detection with actual TDS2024 file outputs
+- [ ] **Storage Failover Testing** - Verify SD → EEPROM → Serial fallback works
 
 ### **Optional Enhancements** (Low Priority)  
 - [ ] Test parallel port data capture timing optimization (1ms polling)
