@@ -3,7 +3,8 @@
 #include <Arduino_FreeRTOS.h>
 #include <queue.h>
 #include <semphr.h>
-#include <SdFat.h>
+#include <SD.h>
+#include "W25Q128Manager.h"
 #include "../Common/Types.h"
 #include "../Common/Config.h"
 
@@ -19,10 +20,16 @@ private:
     // Storage instances
     SdFat _sd;
     SdFile _currentFile;
+    W25Q128Manager _eeprom;
     
     // Storage status
     bool _sdAvailable;
     bool _eepromAvailable;
+    
+    // EEPROM file management
+    uint32_t _eepromCurrentAddress;
+    uint32_t _eepromWriteBuffer[64]; // 256-byte buffer (64 * 4 bytes)
+    uint16_t _eepromBufferIndex;
     Common::StorageType _activeStorage;
     Common::StorageType _preferredStorage;
     

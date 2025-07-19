@@ -75,7 +75,7 @@ namespace Pins {
 namespace Limits {
   constexpr uint16_t MAX_FILENAME_LENGTH = 32;
   constexpr uint16_t MAX_MESSAGE_LENGTH = 32;
-  constexpr uint32_t MAX_FILE_SIZE = 16 * 1024 * 1024; // 16MB
+  constexpr uint32_t MAX_FILE_SIZE = 16777216UL; // 16MB
   constexpr uint8_t QUEUE_WARNING_THRESHOLD = 6; // 75% of 8
   constexpr uint16_t BUFFER_WARNING_THRESHOLD = 384; // 75% of 512
 }

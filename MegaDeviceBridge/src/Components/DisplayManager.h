@@ -45,11 +45,11 @@ private:
     void showMenuScreen();
     
     // Button handling
-    void handleButtonPress(uint8_t button);
-    uint8_t readButtons();
+    void handleButtonPress(uint16_t button);
+    uint16_t readButtons();
     
     // Menu navigation
-    void navigateMenu(uint8_t button);
+    void navigateMenu(uint16_t button);
     void executeMenuSelection();
     void sendCommand(Common::SystemCommand::Type type, uint8_t value, const char* data = nullptr);
     
@@ -76,7 +76,7 @@ public:
 private:
     // Button debouncing
     uint32_t _lastButtonTime;
-    uint8_t _lastButtonState;
+    uint16_t _lastButtonState;
     static constexpr uint32_t BUTTON_DEBOUNCE_MS = 50;
     
     // Menu strings

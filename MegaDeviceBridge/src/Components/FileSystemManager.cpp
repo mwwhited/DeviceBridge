@@ -9,8 +9,11 @@ FileSystemManager::FileSystemManager(QueueHandle_t dataQueue, QueueHandle_t disp
     , _displayQueue(displayQueue)
     , _spiMutex(spiMutex)
     , _taskHandle(nullptr)
+    , _eeprom(Common::Pins::EEPROM_CS, spiMutex)
     , _sdAvailable(false)
     , _eepromAvailable(false)
+    , _eepromCurrentAddress(0)
+    , _eepromBufferIndex(0)
     , _activeStorage(Common::StorageType::AUTO_SELECT)
     , _preferredStorage(Common::StorageType::SD_CARD)
     , _fileCounter(0)
@@ -125,9 +128,7 @@ bool FileSystemManager::initializeSD() {
 }
 
 bool FileSystemManager::initializeEEPROM() {
-    // TODO: Implement EEPROM initialization with NASA EEFS
-    // For now, return false until EEPROM support is implemented
-    return false;
+    return _eeprom.initialize();
 }
 
 bool FileSystemManager::createNewFile() {

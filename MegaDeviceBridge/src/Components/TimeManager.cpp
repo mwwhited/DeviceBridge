@@ -73,9 +73,12 @@ bool TimeManager::initializeRTC() {
         bool result = _rtc.begin();
         if (result) {
             // Check if RTC is running and has valid time
-            // Simple validation - check if year is reasonable
-            uint16_t year = _rtc.getYear();
-            _timeValid = (year >= 2020 && year <= 2099);
+            if (_rtc.isrunning()) {
+                DateTime now = _rtc.now();
+                _timeValid = (now.year() >= 2020 && now.year() <= 2099);
+            } else {
+                _timeValid = false;
+            }
         }
         xSemaphoreGive(_i2cMutex);
         return result;
@@ -108,9 +111,10 @@ void TimeManager::formatTime(char* buffer, size_t bufferSize) {
     }
     
     if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        uint8_t hour = _rtc.getHours();
-        uint8_t minute = _rtc.getMinutes();
-        uint8_t second = _rtc.getSeconds();
+        DateTime now = _rtc.now();
+        uint8_t hour = now.hour();
+        uint8_t minute = now.minute();
+        uint8_t second = now.second();
         
         snprintf(buffer, bufferSize, "Time: %02d:%02d:%02d", hour, minute, second);
         xSemaphoreGive(_i2cMutex);
@@ -128,11 +132,12 @@ void TimeManager::formatDateTime(char* buffer, size_t bufferSize) {
     }
     
     if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        uint8_t day = _rtc.getDay();
-        uint8_t month = _rtc.getMonth();
-        uint16_t year = _rtc.getYear();
-        uint8_t hour = _rtc.getHours();
-        uint8_t minute = _rtc.getMinutes();
+        DateTime now = _rtc.now();
+        uint8_t day = now.day();
+        uint8_t month = now.month();
+        uint16_t year = now.year();
+        uint8_t hour = now.hour();
+        uint8_t minute = now.minute();
         
         snprintf(buffer, bufferSize, "%02d/%02d/%04d %02d:%02d", 
                 day, month, year, hour, minute);
@@ -149,12 +154,12 @@ bool TimeManager::setTime(uint8_t hour, uint8_t minute, uint8_t second) {
     }
     
     if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        bool result = _rtc.setTime(hour, minute, second);
-        if (result) {
-            _timeValid = true;
-        }
+        DateTime now = _rtc.now();
+        DateTime newTime(now.year(), now.month(), now.day(), hour, minute, second);
+        _rtc.adjust(newTime);
+        _timeValid = true;
         xSemaphoreGive(_i2cMutex);
-        return result;
+        return true;
     }
     return false;
 }
@@ -165,12 +170,12 @@ bool TimeManager::setDate(uint8_t day, uint8_t month, uint16_t year) {
     }
     
     if (xSemaphoreTake(_i2cMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        bool result = _rtc.setDate(day, month, year);
-        if (result) {
-            _timeValid = true;
-        }
+        DateTime now = _rtc.now();
+        DateTime newDate(year, month, day, now.hour(), now.minute(), now.second());
+        _rtc.adjust(newDate);
+        _timeValid = true;
         xSemaphoreGive(_i2cMutex);
-        return result;
+        return true;
     }
     return false;
 }

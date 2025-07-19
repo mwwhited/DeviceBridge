@@ -6,9 +6,10 @@
 ### Hardware Specifications (CONFIRMED)
 - **MCU**: Arduino Mega 2560 (ATmega2560, 8KB SRAM, 256KB Flash)
 - **LCD Shield**: OSEPP LCD Keypad Shield (revision 1) - 16x2 LCD with 6 buttons
-- **EEPROM**: Winbond 25Q128FVSG (128Mbit = 16MB SPI Flash)
-- **RTC**: DS1307 on data logger shield
-- **SD Card**: Via data logger shield (SPI interface)
+- **Data Logger Shield**: Deek Robot Data Logging Shield v1.0 (rewired for Mega compatibility)
+  - **SD Card**: SPI interface via modified shield
+  - **RTC**: DS1307 I2C real-time clock
+  - **EEPROM**: Winbond W25Q128FVSG (128Mbit = 16MB SPI Flash) - user added
 - **Parallel Port**: Custom breakout for DB-25 connector to TDS2024
 
 ## Architecture Decisions

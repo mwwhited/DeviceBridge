@@ -4,12 +4,12 @@
 
 namespace DeviceBridge::Components {
 
-// Button constants for LCD shield (typical values)
+// Button constants for OSEPP LCD Keypad Shield v1 (verified specifications)
 constexpr uint16_t BUTTON_RIGHT = 0;
 constexpr uint16_t BUTTON_UP = 144;
 constexpr uint16_t BUTTON_DOWN = 329;
-constexpr uint16_t BUTTON_LEFT = 505;
-constexpr uint16_t BUTTON_SELECT = 742;
+constexpr uint16_t BUTTON_LEFT = 504;
+constexpr uint16_t BUTTON_SELECT = 741;
 constexpr uint16_t BUTTON_NONE = 1023;
 
 DisplayManager::DisplayManager(User::Display& display, QueueHandle_t displayQueue, QueueHandle_t commandQueue)
@@ -79,7 +79,7 @@ void DisplayManager::runTask() {
         }
         
         // Handle button input
-        uint8_t button = readButtons();
+        uint16_t button = readButtons();
         if (button != BUTTON_NONE && button != _lastButtonState) {
             uint32_t currentTime = xTaskGetTickCount();
             if (currentTime - _lastButtonTime > pdMS_TO_TICKS(BUTTON_DEBOUNCE_MS)) {
@@ -152,20 +152,20 @@ void DisplayManager::showMenuScreen() {
     _display.showMenu(title, line2);
 }
 
-uint8_t DisplayManager::readButtons() {
-    int buttonValue = analogRead(A0); // Typical LCD shield button pin
+uint16_t DisplayManager::readButtons() {
+    int buttonValue = analogRead(A0); // OSEPP LCD shield button pin
     
-    // Map analog values to button constants
-    if (buttonValue < 50) return BUTTON_RIGHT;
-    if (buttonValue < 250) return BUTTON_UP;
-    if (buttonValue < 450) return BUTTON_DOWN;
-    if (buttonValue < 650) return BUTTON_LEFT;
-    if (buttonValue < 850) return BUTTON_SELECT;
+    // Map analog values to button constants with tolerance bands
+    if (buttonValue < 50) return BUTTON_RIGHT;        // 0 ± 50
+    if (buttonValue < 194) return BUTTON_UP;          // 144 ± 50  
+    if (buttonValue < 416) return BUTTON_DOWN;        // 329 ± 87
+    if (buttonValue < 622) return BUTTON_LEFT;        // 504 ± 118
+    if (buttonValue < 891) return BUTTON_SELECT;      // 741 ± 150
     
-    return BUTTON_NONE;
+    return BUTTON_NONE; // > 891, should be ~1023
 }
 
-void DisplayManager::handleButtonPress(uint8_t button) {
+void DisplayManager::handleButtonPress(uint16_t button) {
     if (_inMenu) {
         navigateMenu(button);
     } else {
@@ -176,7 +176,7 @@ void DisplayManager::handleButtonPress(uint8_t button) {
     }
 }
 
-void DisplayManager::navigateMenu(uint8_t button) {
+void DisplayManager::navigateMenu(uint16_t button) {
     uint8_t maxOptions = getMenuOptionCount(_menuState);
     
     switch (button) {

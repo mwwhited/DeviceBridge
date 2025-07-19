@@ -3,7 +3,7 @@
 #include <Arduino_FreeRTOS.h>
 #include <queue.h>
 #include <semphr.h>
-#include <RTC.h>
+#include <RTClib.h>
 #include "../Common/Types.h"
 #include "../Common/Config.h"
 
@@ -16,7 +16,7 @@ private:
     TaskHandle_t _taskHandle;
     
     // RTC instance
-    RTC _rtc;
+    RTC_DS1307 _rtc;
     bool _rtcAvailable;
     
     // Time tracking

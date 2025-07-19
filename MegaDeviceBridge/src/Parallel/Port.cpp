@@ -16,8 +16,8 @@ namespace DeviceBridge::Parallel
       Data data) : _control(control),
                             _status(status),
                             _data(data),
-                            _whichIsr(_isrSeed++),
-                            _buffer()
+                            _buffer(),
+                            _whichIsr(_isrSeed++)
   {
   }
 
