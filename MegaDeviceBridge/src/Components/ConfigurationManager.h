@@ -26,6 +26,7 @@ private:
     void processCommand(const String& command);
     void handleTimeSetCommand(const String& command);
     void handleStorageCommand(const String& command);
+    void handleHeartbeatCommand(const String& command);
     
     // Command output methods
     void printHelpMenu();

@@ -78,6 +78,10 @@ public:
     uint16_t freeRam();
     void validateHardware();  // Hardware validation test
     
+    // Serial heartbeat control
+    void setSerialHeartbeatEnabled(bool enabled) { _serialHeartbeatEnabled = enabled; }
+    bool isSerialHeartbeatEnabled() const { return _serialHeartbeatEnabled; }
+    
     // Component management
     void setComponentManagers(ParallelPortManager* ppm, FileSystemManager* fsm, 
                              DisplayManager* dm, TimeManager* tm);
@@ -87,6 +91,7 @@ private:
     uint32_t _uptimeSeconds;
     uint32_t _errorCount;
     uint32_t _commandsProcessed;
+    bool _serialHeartbeatEnabled;
 };
 
 } // namespace DeviceBridge::Components

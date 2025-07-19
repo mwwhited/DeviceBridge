@@ -65,6 +65,8 @@
 - [ ] **TDS2024 Integration Testing** - Connect real oscilloscope and test data capture
 - [x] **Storage Component Validation** - Confirm SD card, RTC, EEPROM detection working ✅ COMPLETED
 - [x] **Serial Interface Implementation** - Full configuration menu with time/storage commands ✅ COMPLETED
+- [x] **ConfigurationManager Component** - Proper architecture for serial commands ✅ COMPLETED
+- [x] **Serial Heartbeat Control** - Optional status messages (default OFF) ✅ COMPLETED
 
 ### **System Validation** (Medium Priority)
 - [ ] **Menu Navigation Testing** - Verify LCD button navigation with calibrated values
@@ -78,6 +80,7 @@
 - [ ] **Display Update Optimization** - Skip display updates when actively capturing/saving files
 - [x] **Time Setting Menu** - Add time set command to device menu and serial interface ✅ COMPLETED
 - [x] **Serial Configuration Menu** - Add simple menu to serial port for device configuration ✅ COMPLETED
+- [x] **Serial Heartbeat Control** - Add ability to turn off/on serial status messages ✅ COMPLETED
 - [ ] **Serial Test Mode** - Add test button mode accessible from serial port
 
 ### **Optional Enhancements** (Low Priority)  

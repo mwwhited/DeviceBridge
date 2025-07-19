@@ -72,6 +72,9 @@ void ConfigurationManager::processCommand(const String& command) {
     } else if (command.startsWith(F("storage "))) {
         handleStorageCommand(command);
         
+    } else if (command.startsWith(F("heartbeat "))) {
+        handleHeartbeatCommand(command);
+        
     } else if (command.equalsIgnoreCase(F("time"))) {
         printCurrentTime();
         
@@ -105,6 +108,7 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  storage serial    - Use serial transfer\r\n"));
     Serial.print(F("  storage auto      - Auto-select storage\r\n"));
     Serial.print(F("\r\nSystem Commands:\r\n"));
+    Serial.print(F("  heartbeat on/off  - Enable/disable serial heartbeat\r\n"));
     Serial.print(F("  restart/reset     - Restart the system\r\n"));
     Serial.print(F("  help              - Show this help\r\n"));
     Serial.print(F("=====================================\r\n\r\n"));
@@ -139,6 +143,12 @@ void ConfigurationManager::printDetailedStatus() {
     if (_timeManager) {
         Serial.print(F("RTC: "));
         Serial.print(_timeManager->isRTCAvailable() ? F("Available") : F("Not Available"));
+        Serial.print(F("\r\n"));
+    }
+    
+    if (_systemManager) {
+        Serial.print(F("Serial Heartbeat: "));
+        Serial.print(_systemManager->isSerialHeartbeatEnabled() ? F("Enabled") : F("Disabled"));
         Serial.print(F("\r\n"));
     }
     
@@ -229,6 +239,42 @@ void ConfigurationManager::handleStorageCommand(const String& command) {
         }
     } else {
         Serial.print(F("FileSystemManager not available\r\n"));
+    }
+}
+
+void ConfigurationManager::handleHeartbeatCommand(const String& command) {
+    String setting = command.substring(10); // Remove "heartbeat "
+    setting.trim();
+    setting.toLowerCase();
+    
+    if (setting == F("on") || setting == F("enable") || setting == F("true") || setting == F("1")) {
+        if (_systemManager) {
+            _systemManager->setSerialHeartbeatEnabled(true);
+            Serial.print(F("Serial heartbeat enabled\r\n"));
+            if (_displayManager) {
+                _displayManager->displayMessage(Common::DisplayMessage::INFO, F("Heartbeat ON"));
+            }
+        }
+    } else if (setting == F("off") || setting == F("disable") || setting == F("false") || setting == F("0")) {
+        if (_systemManager) {
+            _systemManager->setSerialHeartbeatEnabled(false);
+            Serial.print(F("Serial heartbeat disabled\r\n"));
+            if (_displayManager) {
+                _displayManager->displayMessage(Common::DisplayMessage::INFO, F("Heartbeat OFF"));
+            }
+        }
+    } else if (setting == F("status")) {
+        if (_systemManager) {
+            bool enabled = _systemManager->isSerialHeartbeatEnabled();
+            Serial.print(F("Serial heartbeat is "));
+            Serial.print(enabled ? F("enabled") : F("disabled"));
+            Serial.print(F("\r\n"));
+        }
+    } else {
+        Serial.print(F("Usage: heartbeat on/off/status\r\n"));
+        Serial.print(F("  on/enable/true/1  - Enable serial heartbeat\r\n"));
+        Serial.print(F("  off/disable/false/0 - Disable serial heartbeat\r\n"));
+        Serial.print(F("  status - Show current status\r\n"));
     }
 }
 

@@ -23,6 +23,7 @@ SystemManager::SystemManager()
     , _uptimeSeconds(0)
     , _errorCount(0)
     , _commandsProcessed(0)
+    , _serialHeartbeatEnabled(false)  // Default to off
 {
 }
 
@@ -114,6 +115,10 @@ void SystemManager::monitorSystemHealth() {
 }
 
 void SystemManager::logSystemStatus() {
+    // Only log if serial heartbeat is enabled
+    if (!_serialHeartbeatEnabled) {
+        return;
+    }
 
     char timeMessage[32]= "MISSING!";
     if (_timeManager) {
@@ -121,12 +126,17 @@ void SystemManager::logSystemStatus() {
         _timeManager->getFormattedDateTime(timeMessage, sizeof(timeMessage));
     }
 
+    // Read analog value for button debugging
+    int buttonAnalog = analogRead(Common::Pins::LCD_BUTTONS);
+
     Serial.print(F("Uptime: "));
     Serial.print(_uptimeSeconds);
     Serial.print(F("s, Errors: "));
     Serial.print(_errorCount);
     Serial.print(F(", Commands: "));
     Serial.print(_commandsProcessed);
+    Serial.print(F(", Buttons: "));
+    Serial.print(buttonAnalog);
     
     Serial.print(F(", Time: "));
     Serial.print(timeMessage);

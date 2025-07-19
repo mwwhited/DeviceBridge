@@ -35,16 +35,22 @@ Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port
 - **Serial Interface**: Full configuration menu implemented
 - **Serial Output**: Clean debugging with F() macro applied
 
-## Serial Interface: COMPLETED ✅
-**Available Commands**:
+## Serial Interface: ENHANCED ✅
+**Complete Configuration Interface via ConfigurationManager Component**:
 - `validate/test` - Hardware validation
 - `info` - System information
-- `status` - Detailed component status
+- `status` - Detailed component status with heartbeat state
 - `time` - Show current time
 - `time set YYYY-MM-DD HH:MM` - Set RTC time
 - `storage sd/eeprom/serial/auto` - Change storage preference
+- `heartbeat on/off/status` - Control serial status messages (default: OFF)
 - `restart/reset` - Software reset
 - `help` - Show command menu
+
+**Key Features**:
+- **Clean Serial Output**: No status spam by default (heartbeat OFF)
+- **ConfigurationManager Component**: Proper architecture, not in main.cpp
+- **Multiple Command Syntax**: Flexible command parsing
 
 ## Documentation Status: CURRENT ✅
 - **ARCHITECTURE.md**: Loop-based architecture documented

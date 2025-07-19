@@ -48,14 +48,14 @@ The Device Bridge automatically detects file format based on data headers and ha
 ### Loop-Based Cooperative Multitasking Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│              Arduino main() Loop Scheduler                      │
-├─────────────────────────────────────────────────────────────────┤
-│  ParallelPort │ FileSystem    │ Display   │ Time │ System       │
-│  Manager      │ Manager       │ Manager   │ Mgr  │ Manager      │
-│  Interval:1ms │ Interval:10ms │ Int:100ms │ 1s   │ Interval: 5s │
-│  Real-time    │ Storage Ops   │ UI Update │ RTC  │ Monitoring   │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    Arduino main() Loop Scheduler (6 Components)                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ ParallelPort │ FileSystem  │ Display   │ Time │ System    │ Configuration       │
+│ Manager      │ Manager     │ Manager   │ Mgr  │ Manager   │ Manager             │
+│ Int: 1ms     │ Int: 10ms   │ Int:100ms │ 1s   │ Int: 5s   │ Int: 50ms           │
+│ Real-time    │ Storage Ops │ UI Update │ RTC  │ Monitor   │ Serial Interface    │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Major Architecture Change (2025-07-19):**
@@ -163,11 +163,25 @@ Main Menu
 **Monitor Rate**: 5 seconds
 
 #### Responsibilities:
-- Task health monitoring (stack usage, responsiveness)
-- Queue utilization monitoring
-- Error counting and reporting
-- System status coordination
-- Performance metrics collection
+- System health monitoring and error tracking
+- Performance metrics collection (uptime, errors, commands)
+- Optional serial heartbeat status messages (default: OFF)
+- Hardware validation coordination
+- Memory usage monitoring
+
+### 6. ConfigurationManager
+**Purpose**: Serial interface and system configuration
+**Priority**: Normal (1) - User interaction
+**Stack**: 256 bytes
+**Update Rate**: 50ms
+
+#### Responsibilities:
+- Serial command parsing and processing
+- Hardware validation commands (validate/test)
+- Time setting via serial interface (time set)
+- Storage type configuration (storage sd/eeprom/serial/auto)
+- Serial heartbeat control (heartbeat on/off/status)
+- System restart commands and help menu
 
 ## Inter-Component Communication
 
