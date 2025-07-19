@@ -7,7 +7,10 @@
       "Bash(grep:*)",
       "Bash(pio test:*)",
       "Bash(mv:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebFetch(domain:osepp.com)",
+      "WebFetch(domain:wiki.dfrobot.com)",
+      "WebFetch(domain:arduino.stackexchange.com)"
     ],
     "deny": []
   }

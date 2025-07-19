@@ -145,33 +145,63 @@ void setup()
   // Start all component tasks
   Serial.print("Starting component tasks...\r\n");
   
+  Serial.print("Starting parallel port manager...\r\n");
   if (!parallelPortManager->start()) {
     Serial.print("FATAL: Failed to start parallel port task\r\n");
     while(1) { delay(1000); }
   }
+  Serial.print("Parallel port manager started OK\r\n");
   
+  Serial.print("Starting file system manager...\r\n");
   if (!fileSystemManager->start()) {
     Serial.print("FATAL: Failed to start file manager task\r\n");
     while(1) { delay(1000); }
   }
+  Serial.print("File system manager started OK\r\n");
   
+  Serial.print("Starting display manager...\r\n");
   if (!displayManager->start()) {
     Serial.print("FATAL: Failed to start display task\r\n");
     while(1) { delay(1000); }
   }
+  Serial.print("Display manager started OK\r\n");
   
+  Serial.print("Starting time manager...\r\n");
   if (!timeManager->start()) {
     Serial.print("FATAL: Failed to start time manager task\r\n");
     while(1) { delay(1000); }
   }
+  Serial.print("Time manager started OK\r\n");
   
+  Serial.print("Starting system manager...\r\n");
   if (!systemManager->start()) {
     Serial.print("FATAL: Failed to start system manager task\r\n");
     while(1) { delay(1000); }
   }
+  Serial.print("System manager started OK\r\n");
   
   Serial.print("All systems initialized successfully!\r\n");
   Serial.print("Starting FreeRTOS scheduler...\r\n");
+  
+  // Quick button test before starting scheduler
+  Serial.print("Testing button input on A0...\r\n");
+  for (int i = 0; i < 5; i++) {
+    int buttonValue = analogRead(A0);
+    Serial.print("A0 reading ");
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.print(buttonValue);
+    Serial.print("\r\n");
+    delay(500);
+  }
+  Serial.print("Button test complete. Press any button now for 3 seconds...\r\n");
+  for (int i = 0; i < 6; i++) {
+    int buttonValue = analogRead(A0);
+    Serial.print("A0: ");
+    Serial.print(buttonValue);
+    Serial.print("\r\n");
+    delay(500);
+  }
   
   // Start FreeRTOS scheduler - this never returns
   vTaskStartScheduler();

@@ -155,6 +155,21 @@ void DisplayManager::showMenuScreen() {
 uint16_t DisplayManager::readButtons() {
     int buttonValue = analogRead(A0); // OSEPP LCD shield button pin
     
+    // Debug: Output button value changes to serial (with debouncing)
+    static int lastReportedValue = -1;
+    static uint32_t lastReportTime = 0;
+    uint32_t currentTime = xTaskGetTickCount();
+    
+    // Report value changes with some debouncing (every 200ms max)
+    if (abs(buttonValue - lastReportedValue) > 10 && 
+        (currentTime - lastReportTime) > pdMS_TO_TICKS(200)) {
+        Serial.print("Button A0 value: ");
+        Serial.print(buttonValue);
+        Serial.print("\r\n");
+        lastReportedValue = buttonValue;
+        lastReportTime = currentTime;
+    }
+    
     // Map analog values to button constants with tolerance bands
     if (buttonValue < 50) return BUTTON_RIGHT;        // 0 ± 50
     if (buttonValue < 194) return BUTTON_UP;          // 144 ± 50  
