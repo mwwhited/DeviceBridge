@@ -231,6 +231,9 @@ SystemManager → displayMessage() → DisplayManager
 ```
 Arduino Mega 2560 Pin Allocation:
 
+System Status:
+└── HEARTBEAT: 13 (Built-in LED - 500ms blink)
+
 LCD Shield (OSEPP):
 ├── LCD_RESET: 8    ├── LCD_D4: 4
 ├── LCD_ENABLE: 9   ├── LCD_D5: 5  

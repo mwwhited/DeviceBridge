@@ -28,9 +28,10 @@ Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port
 - **Ready for Testing**: Real oscilloscope integration pending
 
 ## Component Status: ALL OPERATIONAL ✅
-- **main.cpp**: Loop-based system coordination deployed
+- **main.cpp**: Loop-based system coordination deployed with heartbeat LED
 - **5 Component Managers**: All rewritten for direct communication
 - **Hardware**: LCD, buttons, SD, RTC, EEPROM all working
+- **Visual Status**: Heartbeat LED (pin 13) blinks every 500ms indicating system operational
 - **Serial Output**: Clean debugging with F() macro applied
 
 ## Documentation Status: CURRENT ✅

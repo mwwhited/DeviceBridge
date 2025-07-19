@@ -62,11 +62,15 @@ void loop() {
     displayManager.update();         // 100ms interval  
     timeManager.update();            // 1s interval
     systemManager.update();          // 5s interval
+    // Heartbeat LED blink            // 500ms interval - visual status indicator
 }
 ```
 
 ## Pin Assignments (Arduino Mega)
 ```cpp
+// System Status
+HEARTBEAT: 13 (Built-in LED - 500ms blink indicates system operational)
+
 // LCD Shield (OSEPP)
 LCD_RESET: 8, LCD_ENABLE: 9, LCD_D4-D7: 4-7, Buttons: A0
 
