@@ -10,6 +10,7 @@
 #include "./Components/DisplayManager.h"
 #include "./Components/TimeManager.h"
 #include "./Components/SystemManager.h"
+#include "./Components/ConfigurationManager.h"
 
 // Common definitions
 #include "./Common/Types.h"
@@ -52,6 +53,7 @@ DeviceBridge::Components::FileSystemManager* fileSystemManager = nullptr;
 DeviceBridge::Components::DisplayManager* displayManager = nullptr;
 DeviceBridge::Components::TimeManager* timeManager = nullptr;
 DeviceBridge::Components::SystemManager* systemManager = nullptr;
+DeviceBridge::Components::ConfigurationManager* configurationManager = nullptr;
 
 // Timing for cooperative multitasking
 unsigned long lastParallelUpdate = 0;
@@ -60,6 +62,7 @@ unsigned long lastDisplayUpdate = 0;
 unsigned long lastTimeUpdate = 0;
 unsigned long lastSystemUpdate = 0;
 unsigned long lastHeartbeatUpdate = 0;
+unsigned long lastConfigurationUpdate = 0;
 
 // Update intervals (milliseconds)
 const unsigned long PARALLEL_INTERVAL = 1;      // 1ms for real-time data capture
@@ -68,7 +71,7 @@ const unsigned long DISPLAY_INTERVAL = 100;     // 100ms for display updates
 const unsigned long TIME_INTERVAL = 1000;       // 1s for time operations
 const unsigned long SYSTEM_INTERVAL = 5000;     // 5s for system monitoring
 const unsigned long HEARTBEAT_INTERVAL = 500;   // 500ms for blink heartbeat LED
-
+const unsigned long CONFIGURATION_INTERVAL = 50; // 50ms for configuration/serial commands
 
 void setup()
 {
@@ -90,10 +93,11 @@ void setup()
   displayManager = new DeviceBridge::Components::DisplayManager(display);
   timeManager = new DeviceBridge::Components::TimeManager();
   systemManager = new DeviceBridge::Components::SystemManager();
+  configurationManager = new DeviceBridge::Components::ConfigurationManager();
   
   // Verify component creation
   if (!parallelPortManager || !fileSystemManager || !displayManager || 
-      !timeManager || !systemManager) {
+      !timeManager || !systemManager || !configurationManager) {
     Serial.print(F("FATAL: Failed to create component managers\r\n"));
     while(1) { delay(1000); }
   }
@@ -106,6 +110,9 @@ void setup()
   
   systemManager->setComponentManagers(parallelPortManager, fileSystemManager, 
                                      displayManager, timeManager);
+  
+  configurationManager->setComponentManagers(parallelPortManager, fileSystemManager,
+                                            displayManager, timeManager, systemManager);
   
   // Initialize all components
   Serial.print(F("Initializing components...\r\n"));
@@ -130,6 +137,10 @@ void setup()
     Serial.print(F("WARNING: System manager initialization failed\r\n"));
   }
   
+  if (!configurationManager->initialize()) {
+    Serial.print(F("WARNING: Configuration manager initialization failed\r\n"));
+  }
+  
   Serial.print(F("All systems initialized successfully!\r\n"));
   Serial.print(F("Device Bridge ready for operation.\r\n"));
   Serial.print(F("Connect TDS2024 to parallel port and use LCD buttons for control.\r\n"));
@@ -140,6 +151,7 @@ void setup()
   lastDisplayUpdate = millis();
   lastTimeUpdate = millis();
   lastSystemUpdate = millis();
+  lastConfigurationUpdate = millis();
 }
 
 void loop()
@@ -182,22 +194,10 @@ void loop()
     lastHeartbeatUpdate = currentTime;
   }
   
-  // Check for serial commands
-  if (Serial.available()) {
-    String command = Serial.readStringUntil('\n');
-    command.trim();
-    
-    if (command.equalsIgnoreCase(F("validate")) || command.equalsIgnoreCase(F("test"))) {
-      systemManager->validateHardware();
-    } else if (command.equalsIgnoreCase(F("info"))) {
-      systemManager->printSystemInfo();
-      systemManager->printMemoryInfo();
-    } else if (command.equalsIgnoreCase(F("help"))) {
-      Serial.print(F("\r\nAvailable commands:\r\n"));
-      Serial.print(F("  validate/test - Run hardware validation\r\n"));
-      Serial.print(F("  info - Show system information\r\n"));
-      Serial.print(F("  help - Show this help\r\n\r\n"));
-    }
+  // Configuration manager - serial commands and settings
+  if (currentTime - lastConfigurationUpdate >= CONFIGURATION_INTERVAL) {
+    configurationManager->update();
+    lastConfigurationUpdate = currentTime;
   }
   
   // Small delay to prevent overwhelming the CPU

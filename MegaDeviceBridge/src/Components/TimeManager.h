@@ -45,6 +45,7 @@ public:
     // Time operations
     bool setTime(uint8_t hour, uint8_t minute, uint8_t second);
     bool setDate(uint8_t day, uint8_t month, uint16_t year);
+    bool setDateTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second);
     uint32_t getTimestamp();
     void getFormattedTime(char* buffer, size_t bufferSize);
     void getFormattedDateTime(char* buffer, size_t bufferSize);

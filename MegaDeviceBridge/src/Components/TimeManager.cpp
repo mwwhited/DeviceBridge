@@ -141,6 +141,17 @@ void TimeManager::getFormattedDateTime(char* buffer, size_t bufferSize) {
 }
 
 
+bool TimeManager::setDateTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second) {
+    if (!_rtcAvailable) {
+        return false;
+    }
+    
+    DateTime newDateTime(year, month, day, hour, minute, second);
+    _rtc.adjust(newDateTime);
+    _timeValid = true;
+    return true;
+}
+
 void TimeManager::padNumber(char* buffer, uint8_t number, uint8_t digits) {
     if (digits == 2) {
         sprintf(buffer, "%02d", number);

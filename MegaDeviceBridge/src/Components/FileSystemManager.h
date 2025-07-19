@@ -74,6 +74,7 @@ public:
     
     // Status inquiry
     Common::StorageType getActiveStorage() const { return _activeStorage; }
+    Common::StorageType getCurrentStorageType() const { return _activeStorage; }  // Alias for serial interface
     Common::FileType getFileType() const { return _fileType; }
     bool isSDAvailable() const { return _sdAvailable; }
     bool isEEPROMAvailable() const { return _eepromAvailable; }
