@@ -19,5 +19,8 @@ namespace DeviceBridge::User
             uint8_t data2,
             uint8_t data3);
         void initialize();
+        void updateStatus(const char* message);
+        void showTime(const char* timeStr);
+        void showMenu(const char* line1, const char* line2);
     };
 }

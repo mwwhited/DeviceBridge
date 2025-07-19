@@ -19,5 +19,35 @@ namespace DeviceBridge::User
     {
         _lcd.begin(16, 2);
         _lcd.clear();
+        _lcd.print("Device Bridge");
+        _lcd.setCursor(0, 1);
+        _lcd.print("Initializing...");
+    }
+
+    void Display::updateStatus(const char* message)
+    {
+        _lcd.clear();
+        _lcd.setCursor(0, 0);
+        _lcd.print("Device Bridge");
+        _lcd.setCursor(0, 1);
+        _lcd.print(message);
+    }
+
+    void Display::showTime(const char* timeStr)
+    {
+        _lcd.clear();
+        _lcd.setCursor(0, 0);
+        _lcd.print("Device Bridge");
+        _lcd.setCursor(0, 1);
+        _lcd.print(timeStr);
+    }
+
+    void Display::showMenu(const char* line1, const char* line2)
+    {
+        _lcd.clear();
+        _lcd.setCursor(0, 0);
+        _lcd.print(line1);
+        _lcd.setCursor(0, 1);
+        _lcd.print(line2);
     }
 }
