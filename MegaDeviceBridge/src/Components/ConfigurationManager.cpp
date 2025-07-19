@@ -87,6 +87,9 @@ void ConfigurationManager::processCommand(const String& command) {
     } else if (command.equalsIgnoreCase(F("testint")) || command.equalsIgnoreCase(F("testinterrupt"))) {
         testInterruptPin();
         
+    } else if (command.equalsIgnoreCase(F("files")) || command.equalsIgnoreCase(F("lastfile"))) {
+        printLastFileInfo();
+        
     } else if (command.equalsIgnoreCase(F("restart")) || command.equalsIgnoreCase(F("reset"))) {
         Serial.print(F("Restarting system...\r\n"));
         delay(100);
@@ -115,6 +118,7 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  buttons           - Show button analog values\r\n"));
     Serial.print(F("  parallel/lpt      - Show parallel port status\r\n"));
     Serial.print(F("  testint           - Test interrupt pin response\r\n"));
+    Serial.print(F("  files/lastfile    - Show last saved file info\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
     Serial.print(F("  storage eeprom    - Use EEPROM storage\r\n"));
@@ -378,6 +382,48 @@ void ConfigurationManager::testInterruptPin() {
     }
     
     Serial.print(F("==============================\r\n\r\n"));
+}
+
+void ConfigurationManager::printLastFileInfo() {
+    Serial.print(F("\r\n=== Last Saved File Information ===\r\n"));
+    
+    if (_fileSystemManager) {
+        Serial.print(F("Files Stored: "));
+        Serial.print(_fileSystemManager->getFilesStored());
+        Serial.print(F("\r\n"));
+        
+        if (_fileSystemManager->getFilesStored() > 0) {
+            Serial.print(F("Last Filename: "));
+            Serial.print(_fileSystemManager->getCurrentFilename());
+            Serial.print(F("\r\n"));
+            
+            Serial.print(F("Storage Device: "));
+            Serial.print(_fileSystemManager->getActiveStorage().toString());
+            Serial.print(F("\r\n"));
+            
+            Serial.print(F("File Type (Requested): "));
+            Serial.print(_fileSystemManager->getFileType().toSimple());
+            Serial.print(F("\r\n"));
+            
+            Serial.print(F("File Type (Detected): "));
+            Serial.print(_fileSystemManager->getDetectedFileType().toSimple());
+            Serial.print(F("\r\n"));
+            
+            Serial.print(F("Total Bytes Written: "));
+            Serial.print(_fileSystemManager->getTotalBytesWritten());
+            Serial.print(F(" bytes\r\n"));
+            
+            Serial.print(F("Write Errors: "));
+            Serial.print(_fileSystemManager->getWriteErrors());
+            Serial.print(F("\r\n"));
+        } else {
+            Serial.print(F("No files saved yet.\r\n"));
+        }
+    } else {
+        Serial.print(F("FileSystemManager not available\r\n"));
+    }
+    
+    Serial.print(F("===================================\r\n\r\n"));
 }
 
 void ConfigurationManager::handleHeartbeatCommand(const String& command) {

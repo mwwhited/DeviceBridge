@@ -33,7 +33,8 @@ private:
     // File management
     uint32_t _fileCounter;
     char _currentFilename[Common::Limits::MAX_FILENAME_LENGTH];
-    Common::FileType _fileType;
+    Common::FileType _fileType;          // Requested/configured file type
+    Common::FileType _detectedFileType;  // Auto-detected file type (if auto-detection enabled)
     bool _isFileOpen;
     
     // Storage operations
@@ -51,6 +52,9 @@ private:
     // File naming
     void generateFilename(char* buffer, size_t bufferSize);
     const char* getFileExtension() const;
+    
+    // File type detection
+    Common::FileType detectFileType(const uint8_t* data, uint16_t length);
     
 public:
     FileSystemManager();
@@ -76,6 +80,7 @@ public:
     Common::StorageType getActiveStorage() const { return _activeStorage; }
     Common::StorageType getCurrentStorageType() const { return _activeStorage; }  // Alias for serial interface
     Common::FileType getFileType() const { return _fileType; }
+    Common::FileType getDetectedFileType() const { return _detectedFileType; }
     bool isSDAvailable() const { return _sdAvailable; }
     bool isEEPROMAvailable() const { return _eepromAvailable; }
     

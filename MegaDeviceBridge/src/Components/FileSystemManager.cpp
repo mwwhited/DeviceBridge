@@ -17,6 +17,7 @@ FileSystemManager::FileSystemManager()
     , _preferredStorage(Common::StorageType::SD_CARD)
     , _fileCounter(0)
     , _fileType(Common::FileType::AUTO_DETECT)
+    , _detectedFileType(Common::FileType::AUTO_DETECT)
     , _totalBytesWritten(0)
     , _writeErrors(0)
     , _isFileOpen(false)
@@ -67,6 +68,13 @@ void FileSystemManager::processDataChunk(const Common::DataChunk& chunk) {
             return;
         }
         sendDisplayMessage(Common::DisplayMessage::STATUS, F("Storing..."));
+        
+        // Detect file type from first chunk if auto-detection is enabled
+        if (_fileType.value == Common::FileType::AUTO_DETECT && chunk.length > 0) {
+            _detectedFileType = detectFileType(chunk.data, chunk.length);
+        } else {
+            _detectedFileType = _fileType;  // Use configured type
+        }
     }
     
     // Write data
@@ -248,6 +256,49 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
                 break;
         }
     }
+}
+
+Common::FileType FileSystemManager::detectFileType(const uint8_t* data, uint16_t length) {
+    // Need at least 4 bytes for detection
+    if (length < 4) {
+        return Common::FileType::BINARY;
+    }
+    
+    // Check for common file format headers
+    // BMP files start with "BM"
+    if (data[0] == 0x42 && data[1] == 0x4D) {
+        return Common::FileType::BMP;
+    }
+    
+    // PCX files start with 0x0A
+    if (data[0] == 0x0A) {
+        return Common::FileType::PCX;
+    }
+    
+    // TIFF files start with "II" (little-endian) or "MM" (big-endian) 
+    if ((data[0] == 0x49 && data[1] == 0x49 && data[2] == 0x2A && data[3] == 0x00) ||
+        (data[0] == 0x4D && data[1] == 0x4D && data[2] == 0x00 && data[3] == 0x2A)) {
+        return Common::FileType::TIFF;
+    }
+    
+    // PostScript/EPS files start with "%!"
+    if (data[0] == 0x25 && data[1] == 0x21) {
+        return Common::FileType::EPSIMAGE;
+    }
+    
+    // Check for printer command sequences (HP PCL commands often start with ESC)
+    if (data[0] == 0x1B) {  // ESC character
+        if (length >= 3) {
+            // HP PCL commands: ESC E (reset), ESC & (parameterized command)
+            if (data[1] == 0x45 || data[1] == 0x26) {
+                return Common::FileType::LASERJET;  // Default HP printer format
+            }
+        }
+        return Common::FileType::LASERJET;  // Generic escape sequence
+    }
+    
+    // If no specific format detected, assume binary
+    return Common::FileType::BINARY;
 }
 
 } // namespace DeviceBridge::Components
