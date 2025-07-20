@@ -90,7 +90,19 @@ void ParallelPortManager::processData() {
                     Serial.print(sizeof(_currentChunk.data));
                     Serial.print(F(", file: "));
                     Serial.print(_currentFileBytes);
-                    Serial.print(F(" total\r\n"));
+                    Serial.print(F(" total"));
+                    
+                    // Show hex dump of first 10 bytes for new files
+                    if (_currentFileBytes <= 10 && _currentChunk.isNewFile) {
+                        Serial.print(F(" - HEADER HEX: "));
+                        uint16_t headerBytes = min(10, _currentFileBytes);
+                        for (uint16_t i = 0; i < headerBytes; i++) {
+                            if (_currentChunk.data[i] < 0x10) Serial.print(F("0"));
+                            Serial.print(_currentChunk.data[i], HEX);
+                            if (i < headerBytes - 1) Serial.print(F(" "));
+                        }
+                    }
+                    Serial.print(F("\r\n"));
                 }
 
                 // If chunk is full, send it
