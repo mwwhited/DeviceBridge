@@ -84,6 +84,8 @@ void ConfigurationManager::processCommand(const String &command) {
         printStorageStatus();
     } else if (command.equalsIgnoreCase(F("testwrite")) || command.startsWith(F("testwrite "))) {
         handleTestWriteCommand(command);
+    } else if (command.equalsIgnoreCase(F("testwritelong")) || command.startsWith(F("testwritelong "))) {
+        handleTestWriteLongCommand(command);
     } else if (command.startsWith(F("heartbeat "))) {
         handleHeartbeatCommand(command);
     } else if (command.startsWith(F("debug "))) {
@@ -151,6 +153,7 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  storage serial    - Use serial transfer\r\n"));
     Serial.print(F("  storage auto      - Auto-select storage\r\n"));
     Serial.print(F("  testwrite         - Write test file to current storage\r\n"));
+    Serial.print(F("  testwritelong     - Write test file with multiple chunks (tests LED/buffer)\r\n"));
     Serial.print(F("\r\nSystem Commands:\r\n"));
     Serial.print(F("  heartbeat on/off  - Enable/disable serial heartbeat\r\n"));
     Serial.print(F("  restart/reset     - Restart the system\r\n"));
@@ -683,6 +686,126 @@ void ConfigurationManager::handleTestWriteCommand(const String &command) {
 
     Serial.print(F("Test write completed.\r\n"));
     Serial.print(F("=======================\r\n\r\n"));
+}
+
+void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
+    auto fileSystem = getServices().getFileSystemManager();
+    auto timeManager = getServices().getTimeManager();
+    auto systemManager = getServices().getSystemManager();
+    
+    Serial.print(F("\r\n=== Long Test File Write (Multiple Chunks) ===\r\n"));
+    
+    // Parse optional chunk count parameter (default 10)
+    int chunkCount = 10;
+    if (command.length() > 14) { // "testwritelong "
+        String param = command.substring(14);
+        param.trim();
+        if (param.length() > 0) {
+            chunkCount = param.toInt();
+            if (chunkCount < 1 || chunkCount > 500) {
+                chunkCount = 10; // Safe default
+            }
+        }
+    }
+    
+    Serial.print(F("Chunks to write: "));
+    Serial.print(chunkCount);
+    Serial.print(F("\r\n"));
+    
+    // Create base test data with timestamp
+    char baseData[48];
+    if (timeManager->isRTCAvailable()) {
+        char timeBuffer[32];
+        timeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
+        snprintf(baseData, sizeof(baseData), "LONG-TEST %s", timeBuffer);
+    } else {
+        snprintf(baseData, sizeof(baseData), "LONG-TEST %lu", millis());
+    }
+    
+    Serial.print(F("Base Data: "));
+    Serial.print(baseData);
+    Serial.print(F("\r\n"));
+    Serial.print(F("Active Storage: "));
+    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Writing long test file...\r\n"));
+    Serial.print(F("Watch L2 LED for activity!\r\n"));
+    
+    // First chunk - new file
+    Common::DataChunk chunk;
+    memset(&chunk, 0, sizeof(chunk));
+    
+    chunk.isNewFile = 1;
+    chunk.isEndOfFile = 0;
+    chunk.timestamp = millis();
+    
+    // Create first chunk data
+    char chunkData[80];
+    snprintf(chunkData, sizeof(chunkData), "%s - Chunk 1/%d - Memory: %d\r\n", 
+             baseData, chunkCount, systemManager->getFreeMemory());
+    chunk.length = strlen(chunkData);
+    strncpy((char *)chunk.data, chunkData, sizeof(chunk.data) - 1);
+    
+    // Process first chunk (creates file)
+    fileSystem->processDataChunk(chunk);
+    Serial.print(F("Chunk 1 written\r\n"));
+    
+    // Write remaining chunks with delays to show L2 LED activity
+    for (int i = 2; i <= chunkCount; i++) {
+        delay(100); // 100ms delay between chunks to make LED visible
+        
+        // Prepare next chunk
+        memset(&chunk, 0, sizeof(chunk));
+        chunk.isNewFile = 0;
+        chunk.isEndOfFile = 0;
+        chunk.timestamp = millis();
+        
+        snprintf(chunkData, sizeof(chunkData), "%s - Chunk %d/%d - Free: %d\r\n", 
+                 baseData, i, chunkCount, systemManager->getFreeMemory());
+        chunk.length = strlen(chunkData);
+        strncpy((char *)chunk.data, chunkData, sizeof(chunk.data) - 1);
+        
+        // Process chunk
+        fileSystem->processDataChunk(chunk);
+        
+        Serial.print(F("Chunk "));
+        Serial.print(i);
+        Serial.print(F(" written\r\n"));
+    }
+    
+    // Final chunk - end of file
+    delay(100);
+    memset(&chunk, 0, sizeof(chunk));
+    chunk.isNewFile = 0;
+    chunk.isEndOfFile = 1;
+    chunk.length = 0;
+    chunk.timestamp = millis();
+    
+    // Process end chunk (closes file)
+    fileSystem->processDataChunk(chunk);
+    
+    // Check final status
+    Serial.print(F("Write errors after completion: "));
+    Serial.print(fileSystem->getWriteErrors());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Final Storage Used: "));
+    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Files Now Stored: "));
+    Serial.print(fileSystem->getFilesStored());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("New file: "));
+    Serial.print(fileSystem->getCurrentFilename());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Long test write completed - "));
+    Serial.print(chunkCount);
+    Serial.print(F(" chunks written.\r\n"));
+    Serial.print(F("===============================================\r\n\r\n"));
 }
 
 void ConfigurationManager::printLastFileInfo() {

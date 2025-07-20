@@ -37,6 +37,7 @@ private:
     void printLastFileInfo();
     void printStorageStatus();
     void handleTestWriteCommand(const String& command);
+    void handleTestWriteLongCommand(const String& command);
     void testPrinterProtocol();
     void clearLPTBuffer();
     void resetCriticalState();
