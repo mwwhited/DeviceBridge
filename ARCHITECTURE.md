@@ -69,6 +69,7 @@ The Device Bridge automatically detects file format based on data headers and ha
 │  │  ┌───────────┬───────────┬─────────────┬──────────┬───────────────┐     │   │
 │  │  │Parallel   │FileSystem │DisplayMgr   │TimeMgr   │SystemMgr      │     │   │
 │  │  │PortMgr    │Manager    │             │          │               │     │   │
+│  │  │           │           │             │          │ConfigMgr      │     │   │
 │  │  └───────────┴───────────┴─────────────┴──────────┴───────────────┘     │   │
 │  └─────────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -80,6 +81,7 @@ The Device Bridge automatically detects file format based on data headers and ha
 - **IComponent Interface**: Standardized lifecycle (initialize/update/stop) and validation
 - **Self-Test Framework**: Each component validates its dependencies and hardware
 - **Multi-Layer Validation**: ServiceLocator + Component + Hardware validation
+- **6 Component Architecture**: All managers integrated with bulletproof dependency management
 
 ### Loop-Based Cooperative Multitasking Architecture
 
@@ -89,8 +91,9 @@ The Device Bridge automatically detects file format based on data headers and ha
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │ ParallelPort │ FileSystem  │ Display   │ Time │ System    │ Configuration       │
 │ Manager      │ Manager     │ Manager   │ Mgr  │ Manager   │ Manager             │
-│ Int: 1ms     │ Int: 10ms   │ Int:100ms │ 1s   │ Int: 5s   │ Int: 50ms           │
-│ Real-time    │ Storage Ops │ UI Update │ RTC  │ Monitor   │ Serial Interface    │
+│ Int: 1ms     │ Int: 10ms   │ Adaptive  │ 1s   │ Int: 5s   │ Int: 50ms           │
+│ Real-time    │ Storage Ops │ 100ms/500ms│ RTC  │ Monitor   │ Serial Interface    │
+│ Flow Control │ LPT Locking │ LCD Throttle│     │ LCD Debug │ System Commands     │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -239,12 +242,15 @@ Main Menu
 **Update Rate**: 50ms
 
 #### Responsibilities:
-- Serial command parsing and processing
-- Hardware validation commands (validate/test)
+- Serial command parsing and processing (50+ commands)
+- Hardware validation commands (validate/test/testlpt)
 - Time setting via serial interface (time set)
 - Storage type configuration (storage sd/eeprom/serial/auto)
 - Serial heartbeat control (heartbeat on/off/status)
 - System restart commands and help menu
+- **Enhanced Debugging**: LCD debug mode, buffer monitoring, LED testing
+- **LPT Protocol Testing**: Complete printer protocol validation
+- **Component Validation**: Self-test framework coordination
 
 ## Inter-Component Communication
 
