@@ -27,7 +27,21 @@
 
 **All critical development phases completed. System ready for production TDS2024 integration.**
 
-## Pending Tasks
+## Current Pending Tasks
+
+### **High Priority** (Critical Data Capture Issues)
+- [ ] **Add port buffer size to storage status** for debugging
+- [ ] **Fix buffer clearing issue** - ensure buffer clears after file closes or long wait, ensure file closure
+- [ ] **Investigate BMP skewing issue** - data being lost in buffer during capture
+- [ ] **Optimize LPT port timing** - stretch busy/ack while reading bytes for better capture
+
+### **Medium Priority** (Feature Enhancements)
+- [ ] **Refactor file system** - create interface for each file system supported by FileSystemManager
+- [ ] **Refactor each filesystem** to its own class with proper separation
+- [ ] **Import supported file systems** into FileSystemManager with modular design
+- [ ] **Add serial configuration interface** - ability to set all configuration from serial
+- [ ] **Add serial menu options** - get/set all menu options like file type via serial commands
+- [ ] **Add analog button simulation** - serial option to simulate LCD board button presses with display
 
 ### **Hardware Validation** (High Priority)
 - [ ] **Test Bulletproof Buffer System** with real TDS2024 to validate zero data loss
@@ -38,8 +52,6 @@
 - [ ] **Storage Failover Testing** - Verify SD → EEPROM → Serial fallback works
 
 ### **Enhancement Features** (Medium Priority)
-- [ ] **Refactor FileSystemManager** with interface pattern for each storage type (nice-to-have)
-- [ ] **Serial Configuration Commands** - Add get/set commands for all menu options
 - [ ] **Configuration EEPROM** - Save/restore settings via serial menu
 - [ ] **Serial File Management** - list, get, delete commands for file operations
 

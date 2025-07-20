@@ -72,17 +72,18 @@ namespace DeviceBridge::Components
     {
         _storageOperationActive = active;
         
-        // If storage operation is ending, allow immediate display update
+        // If storage operation is ending, allow immediate display update and clock refresh
         if (!active) {
             _lastDisplayUpdate = 0;
+            _showingTime = false; // Allow clock to refresh when idle
         }
     }
 
     void DisplayManager::updateDisplay()
     {
         auto timeManager = getServices().getTimeManager();
-        // Check if we should show time when idle
-        if (!_inMenu && (millis() - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
+        // Check if we should show time when truly idle (not in menu, not during storage operations)
+        if (!_inMenu && !_storageOperationActive && (millis() - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
         {
             if (!_showingTime)
             {
@@ -193,6 +194,9 @@ namespace DeviceBridge::Components
 
     void DisplayManager::navigateMenu(uint16_t button)
     {
+        // Reset idle timer on any menu interaction
+        _lastMessageTime = millis();
+        
         switch (button)
         {
         case BUTTON_UP:
@@ -326,12 +330,15 @@ namespace DeviceBridge::Components
         _inMenu = true;
         _menuState = MAIN_MENU;
         _menuSelection = 0;
+        _lastMessageTime = millis(); // Reset idle timer when entering menu
+        _showingTime = false; // Ensure we're not showing time
         showMenuScreen();
     }
 
     void DisplayManager::exitMenu()
     {
         _inMenu = false;
+        _showingTime = false; // Allow clock to refresh when idle
         showMainScreen();
     }
 

@@ -1,11 +1,3 @@
-- refactor file system
-  - create an interface for each file system supported by FileSystemManager
-  - refactor each filesystem to its own class
-  - import the supported file sytems into file system manager
-- improve debugging
-  - add a port buffer size to storage status
-- something is wrong with the buffer.  after the file closes or there is a long wait the buffer should be cleared and the file should be ensured closed
-- I was finally able to extract and image after putting the files into directories.  but the bmp was skewed.  this tells me some of the data in the buffer was being lost.
-- check the timing for the lpt port.  you might want to stretch the times especially the busy/ack while reading the bytes.  this should allow for better capture of each byte
-- I need the ability to set all configuration from the serial
-  - need the ability to get/set all menu options like file type
+- add an option to the serial mode to run in a vt100 terminal model
+  - this will allow file transfers, positional rendering, colors and much more
+  
