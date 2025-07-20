@@ -24,6 +24,12 @@ private:
     bool _showingTime;
     bool _inMenu;
     
+    // Storage operation awareness for LCD refresh throttling
+    bool _storageOperationActive;
+    uint32_t _lastDisplayUpdate;
+    uint32_t _normalUpdateInterval;
+    uint32_t _storageUpdateInterval;
+    
     // Menu system state
     enum MenuState {
         MAIN_MENU,
@@ -78,6 +84,10 @@ public:
     
     // Status inquiry
     bool isShowingMenu() const { return _inMenu; }
+    
+    // Storage operation control for LCD refresh throttling
+    void setStorageOperationActive(bool active);
+    bool isStorageOperationActive() const { return _storageOperationActive; }
     
 private:
     // Button debouncing

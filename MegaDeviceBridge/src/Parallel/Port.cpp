@@ -20,7 +20,9 @@ namespace DeviceBridge::Parallel
                             _whichIsr(_isrSeed++),
                             _interruptCount(0),
                             _dataCount(0),
-                            _locked(false)
+                            _locked(false),
+                            _criticalFlowControl(false),
+                            _criticalStartTime(0)
   {
   }
 
@@ -64,11 +66,34 @@ namespace DeviceBridge::Parallel
     // This MUST happen before clearing busy for proper protocol
     sendAcknowledge();
     
-    // Check if buffer is getting full and adjust flow control
-    if (isAlmostFull()) {
-      setBusy(true);  // Hold busy high to slow down sender  
+    // State-based adaptive flow control
+    if (isCriticallyFull()) {
+      // Entering or staying in critical state
+      if (!_criticalFlowControl) {
+        _criticalFlowControl = true;
+        _criticalStartTime = millis();
+      }
+      setBusy(true);
+      delayMicroseconds(50); // Extended delay in critical state
+    } else if (_criticalFlowControl) {
+      // In critical recovery - stay busy until below warning level
+      if (!isAlmostFull()) {
+        // Buffer drained below warning level - exit critical state
+        _criticalFlowControl = false;
+        setBusy(false);
+        delayMicroseconds(2);
+      } else {
+        // Still above warning level - maintain critical flow control
+        setBusy(true);
+        delayMicroseconds(50);
+      }
+    } else if (isAlmostFull()) {
+      // 60%+ full - WARNING: Hold busy with moderate delay
+      setBusy(true);
+      delayMicroseconds(25); // Moderate delay to slow down sender
     } else {
-      setBusy(false); // Clear busy when buffer has space
+      // <60% full - Normal operation
+      setBusy(false);
       delayMicroseconds(2); // Brief delay for TDS2024 timing stability
     }
     
@@ -123,7 +148,14 @@ namespace DeviceBridge::Parallel
 
   bool Port::isAlmostFull()
   {
-    return _buffer.size() > (_buffer.maxSize() / 4 * 3);
+    // 60% threshold for moderate flow control
+    return _buffer.size() >= (_buffer.maxSize() * 3 / 5);
+  }
+
+  bool Port::isCriticallyFull()
+  {
+    // 80% threshold for extended flow control
+    return _buffer.size() >= (_buffer.maxSize() * 4 / 5);
   }
 
   bool Port::isFull()
@@ -159,9 +191,20 @@ namespace DeviceBridge::Parallel
     // Re-enable interrupts
     interrupts();
     
-    // Update flow control based on current buffer level
-    if (!isAlmostFull() && cnt > 0) {
-      setBusy(false); // Clear busy when we've freed up space
+    // Aggressive flow control update based on buffer level after read
+    uint16_t bufferLevelAfterRead = _buffer.size();
+    uint16_t bufferCapacity = _buffer.maxSize();
+    
+    if (cnt > 0) { // Only update if we actually read data
+      if (bufferLevelAfterRead < (bufferCapacity / 2)) {
+        // Less than 50% full - clear busy immediately
+        setBusy(false);
+      } else if (bufferLevelAfterRead < (bufferCapacity * 3 / 5)) {
+        // 50-60% full - clear busy but with brief delay
+        setBusy(false);
+        delayMicroseconds(5);
+      }
+      // If still >60% full, keep busy active until next interrupt
     }
     
     return cnt;
@@ -200,6 +243,25 @@ namespace DeviceBridge::Parallel
 
   uint16_t Port::getBufferSize() const {
     return _buffer.size();
+  }
+
+  uint16_t Port::getBufferFreeSpace() const {
+    return _buffer.maxSize() - _buffer.size();
+  }
+
+  bool Port::checkCriticalTimeout() const {
+    if (!_criticalFlowControl) {
+      return false;
+    }
+    uint32_t currentTime = millis();
+    uint32_t elapsed = currentTime - _criticalStartTime;
+    return elapsed >= CRITICAL_TIMEOUT_MS;
+  }
+
+  void Port::resetCriticalState() {
+    _criticalFlowControl = false;
+    _criticalStartTime = 0;
+    setBusy(false);
   }
 
   /*

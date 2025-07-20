@@ -100,6 +100,10 @@ void ConfigurationManager::processCommand(const String &command) {
         testPrinterProtocol();
     } else if (command.equalsIgnoreCase(F("clearbuffer")) || command.equalsIgnoreCase(F("clearport"))) {
         clearLPTBuffer();
+    } else if (command.equalsIgnoreCase(F("resetcritical")) || command.equalsIgnoreCase(F("clearcritical"))) {
+        resetCriticalState();
+    } else if (command.startsWith(F("lcdthrottle "))) {
+        handleLCDThrottleCommand(command);
     } else if (command.startsWith(F("led "))) {
         handleLEDCommand(command);
     } else if (command.equalsIgnoreCase(F("files")) || command.equalsIgnoreCase(F("lastfile"))) {
@@ -134,6 +138,8 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  testint           - Test interrupt pin response\r\n"));
     Serial.print(F("  testlpt           - Test LPT printer protocol signals\r\n"));
     Serial.print(F("  clearbuffer       - Clear LPT data buffer and reset state\r\n"));
+    Serial.print(F("  resetcritical     - Reset critical flow control state\r\n"));
+    Serial.print(F("  lcdthrottle on/off - Control LCD refresh throttling for storage ops\r\n"));
     Serial.print(F("  led l1/l2 on/off  - Control L1 (LPT) and L2 (Write) LEDs\r\n"));
     Serial.print(F("  debug lcd on/off  - Enable/disable LCD debug output to serial\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
@@ -506,16 +512,50 @@ void ConfigurationManager::printStorageStatus() {
     Serial.print((bufferLevel * 100) / 512);
     Serial.print(F("% full)\r\n"));
     
+    Serial.print(F("Flow Control Thresholds:\r\n"));
+    Serial.print(F("  60% (307 bytes): Moderate busy delay (25μs)\r\n"));
+    Serial.print(F("  80% (409 bytes): Extended busy delay (50μs)\r\n"));
+    
     Serial.print(F("Buffer Status: "));
     if (bufferLevel >= 512) {
         Serial.print(F("❌ FULL - DATA LOSS RISK!"));
-    } else if (bufferLevel >= 384) {
-        Serial.print(F("⚠️  ALMOST FULL - Flow control active"));
+    } else if (bufferLevel >= 409) {  // 80% threshold
+        Serial.print(F("🔴 CRITICAL - Extended flow control (50μs)"));
+    } else if (bufferLevel >= 307) {  // 60% threshold
+        Serial.print(F("⚠️  WARNING - Moderate flow control (25μs)"));
+    } else if (bufferLevel >= 256) {  // 50% threshold
+        Serial.print(F("🟡 ELEVATED - Ready for flow control"));
     } else if (bufferLevel > 0) {
-        Serial.print(F("✅ Data available"));
+        Serial.print(F("✅ Normal - Data available"));
     } else {
         Serial.print(F("✅ Empty"));
     }
+    Serial.print(F("\r\n"));
+    
+    // Add critical state information
+    if (parallelPort->isCriticalFlowControlActive()) {
+        Serial.print(F("⚠️  CRITICAL FLOW CONTROL ACTIVE\r\n"));
+        Serial.print(F("Critical State Duration: "));
+        // Calculate duration (approximation)
+        Serial.print(F("Active\r\n"));
+    }
+    
+    // Add interrupt statistics
+    Serial.print(F("Interrupt Count: "));
+    Serial.print(parallelPort->getInterruptCount());
+    Serial.print(F("\r\n"));
+    Serial.print(F("Data Count: "));
+    Serial.print(parallelPort->getDataCount());
+    Serial.print(F("\r\n"));
+    
+    // Add LCD refresh status
+    auto displayManager = getServices().getDisplayManager();
+    Serial.print(F("\r\n=== LCD Refresh Status ===\r\n"));
+    Serial.print(F("Storage Operation Active: "));
+    Serial.print(displayManager->isStorageOperationActive() ? F("YES") : F("NO"));
+    Serial.print(F("\r\n"));
+    Serial.print(F("Current Refresh Rate: "));
+    Serial.print(displayManager->isStorageOperationActive() ? F("500ms (Throttled)") : F("100ms (Normal)"));
     Serial.print(F("\r\n"));
 
     Serial.print(F("Active Storage: "));
@@ -944,6 +984,67 @@ void ConfigurationManager::clearLPTBuffer() {
     Serial.print(F("===========================\r\n"));
     
     displayManager->displayMessage(Common::DisplayMessage::INFO, F("Buffer Cleared"));
+}
+
+void ConfigurationManager::resetCriticalState() {
+    auto parallelPort = getServices().getParallelPortManager();
+    auto displayManager = getServices().getDisplayManager();
+    
+    Serial.print(F("\r\n=== Resetting Critical State ===\r\n"));
+    
+    bool wasCritical = parallelPort->isCriticalFlowControlActive();
+    
+    // Reset the critical state
+    parallelPort->resetCriticalState();
+    
+    Serial.print(F("Critical flow control state: "));
+    Serial.print(wasCritical ? F("WAS ACTIVE - Now Reset") : F("Was not active"));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Buffer and flow control reset\r\n"));
+    Serial.print(F("===============================\r\n"));
+    
+    if (wasCritical) {
+        displayManager->displayMessage(Common::DisplayMessage::INFO, F("Critical Reset"));
+    } else {
+        displayManager->displayMessage(Common::DisplayMessage::INFO, F("No Critical State"));
+    }
+}
+
+void ConfigurationManager::handleLCDThrottleCommand(const String& command) {
+    auto displayManager = getServices().getDisplayManager();
+    String params = command.substring(12); // Remove "lcdthrottle "
+    params.trim();
+    params.toLowerCase();
+    
+    Serial.print(F("\r\n=== LCD Throttle Control ===\r\n"));
+    
+    if (params == F("on") || params == F("enable") || params == F("true")) {
+        displayManager->setStorageOperationActive(true);
+        Serial.print(F("LCD refresh throttled to 500ms\r\n"));
+        Serial.print(F("Storage operation mode: ACTIVE\r\n"));
+        displayManager->displayMessage(Common::DisplayMessage::INFO, F("LCD Throttled"));
+    } else if (params == F("off") || params == F("disable") || params == F("false")) {
+        displayManager->setStorageOperationActive(false);
+        Serial.print(F("LCD refresh restored to 100ms\r\n"));
+        Serial.print(F("Storage operation mode: INACTIVE\r\n"));
+        displayManager->displayMessage(Common::DisplayMessage::INFO, F("LCD Normal"));
+    } else if (params == F("status")) {
+        bool isThrottled = displayManager->isStorageOperationActive();
+        Serial.print(F("Storage Operation Active: "));
+        Serial.print(isThrottled ? F("YES") : F("NO"));
+        Serial.print(F("\r\n"));
+        Serial.print(F("Current Refresh Rate: "));
+        Serial.print(isThrottled ? F("500ms (Throttled)") : F("100ms (Normal)"));
+        Serial.print(F("\r\n"));
+    } else {
+        Serial.print(F("Usage: lcdthrottle [on|off|status]\r\n"));
+        Serial.print(F("  on/enable  - Throttle LCD to 500ms refresh\r\n"));
+        Serial.print(F("  off/disable - Restore LCD to 100ms refresh\r\n"));
+        Serial.print(F("  status     - Show current throttle status\r\n"));
+    }
+    
+    Serial.print(F("============================\r\n"));
 }
 
 // IComponent interface implementation

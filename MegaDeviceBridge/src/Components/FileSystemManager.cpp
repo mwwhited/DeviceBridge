@@ -66,11 +66,25 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         sendDisplayMessage(Common::DisplayMessage::STATUS, F(","));
     }
 
-    // Write data
+    // Write data - only if file is properly open
     if (chunk.length > 0) {
-        if (!writeDataChunk(chunk)) {
+        if (_isFileOpen) {
+            if (!writeDataChunk(chunk)) {
+                _writeErrors++;
+                sendDisplayMessage(Common::DisplayMessage::ERROR, F("Write Failed"));
+            }
+        } else {
+            // File not open - don't spam errors, just count them
             _writeErrors++;
-            sendDisplayMessage(Common::DisplayMessage::ERROR, F("Write Failed"));
+            // Only send error message once per file to avoid LCD spam
+            static bool errorSent = false;
+            if (chunk.isNewFile || !errorSent) {
+                sendDisplayMessage(Common::DisplayMessage::ERROR, F("No File Open"));
+                errorSent = true;
+            }
+            if (chunk.isEndOfFile) {
+                errorSent = false; // Reset for next file
+            }
         }
     }
 
@@ -101,6 +115,10 @@ bool FileSystemManager::initializeSD() {
 bool FileSystemManager::initializeEEPROM() { return _eeprom.initialize(); }
 
 bool FileSystemManager::createNewFile() {
+    // Notify display manager that storage operation is starting
+    auto displayManager = getServices().getDisplayManager();
+    displayManager->setStorageOperationActive(true);
+    
     generateFilename(_currentFilename, sizeof(_currentFilename));
 
     switch (_activeStorage.value) {
@@ -124,9 +142,30 @@ bool FileSystemManager::createNewFile() {
             auto fileName = currentPath.substring(lastSlash + 1);
             sendDisplayMessage(Common::DisplayMessage::INFO, ("File: " + fileName).c_str());
 
+            // Lock LPT port during SD operations to prevent interference
+            getServices().getParallelPortManager()->lockPort();
+            
             _currentFile = SD.open(currentPath, FILE_WRITE);
-            sendDisplayMessage(Common::DisplayMessage::INFO, _currentFile ? "SD Opened" : "SD Open Failed");
+            
+            // Unlock LPT port immediately after SD operation
+            getServices().getParallelPortManager()->unlockPort();
+            
             _isFileOpen = (_currentFile != 0);
+            
+            if (_isFileOpen) {
+                sendDisplayMessage(Common::DisplayMessage::INFO, F("SD Opened"));
+            } else {
+                sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Open Failed"));
+                // Try to understand why it failed
+                if (!isSDCardPresent()) {
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, F("No SD Card"));
+                } else if (isSDWriteProtected()) {
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Protected"));
+                } else {
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Busy/Error"));
+                }
+            }
+            
             return _isFileOpen;
         }
         break;
@@ -155,6 +194,10 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
     if (!_isFileOpen) {
         return false;
     }
+
+    // Ensure storage operation mode is active during writes
+    auto displayManager = getServices().getDisplayManager();
+    displayManager->setStorageOperationActive(true);
 
     // Turn on write activity LED
     digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
@@ -226,6 +269,11 @@ bool FileSystemManager::closeCurrentFile() {
     }
 
     _isFileOpen = false;
+    
+    // Notify display manager that storage operation is ending
+    auto displayManager = getServices().getDisplayManager();
+    displayManager->setStorageOperationActive(false);
+    
     return result;
 }
 

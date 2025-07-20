@@ -35,6 +35,11 @@ namespace DeviceBridge::Parallel
     // Printer protocol state
     volatile bool _locked;
     
+    // Critical buffer management
+    volatile bool _criticalFlowControl;
+    volatile uint32_t _criticalStartTime;
+    static const uint32_t CRITICAL_TIMEOUT_MS = 20000; // 20 seconds
+    
   public:
     Port(
         Control control,
@@ -43,7 +48,10 @@ namespace DeviceBridge::Parallel
 
     void initialize();
     bool hasData();
-    bool isAlmostFull();
+    bool isAlmostFull();    // 60% threshold - moderate flow control
+    bool isCriticallyFull(); // 80% threshold - extended flow control  
+    uint16_t getBufferCapacity() const { return 512; }
+    uint16_t getBufferFreeSpace() const;
     bool isFull();
     uint16_t readData(uint8_t buffer[], uint16_t index = 0, uint16_t length = 0);
     
@@ -64,6 +72,11 @@ namespace DeviceBridge::Parallel
     // Buffer management methods
     void clearBuffer();
     uint16_t getBufferSize() const;
+    
+    // Critical buffer state management
+    bool isCriticalFlowControlActive() const { return _criticalFlowControl; }
+    bool checkCriticalTimeout() const;
+    void resetCriticalState();
   };
 
   /*

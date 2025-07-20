@@ -39,6 +39,8 @@ private:
     void handleTestWriteCommand(const String& command);
     void testPrinterProtocol();
     void clearLPTBuffer();
+    void resetCriticalState();
+    void handleLCDThrottleCommand(const String& command);
     
     // Timing for updates
     unsigned long _lastCommandCheck;

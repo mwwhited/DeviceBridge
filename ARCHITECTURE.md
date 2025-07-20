@@ -4,7 +4,7 @@
 
 The MegaDeviceBridge is a sophisticated embedded system that converts parallel port data from a Tektronix TDS2024 oscilloscope to modern storage formats. The system uses a **loop-based cooperative multitasking architecture** with component-based design for real-time data capture and processing.
 
-**Current Status (2025-07-20)**: Enterprise-grade architecture with Service Locator pattern providing zero null pointer risk, comprehensive dependency management, and professional self-validation framework. Includes full hardware enhancements with visual LED indicators, SD card detection, and complete LPT printer protocol for seamless TDS2024 integration.
+**Current Status (2025-07-20)**: **Bulletproof enterprise-grade architecture** with Service Locator pattern providing zero null pointer risk, multi-tier adaptive flow control, 20-second timeout protection, and intelligent LCD throttling. Includes comprehensive hardware enhancements, emergency recovery systems, and complete TDS2024 printer protocol for **zero data loss** high-speed oscilloscope data capture.
 
 ### TDS2024 Oscilloscope Capabilities
 **Supported File Formats:**
@@ -49,16 +49,18 @@ The Device Bridge automatically detects file format based on data headers and ha
 ## System Architecture
 
 ### Core Design Principles
-1. **Real-Time Performance**: 1ms polling for parallel port data capture
-2. **Zero Null Pointers**: Service Locator pattern eliminates dependency injection issues
-3. **Self-Validating System**: Runtime dependency validation with fail-safe operation
-4. **Component Isolation**: Modular design with clear boundaries and standardized interfaces
-5. **Graceful Degradation**: Storage failover mechanisms with comprehensive error handling
-6. **Memory Efficiency**: Optimized for 8KB RAM constraint with enterprise-grade architecture
+1. **Zero Data Loss**: Multi-tier adaptive flow control with state-based critical recovery
+2. **Real-Time Performance**: Enhanced 1ms polling with memory barriers and timing optimization
+3. **Emergency Recovery**: 20-second timeout protection with automatic TDS2024 error signaling
+4. **Zero Null Pointers**: Service Locator pattern eliminates dependency injection issues
+5. **Self-Healing System**: Runtime dependency validation with comprehensive error recovery
+6. **Component Isolation**: Modular design with standardized interfaces and self-testing
+7. **Graceful Degradation**: Storage failover with intelligent LCD throttling
+8. **Memory Efficiency**: Optimized for 8KB RAM with bulletproof buffer management
 
-### Service Locator Architecture (2025-07-20) ⭐⭐
+### Service Locator Architecture (2025-07-20) ⭐⭐⭐
 
-**Enterprise-Grade Dependency Management:**
+**Bulletproof Enterprise-Grade Dependency Management:**
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                         ServiceLocator (Singleton)                             │
@@ -98,6 +100,33 @@ Successfully converted from FreeRTOS to loop-based cooperative multitasking, ach
 - **Simplified Debugging**: No complex scheduler overhead
 - **Direct Communication**: Function calls replace queues/mutexes
 - **Production Stability**: Confirmed operational on hardware
+
+### Bulletproof Buffer Management System (2025-07-20) ⭐⭐⭐
+
+**Zero Data Loss Architecture:**
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    Multi-Tier Adaptive Flow Control                            │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Normal (0-59%)  │ Warning (60-79%) │ Critical (80-99%) │ Emergency (20s timeout) │
+│ Busy: OFF       │ Busy: ON (25μs)  │ Busy: ON (50μs)   │ TDS2024 Error Signal    │
+│ 100ms LCD       │ LCD Throttling   │ State Locked      │ File Close + Buffer     │
+│ 2μs Timing      │ Buffer Draining  │ Until <60%        │ Clear + Recovery        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**State-Based Critical Recovery:**
+- **Entry Condition**: Buffer reaches 80% (409/512 bytes)
+- **Lock Mechanism**: Busy signal held until buffer drops below 60% (307 bytes)
+- **Progressive Delays**: 25μs moderate → 50μs critical → Emergency timeout
+- **LCD Throttling**: Automatic 100ms → 500ms refresh during storage operations
+- **Emergency Recovery**: 20-second timeout triggers TDS2024 error signaling and system reset
+
+**Enhanced Timing Protection:**
+- **Memory Barriers**: `__asm__ __volatile__("" ::: "memory")` prevents optimization issues
+- **Extended ACK Pulses**: 15μs acknowledge signals for reliable TDS2024 communication
+- **Interrupt Safety**: `noInterrupts()/interrupts()` blocks during critical buffer operations
+- **LPT Port Locking**: SPI operations lock parallel port to prevent interference
 
 ## Component Managers
 

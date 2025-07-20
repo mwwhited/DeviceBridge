@@ -17,7 +17,9 @@ namespace DeviceBridge::Components
     constexpr uint16_t BUTTON_NONE = 1023;
 
     DisplayManager::DisplayManager(User::Display &display)
-        : _display(display), _lastMessageTime(0), _showingTime(false), _inMenu(false), _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(BUTTON_NONE)
+        : _display(display), _lastMessageTime(0), _showingTime(false), _inMenu(false), 
+          _storageOperationActive(false), _lastDisplayUpdate(0), _normalUpdateInterval(100), _storageUpdateInterval(500),
+          _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(BUTTON_NONE)
     {
         memset(_currentMessage, 0, sizeof(_currentMessage));
         memset(_currentLine2, 0, sizeof(_currentLine2));
@@ -37,7 +39,7 @@ namespace DeviceBridge::Components
 
     void DisplayManager::update()
     {
-        // Check for button presses
+        // Check for button presses (always responsive)
         uint16_t buttonValue = readButtons();
         if (buttonValue != BUTTON_NONE && buttonValue != _lastButtonState)
         {
@@ -50,14 +52,30 @@ namespace DeviceBridge::Components
             _lastButtonState = BUTTON_NONE;
         }
 
-        // Update display content
-        updateDisplay();
+        // Adaptive display update based on storage operation state
+        uint32_t currentTime = millis();
+        uint32_t updateInterval = _storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
+        
+        if (currentTime - _lastDisplayUpdate >= updateInterval) {
+            updateDisplay();
+            _lastDisplayUpdate = currentTime;
+        }
     }
 
     void DisplayManager::stop()
     {
         _inMenu = false;
         _showingTime = false;
+    }
+
+    void DisplayManager::setStorageOperationActive(bool active)
+    {
+        _storageOperationActive = active;
+        
+        // If storage operation is ending, allow immediate display update
+        if (!active) {
+            _lastDisplayUpdate = 0;
+        }
     }
 
     void DisplayManager::updateDisplay()
