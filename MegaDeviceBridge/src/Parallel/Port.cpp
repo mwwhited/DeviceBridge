@@ -170,7 +170,7 @@ namespace DeviceBridge::Parallel
     // Note: sizeof(buffer) gives size of pointer, not array
     // For Arduino, we'll use the length parameter properly
     if (length == 0) // if length is 0, assume we want to fill the buffer
-      length = 512; // Default chunk size
+      length = ServiceLocator::getInstance().getConfigurationService()->getDataChunkSize(); // Default chunk size from configuration
 
     // Disable interrupts during buffer operations to prevent corruption
     noInterrupts();

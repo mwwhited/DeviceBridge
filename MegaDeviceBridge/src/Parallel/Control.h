@@ -20,5 +20,11 @@ namespace DeviceBridge::Parallel
     uint8_t getStrobePin();
     int getStrobeValue();
     uint8_t readValue();
+    
+    // Individual control signal access for debugging
+    bool isStrobeLow();
+    bool isAutoFeedLow();
+    bool isInitializeLow();
+    bool isSelectInLow();
   };
 }

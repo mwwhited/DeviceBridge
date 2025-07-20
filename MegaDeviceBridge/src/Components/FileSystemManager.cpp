@@ -14,7 +14,8 @@ FileSystemManager::FileSystemManager()
     : _eeprom(Common::Pins::EEPROM_CS), _sdAvailable(false), _eepromAvailable(false), _eepromCurrentAddress(0),
       _eepromBufferIndex(0), _activeStorage(Common::StorageType::AUTO_SELECT),
       _preferredStorage(Common::StorageType::SD_CARD), _fileCounter(0), _fileType(Common::FileType::AUTO_DETECT),
-      _detectedFileType(Common::FileType::AUTO_DETECT), _totalBytesWritten(0), _writeErrors(0), _isFileOpen(false) {
+      _detectedFileType(Common::FileType::AUTO_DETECT), _totalBytesWritten(0), _currentFileBytesWritten(0), 
+      _writeErrors(0), _isFileOpen(false) {
     memset(_currentFilename, 0, sizeof(_currentFilename));
 }
 
@@ -270,6 +271,9 @@ bool FileSystemManager::createNewFile() {
             getServices().getParallelPortManager()->unlockPort();
             
             _isFileOpen = (_currentFile != 0);
+            if (_isFileOpen) {
+                _currentFileBytesWritten = 0; // Reset counter for new file
+            }
             
             if (_isFileOpen) {
                 sendDisplayMessage(Common::DisplayMessage::INFO, F("SD Opened"));
@@ -297,6 +301,7 @@ bool FileSystemManager::createNewFile() {
     case Common::StorageType::SERIAL_TRANSFER:
         // For serial transfer, we'll send data directly
         _isFileOpen = true;
+        _currentFileBytesWritten = 0; // Reset counter for new file
         _fileCounter++; // Increment counter for serial transfer files too
         return true;
 
@@ -338,6 +343,7 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
 
             if (written == chunk.length) {
                 _totalBytesWritten += chunk.length;
+                _currentFileBytesWritten += chunk.length;
                 success = true;
             }
         }
@@ -349,6 +355,8 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
 
     case Common::StorageType::SERIAL_TRANSFER:
         // TODO: Implement serial transfer
+        _totalBytesWritten += chunk.length;
+        _currentFileBytesWritten += chunk.length;
         success = true;
         break;
 

@@ -25,6 +25,7 @@ private:
     // Data buffer for loop-based processing
     Common::DataChunk _currentChunk;
     uint16_t _chunkIndex;
+    uint32_t _chunkStartTime;
     
     // File boundary detection
     bool detectNewFile();
@@ -33,6 +34,7 @@ private:
     // Data processing
     void processData();
     void sendChunk();
+    bool shouldSendPartialChunk() const;
     
     // Critical timeout handling
     void handleCriticalTimeout();
@@ -65,6 +67,12 @@ public:
     // Debug methods
     uint32_t getInterruptCount() const;
     uint32_t getDataCount() const;
+    
+    // Control signal debugging
+    bool isStrobeLow();
+    bool isAutoFeedLow();
+    bool isInitializeLow();
+    bool isSelectInLow();
     
     // LPT locking for SPI/Serial operations
     void lockPort();

@@ -37,8 +37,11 @@ public:
     
     // Buffer configuration access
     static constexpr uint16_t getRingBufferSize() { return Buffer::RING_BUFFER_SIZE; }
+    static constexpr uint16_t getDataChunkSize() { return Buffer::DATA_CHUNK_SIZE; }
     static constexpr uint16_t getEepromBufferSize() { return Buffer::EEPROM_BUFFER_SIZE; }
     static constexpr uint32_t getCriticalTimeoutMs() { return Buffer::CRITICAL_TIMEOUT_MS; }
+    static constexpr uint32_t getChunkSendTimeoutMs() { return Buffer::CHUNK_SEND_TIMEOUT_MS; }
+    static constexpr uint16_t getMinChunkSize() { return Buffer::MIN_CHUNK_SIZE; }
     
     // Flow control threshold calculation - OPTIMIZED FOR TDS2024
     static constexpr uint16_t getPreWarningFlowThreshold(uint16_t bufferSize) {

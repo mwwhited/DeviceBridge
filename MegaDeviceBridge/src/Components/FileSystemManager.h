@@ -97,6 +97,7 @@ public:
     uint32_t getSDCardFileCount() const;  // Explicitly count SD card files
     const char* getCurrentFilename() const { return _currentFilename; }
     uint32_t getTotalBytesWritten() const { return _totalBytesWritten; }
+    uint32_t getCurrentFileBytesWritten() const { return _currentFileBytesWritten; }
     uint16_t getWriteErrors() const { return _writeErrors; }
     
     // Hardware status
@@ -107,7 +108,8 @@ private:
     // Helper methods
     uint32_t countFilesRecursive(const char* dirPath) const;
     // Statistics
-    uint32_t _totalBytesWritten;
+    uint32_t _totalBytesWritten;      // Total bytes written across all files
+    uint32_t _currentFileBytesWritten; // Bytes written to current file
     uint16_t _writeErrors;
 };
 

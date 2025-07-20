@@ -1,10 +1,22 @@
-- watch for the init signal from the parallel port.  
-- add debug logic to monitor `/Auto Feed`, `/Initialize` and `/Select In`
-- if `/Initialize` is low for 10ms then get ready for a print job.
-- suggested timing change
-  - monitor init.  if detected low for at least 10ms then enable IRS, pull busy low and set a delay of 100ms
-  - the ISR should fill the ring buffer on strobe
-    - when a strobe is receive the ISR should old BUSY high, delay for 5ms, read the data, delay for 2ms set the ACK delay 2ms, reset busy to low
-  - once the delay trip the busy should be forced high until the next polling period 
-  - is no strobes for at least 50ms during 100ms delay then end of print job
-- buffer size is a magic number of 512, chunk size is also 512.  they should be moved to configuration
+- i think the timing is wrong in the data read sequence.  try this 
+  - within ISR
+    - ISR should be configured for the falling edge
+    - The first action in the IRS should be BUSY goes high
+    - cli();
+    - delay for 5ms
+    - read data
+    - write to ring bummer
+    - delay for 2ms
+    - ACK set
+    - delay for 2ms
+    - Ack clear
+    - delay for 2ms
+    - BUSY LOW
+    - sei();
+  - within parallel controller update
+    - busy high
+    - if init low
+      - busy low
+      - delay 100ms
+      - busy high
+  - nothing else should control the parallel port

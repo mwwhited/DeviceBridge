@@ -310,10 +310,15 @@ void ConfigurationManager::printButtonStatus() {
 
 void ConfigurationManager::printParallelPortStatus() {
     auto parallelPortManager = getServices().getParallelPortManager();
+    auto fileSystemManager = getServices().getFileSystemManager();
     Serial.print(F("\r\n=== Parallel Port Status ===\r\n"));
 
     Serial.print(F("Total Bytes Received: "));
     Serial.print(parallelPortManager->getTotalBytesReceived());
+    Serial.print(F("\r\n"));
+
+    Serial.print(F("Total Bytes Written: "));
+    Serial.print(fileSystemManager->getTotalBytesWritten());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Files Received: "));
@@ -331,6 +336,24 @@ void ConfigurationManager::printParallelPortStatus() {
     Serial.print(F("Data Count: "));
     Serial.print(parallelPortManager->getDataCount());
     Serial.print(F("\r\n"));
+    
+    // Data integrity check
+    uint32_t totalRead = parallelPortManager->getTotalBytesReceived();
+    uint32_t totalWritten = fileSystemManager->getTotalBytesWritten();
+    Serial.print(F("Data Integrity: "));
+    if (totalRead == totalWritten) {
+        Serial.print(F("GOOD ("));
+        Serial.print(totalRead);
+        Serial.print(F(" bytes match)\r\n"));
+    } else {
+        Serial.print(F("MISMATCH - Read: "));
+        Serial.print(totalRead);
+        Serial.print(F(", Written: "));
+        Serial.print(totalWritten);
+        Serial.print(F(", Diff: "));
+        Serial.print((totalRead > totalWritten) ? (totalRead - totalWritten) : (totalWritten - totalRead));
+        Serial.print(F("\r\n"));
+    }
 
     // Read raw parallel port pin states
     Serial.print(F("\r\nPin States:\r\n"));
@@ -358,16 +381,30 @@ void ConfigurationManager::printParallelPortStatus() {
     Serial.print(F(")"));
     Serial.print(F("\r\n"));
 
-    Serial.print(F("\r\nControl pins (Input):\r\n"));
-    Serial.print(F("  Auto Feed (pin 22): "));
+    Serial.print(F("\r\nControl pins (Input - Active Low):\r\n"));
+    Serial.print(F("  /Strobe: "));
+    Serial.print(parallelPortManager->isStrobeLow() ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(F(" (pin "));
+    Serial.print(digitalRead(Common::Pins::LPT_STROBE));
+    Serial.print(F(")\r\n"));
+    
+    Serial.print(F("  /Auto Feed: "));
+    Serial.print(parallelPortManager->isAutoFeedLow() ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_AUTO_FEED));
-    Serial.print(F("\r\n"));
-    Serial.print(F("  Initialize (pin 26): "));
+    Serial.print(F(")\r\n"));
+    
+    Serial.print(F("  /Initialize: "));
+    Serial.print(parallelPortManager->isInitializeLow() ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_INITIALIZE));
-    Serial.print(F("\r\n"));
-    Serial.print(F("  Select In (pin 28): "));
+    Serial.print(F(")\r\n"));
+    
+    Serial.print(F("  /Select In: "));
+    Serial.print(parallelPortManager->isSelectInLow() ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_SELECT_IN));
-    Serial.print(F("\r\n"));
+    Serial.print(F(")\r\n"));
 
     Serial.print(F("\r\nStatus pins (Output):\r\n"));
     Serial.print(F("  Ack (pin 41): "));
@@ -872,6 +909,27 @@ void ConfigurationManager::printLastFileInfo() {
         Serial.print(F("Total Bytes Written: "));
         Serial.print(fileSystem->getTotalBytesWritten());
         Serial.print(F(" bytes\r\n"));
+        
+        Serial.print(F("Current File Bytes Written: "));
+        Serial.print(fileSystem->getCurrentFileBytesWritten());
+        Serial.print(F(" bytes\r\n"));
+
+        // Show byte tracking comparison
+        auto parallelPortManager = getServices().getParallelPortManager();
+        uint32_t totalRead = parallelPortManager->getTotalBytesReceived();
+        uint32_t totalWritten = fileSystem->getTotalBytesWritten();
+        Serial.print(F("Data Integrity Check: "));
+        if (totalRead == totalWritten) {
+            Serial.print(F("GOOD ("));
+            Serial.print(totalRead);
+            Serial.print(F(" bytes match)\r\n"));
+        } else {
+            Serial.print(F("MISMATCH - Read: "));
+            Serial.print(totalRead);
+            Serial.print(F(", Written: "));
+            Serial.print(totalWritten);
+            Serial.print(F("\r\n"));
+        }
 
         Serial.print(F("Write Errors: "));
         Serial.print(fileSystem->getWriteErrors());
@@ -1142,7 +1200,9 @@ void ConfigurationManager::clearLPTBuffer() {
     uint16_t bufferLevel = parallelPort->getBufferLevel();
     Serial.print(F("Buffer level before: "));
     Serial.print(bufferLevel);
-    Serial.print(F("/512 bytes\r\n"));
+    Serial.print(F("/"));
+    Serial.print(getServices().getConfigurationService()->getRingBufferSize());
+    Serial.print(F(" bytes\r\n"));
     
     // Clear the buffer
     parallelPort->clearBuffer();
@@ -1151,7 +1211,9 @@ void ConfigurationManager::clearLPTBuffer() {
     bufferLevel = parallelPort->getBufferLevel();
     Serial.print(F("Buffer level after: "));
     Serial.print(bufferLevel);
-    Serial.print(F("/512 bytes\r\n"));
+    Serial.print(F("/"));
+    Serial.print(getServices().getConfigurationService()->getRingBufferSize());
+    Serial.print(F(" bytes\r\n"));
     
     Serial.print(F("LPT buffer cleared successfully\r\n"));
     Serial.print(F("===========================\r\n"));

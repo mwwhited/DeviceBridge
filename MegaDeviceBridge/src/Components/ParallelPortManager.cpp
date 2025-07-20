@@ -8,8 +8,8 @@
 namespace DeviceBridge::Components {
 
 ParallelPortManager::ParallelPortManager(Parallel::Port &port)
-    : _port(port), _fileInProgress(false), _idleCounter(0), _lastDataTime(0), _chunkIndex(0), _totalBytesReceived(0),
-      _filesReceived(0), _currentFileBytes(0) {
+    : _port(port), _fileInProgress(false), _idleCounter(0), _lastDataTime(0), _chunkIndex(0), _chunkStartTime(0),
+      _totalBytesReceived(0), _filesReceived(0), _currentFileBytes(0) {
     memset(&_currentChunk, 0, sizeof(_currentChunk));
 }
 
@@ -37,6 +37,7 @@ void ParallelPortManager::stop() {
     _fileInProgress = false;
     _idleCounter = 0;
     _chunkIndex = 0;
+    _chunkStartTime = 0;
 }
 
 void ParallelPortManager::processData() {
@@ -53,6 +54,7 @@ void ParallelPortManager::processData() {
             _currentFileBytes = 0;
             _filesReceived++;
             _chunkIndex = 0;
+            _chunkStartTime = millis(); // Start timing for first chunk
             
             // Debug logging for new file detection
             auto systemManager = getServices().getSystemManager();
@@ -68,6 +70,11 @@ void ParallelPortManager::processData() {
 
         // Read available data into current chunk
         if (_chunkIndex < sizeof(_currentChunk.data)) {
+            // Start timing if this is the first data in a new chunk
+            if (_chunkIndex == 0 && _chunkStartTime == 0) {
+                _chunkStartTime = millis();
+            }
+            
             // Turn on LPT read activity LED
             digitalWrite(Common::Pins::LPT_READ_LED, HIGH);
 
@@ -92,6 +99,30 @@ void ParallelPortManager::processData() {
                     Serial.print(_currentFileBytes);
                     Serial.print(F(" total"));
                     
+                    // Control signal status
+                    Serial.print(F(" | Signals: /STR="));
+                    Serial.print(_port.isStrobeLow() ? F("ACT") : F("INA"));
+                    Serial.print(F(" /AF="));
+                    Serial.print(_port.isAutoFeedLow() ? F("ACT") : F("INA"));
+                    Serial.print(F(" /INI="));
+                    Serial.print(_port.isInitializeLow() ? F("ACT") : F("INA"));
+                    Serial.print(F(" /SEL="));
+                    Serial.print(_port.isSelectInLow() ? F("ACT") : F("INA"));
+                    
+                    // Byte tracking comparison (read vs written)
+                    auto fileSystemManager = getServices().getFileSystemManager();
+                    Serial.print(F(" | Bytes: Read="));
+                    Serial.print(_currentFileBytes);
+                    Serial.print(F(" Written="));
+                    Serial.print(fileSystemManager->getCurrentFileBytesWritten());
+                    uint32_t difference = (_currentFileBytes > fileSystemManager->getCurrentFileBytesWritten()) ? 
+                        (_currentFileBytes - fileSystemManager->getCurrentFileBytesWritten()) : 
+                        (fileSystemManager->getCurrentFileBytesWritten() - _currentFileBytes);
+                    if (difference > 0) {
+                        Serial.print(F(" DIFF="));
+                        Serial.print(difference);
+                    }
+                    
                     // Show hex dump of first N bytes for new files once we have enough data
                     auto config = getServices().getConfigurationService();
                     uint8_t headerBytes = config->getHeaderHexBytes();
@@ -106,8 +137,11 @@ void ParallelPortManager::processData() {
                     Serial.print(F("\r\n"));
                 }
 
-                // If chunk is full, send it
+                // If chunk is full, send it immediately
                 if (_chunkIndex >= sizeof(_currentChunk.data)) {
+                    sendChunk();
+                } else if (shouldSendPartialChunk()) {
+                    // Send partial chunk if timeout reached and minimum size met
                     sendChunk();
                 }
             }
@@ -123,12 +157,20 @@ void ParallelPortManager::processData() {
             // Debug logging for end of file detection
             auto systemManager = getServices().getSystemManager();
             if (systemManager && systemManager->isParallelDebugEnabled()) {
+                auto fileSystemManager = getServices().getFileSystemManager();
                 Serial.print(F("[DEBUG-LPT] END OF FILE DETECTED - File #"));
                 Serial.print(_filesReceived);
-                Serial.print(F(", total bytes: "));
+                Serial.print(F(", bytes read: "));
                 Serial.print(_currentFileBytes);
+                Serial.print(F(", bytes written: "));
+                Serial.print(fileSystemManager->getCurrentFileBytesWritten());
                 Serial.print(F(", idle cycles: "));
                 Serial.print(_idleCounter);
+                
+                // Check for data loss
+                if (_currentFileBytes != fileSystemManager->getCurrentFileBytesWritten()) {
+                    Serial.print(F(" **DATA MISMATCH**"));
+                }
                 Serial.print(F("\r\n"));
             }
 
@@ -145,6 +187,7 @@ void ParallelPortManager::processData() {
             _idleCounter = 0;
             _currentFileBytes = 0;
             _chunkIndex = 0;
+            _chunkStartTime = 0;
             
             // Clear any remaining data in buffer to prevent corruption of next file
             _port.clearBuffer();
@@ -175,6 +218,22 @@ void ParallelPortManager::sendChunk() {
     // Reset chunk for next data - ONLY reset isNewFile after processing
     _chunkIndex = 0;
     _currentChunk.isNewFile = 0;
+    _chunkStartTime = millis(); // Reset timing for next chunk
+}
+
+bool ParallelPortManager::shouldSendPartialChunk() const {
+    // Don't send if no data collected yet
+    if (_chunkIndex == 0) {
+        return false;
+    }
+    
+    auto config = getServices().getConfigurationService();
+    uint32_t currentTime = millis();
+    uint32_t chunkAge = currentTime - _chunkStartTime;
+    
+    // Send if timeout reached and we have minimum data, or if we have significant data
+    return (chunkAge >= config->getChunkSendTimeoutMs() && _chunkIndex >= config->getMinChunkSize()) ||
+           (_chunkIndex >= config->getDataChunkSize() / 2); // Send when half full regardless of time
 }
 
 bool ParallelPortManager::detectNewFile() {
@@ -217,6 +276,14 @@ uint32_t ParallelPortManager::getInterruptCount() const { return _port.getInterr
 
 uint32_t ParallelPortManager::getDataCount() const { return _port.getDataCount(); }
 
+bool ParallelPortManager::isStrobeLow() { return _port.isStrobeLow(); }
+
+bool ParallelPortManager::isAutoFeedLow() { return _port.isAutoFeedLow(); }
+
+bool ParallelPortManager::isInitializeLow() { return _port.isInitializeLow(); }
+
+bool ParallelPortManager::isSelectInLow() { return _port.isSelectInLow(); }
+
 void ParallelPortManager::lockPort() { _port.lock(); }
 
 void ParallelPortManager::unlockPort() { _port.unlock(); }
@@ -239,6 +306,7 @@ void ParallelPortManager::clearBuffer() {
     _chunkIndex = 0;
     _fileInProgress = false;
     _idleCounter = 0;
+    _chunkStartTime = 0;
 }
 
 uint16_t ParallelPortManager::getBufferSize() const { 
