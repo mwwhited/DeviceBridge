@@ -25,7 +25,7 @@ bool HeartbeatLEDManager::initialize() {
     return true;
 }
 
-void HeartbeatLEDManager::update() {
+void HeartbeatLEDManager::update(unsigned long currentTime) {
     switch (_mode) {
         case HeartbeatMode::NORMAL:
             updateNormalHeartbeat();
@@ -210,6 +210,11 @@ void HeartbeatLEDManager::printDependencyStatus() const {
     Serial.print(F("  ConfigurationService: "));
     Serial.print(configService ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
+}
+
+unsigned long HeartbeatLEDManager::getUpdateInterval() const {
+    auto configService = getServices().getConfigurationService();
+    return configService ? configService->getHeartbeatInterval() : 100; // Default 100ms
 }
 
 } // namespace DeviceBridge::Components

@@ -48,7 +48,7 @@ public:
     
     // Lifecycle management (IComponent interface)
     bool initialize() override;
-    void update() override;
+    void update(unsigned long currentTime) override;
     void stop() override;
     
     // IComponent interface implementation
@@ -56,6 +56,7 @@ public:
     const char* getComponentName() const override;
     bool validateDependencies() const override;
     void printDependencyStatus() const override;
+    unsigned long getUpdateInterval() const override;
     
     // Mode control
     void setMode(HeartbeatMode mode);

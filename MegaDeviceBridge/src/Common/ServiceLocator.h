@@ -90,7 +90,7 @@ private:
 
 /**
  * Base interface for all system components
- * Provides common lifecycle and validation methods
+ * Provides common lifecycle and validation methods with encapsulated timing
  */
 class IComponent {
 public:
@@ -98,7 +98,7 @@ public:
     
     // Lifecycle management
     virtual bool initialize() = 0;
-    virtual void update() = 0;
+    virtual void update(unsigned long currentTime) = 0;
     virtual void stop() = 0;
     
     // Self-testing capabilities
@@ -109,9 +109,21 @@ public:
     virtual bool validateDependencies() const = 0;
     virtual void printDependencyStatus() const = 0;
     
+    // Time management
+    virtual unsigned long getUpdateInterval() const = 0;
+    virtual bool shouldUpdate(unsigned long currentTime) const {
+        return (currentTime - _lastUpdateTime) >= getUpdateInterval();
+    }
+    virtual void markUpdated(unsigned long currentTime) {
+        _lastUpdateTime = currentTime;
+    }
+    
 protected:
     // Helper for getting services
     ServiceLocator& getServices() const { return ServiceLocator::getInstance(); }
+    
+    // Time tracking
+    unsigned long _lastUpdateTime = 0;
 };
 
 } // namespace DeviceBridge

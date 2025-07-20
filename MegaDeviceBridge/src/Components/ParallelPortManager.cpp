@@ -24,7 +24,7 @@ bool ParallelPortManager::initialize() {
     return true;
 }
 
-void ParallelPortManager::update() { 
+void ParallelPortManager::update(unsigned long currentTime) { 
     processData(); 
     
     // Check for critical buffer timeout
@@ -409,6 +409,11 @@ void ParallelPortManager::printDependencyStatus() const {
     Serial.print(F("  FileSystemManager: "));
     Serial.print(fileSystemManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
+}
+
+unsigned long ParallelPortManager::getUpdateInterval() const {
+    auto configService = getServices().getConfigurationService();
+    return configService ? configService->getParallelInterval() : 1; // Default 1ms for real-time
 }
 
 } // namespace DeviceBridge::Components
