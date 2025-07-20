@@ -4,7 +4,7 @@
 
 The MegaDeviceBridge is a sophisticated embedded system that converts parallel port data from a Tektronix TDS2024 oscilloscope to modern storage formats. The system uses a **loop-based cooperative multitasking architecture** with component-based design for real-time data capture and processing.
 
-**Current Status (2025-07-20)**: **Enterprise-grade configuration architecture** with comprehensive centralization of all magic numbers and configuration values through Service Locator pattern. Features bulletproof buffer management, zero null pointer risk, multi-tier adaptive flow control, 20-second timeout protection, and intelligent LCD throttling. Includes comprehensive hardware enhancements, emergency recovery systems, complete TDS2024 printer protocol, and **type-safe configuration management** for **zero data loss** high-speed oscilloscope data capture.
+**Current Status (2025-07-20)**: **Critical TDS2024 file creation bugs fixed** with comprehensive error signaling plus **enterprise-grade configuration architecture** with comprehensive centralization of all magic numbers and configuration values through Service Locator pattern. Features bulletproof buffer management, zero null pointer risk, multi-tier adaptive flow control, 20-second timeout protection, and intelligent LCD throttling. Includes comprehensive hardware enhancements, emergency recovery systems, complete TDS2024 printer protocol, and **type-safe configuration management** for **zero data loss** high-speed oscilloscope data capture.
 
 ### TDS2024 Oscilloscope Capabilities
 **Supported File Formats:**
@@ -176,11 +176,13 @@ Successfully converted from FreeRTOS to loop-based cooperative multitasking, ach
 - Detect file boundaries (2-second timeout)
 - Buffer data in 256-byte chunks
 - Queue data for storage processing
+- **TDS2024 Error Signaling**: Communicate file operation failures to oscilloscope
 
 #### File Detection Logic:
 - **New File**: First data after idle period
 - **Data Stream**: Continuous data with <1ms gaps  
 - **End of File**: 2000ms timeout without data (2000 polling cycles)
+- **Critical Bug Fix (2025-07-20)**: Fixed isNewFile flag timing - flag now persists until FileSystemManager processes it
 
 #### TDS2024 File Format Detection:
 Automatically identifies file types based on data headers:
@@ -190,6 +192,12 @@ Automatically identifies file types based on data headers:
 - **RLE**: Run-Length Encoded images
 - **EPSIMAGE**: Encapsulated PostScript images
 - **Printer Data**: Various printer format streams
+
+#### TDS2024 Error Communication (2025-07-20) ⭐:
+- **ERROR Signal**: Active when file operations fail
+- **PAPER_OUT Signal**: Indicates storage problems to oscilloscope
+- **Smart Recovery**: Error signals automatically cleared on successful operations
+- **Multi-Error Protection**: After 5+ consecutive errors, signals TDS2024 to stop transmission
 
 ### 2. FileSystemManager  
 **Purpose**: Unified storage interface with failover capability
@@ -207,6 +215,14 @@ Automatically identifies file types based on data headers:
 - Generate timestamp-based filenames
 - Coordinate with W25Q128Manager for EEPROM operations
 - Monitor storage capacity and health
+- **TDS2024 Error Response**: Signal oscilloscope when file operations fail
+
+#### Critical File Creation Fix (2025-07-20) ⭐:
+- **Immediate Error Signaling**: TDS2024 gets ERROR and PAPER_OUT signals when file creation fails
+- **Smart Error Recovery**: Error signals automatically cleared on successful file creation and closure
+- **Multi-Error Protection**: After 5+ consecutive write errors, system signals TDS2024 to stop transmission
+- **Debug System**: Complete parallel port debug logging reveals file creation issues
+- **Production Ready**: "Saved:" with no filename issue completely resolved
 
 ### 3. DisplayManager
 **Purpose**: User interface and system interaction

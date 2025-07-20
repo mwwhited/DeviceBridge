@@ -40,17 +40,30 @@ public:
     static constexpr uint16_t getEepromBufferSize() { return Buffer::EEPROM_BUFFER_SIZE; }
     static constexpr uint32_t getCriticalTimeoutMs() { return Buffer::CRITICAL_TIMEOUT_MS; }
     
-    // Flow control threshold calculation
+    // Flow control threshold calculation - OPTIMIZED FOR TDS2024
+    static constexpr uint16_t getPreWarningFlowThreshold(uint16_t bufferSize) {
+        return (bufferSize * Buffer::FLOW_CONTROL_40_PERCENT) / Buffer::FLOW_CONTROL_40_DIVISOR;
+    }
+    
     static constexpr uint16_t getModerateFlowThreshold(uint16_t bufferSize) {
-        return (bufferSize * Buffer::FLOW_CONTROL_60_PERCENT) / Buffer::FLOW_CONTROL_60_DIVISOR;
+        return (bufferSize * Buffer::FLOW_CONTROL_50_PERCENT) / Buffer::FLOW_CONTROL_50_DIVISOR;
     }
     
     static constexpr uint16_t getCriticalFlowThreshold(uint16_t bufferSize) {
-        return (bufferSize * Buffer::FLOW_CONTROL_80_PERCENT) / Buffer::FLOW_CONTROL_80_DIVISOR;
+        return (bufferSize * Buffer::FLOW_CONTROL_70_PERCENT) / Buffer::FLOW_CONTROL_70_DIVISOR;
     }
     
     static constexpr uint16_t getRecoveryFlowThreshold(uint16_t bufferSize) {
-        return (bufferSize * Buffer::FLOW_CONTROL_50_PERCENT) / Buffer::FLOW_CONTROL_50_DIVISOR;
+        return (bufferSize * Buffer::FLOW_CONTROL_40_PERCENT) / Buffer::FLOW_CONTROL_40_DIVISOR;
+    }
+    
+    // Legacy flow control thresholds for compatibility
+    static constexpr uint16_t getLegacyModerateFlowThreshold(uint16_t bufferSize) {
+        return (bufferSize * Buffer::FLOW_CONTROL_60_PERCENT) / Buffer::FLOW_CONTROL_60_DIVISOR;
+    }
+    
+    static constexpr uint16_t getLegacyCriticalFlowThreshold(uint16_t bufferSize) {
+        return (bufferSize * Buffer::FLOW_CONTROL_80_PERCENT) / Buffer::FLOW_CONTROL_80_DIVISOR;
     }
     
     // Button configuration access
@@ -113,7 +126,8 @@ public:
     static constexpr uint8_t getLcdWidth() { return DisplayRefresh::LCD_WIDTH; }
     static constexpr uint8_t getLcdHeight() { return DisplayRefresh::LCD_HEIGHT; }
     
-    // Flow control percentage access
+    // Flow control percentage access - OPTIMIZED FOR TDS2024
+    static constexpr uint8_t getPreWarningThresholdPercent() { return FlowControl::PRE_WARNING_THRESHOLD_PERCENT; }
     static constexpr uint8_t getModerateThresholdPercent() { return FlowControl::MODERATE_THRESHOLD_PERCENT; }
     static constexpr uint8_t getCriticalThresholdPercent() { return FlowControl::CRITICAL_THRESHOLD_PERCENT; }
     static constexpr uint8_t getRecoveryThresholdPercent() { return FlowControl::RECOVERY_THRESHOLD_PERCENT; }

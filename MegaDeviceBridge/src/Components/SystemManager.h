@@ -83,6 +83,8 @@ public:
     // Debug mode control
     void setLCDDebugEnabled(bool enabled) { _lcdDebugEnabled = enabled; }
     bool isLCDDebugEnabled() const { return _lcdDebugEnabled; }
+    void setParallelDebugEnabled(bool enabled) { _parallelDebugEnabled = enabled; }
+    bool isParallelDebugEnabled() const { return _parallelDebugEnabled; }
         
 private:
     // Statistics tracking
@@ -91,6 +93,7 @@ private:
     uint32_t _commandsProcessed;
     bool _serialHeartbeatEnabled;
     bool _lcdDebugEnabled;
+    bool _parallelDebugEnabled;
 };
 
 } // namespace DeviceBridge::Components

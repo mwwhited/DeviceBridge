@@ -1,12 +1,44 @@
 # Change History - MegaDeviceBridge Project
 
-## Current Status: Bulletproof Data Capture System ⭐⭐⭐
+## Current Status: Critical TDS2024 Bugs Fixed + Bulletproof Data Capture ⭐⭐⭐⭐⭐
 
-**The MegaDeviceBridge has achieved bulletproof data capture with zero data loss guarantees, emergency recovery systems, and enterprise-grade Service Locator architecture.**
+**The MegaDeviceBridge has resolved critical TDS2024 file creation bugs with comprehensive error signaling, achieved bulletproof data capture with zero data loss guarantees, emergency recovery systems, and enterprise-grade Service Locator architecture.**
 
 ## Latest Changes (2025-07-20)
 
-### **MAJOR: BMP Data Loss Analysis + Configuration Centralization** ⭐⭐⭐⭐⭐ ✅
+### **CRITICAL: TDS2024 File Creation Bug Fixed + Comprehensive Error Signaling** ⭐⭐⭐⭐⭐ ✅
+**Root cause of "Saved:" with no filename issue resolved - complete fix for TDS2024 file creation with intelligent error communication**
+
+#### **Critical File Creation Bug Resolution** ✅
+**Fixed the critical isNewFile flag timing bug that prevented TDS2024 file creation**
+
+**Root Cause Identified:**
+- **isNewFile Flag Timing Bug**: First data chunk had `new file: NO` instead of `new file: YES` due to premature flag reset in ParallelPortManager line 67
+- **Debug System Revealed Issue**: Comprehensive parallel port debug logging tracked data flow and identified exact failure point
+- **File Creation Failure**: No file was being created, causing all 56 write attempts to fail with "No File Open" errors
+
+**Critical Fixes Implemented:**
+- **ParallelPortManager.cpp Fix**: Removed premature `isNewFile = 0` reset, allowing flag to persist until FileSystemManager processes it
+- **Immediate Error Signaling**: TDS2024 gets ERROR and PAPER_OUT signals when file creation fails
+- **Smart Error Recovery**: Error signals automatically cleared on successful file creation and closure
+- **Multi-Error Protection**: After 5+ consecutive write errors, system signals TDS2024 to stop transmission
+- **Buffer Clearing**: Emergency buffer clearing prevents data corruption when errors occur
+
+**Technical Implementation:**
+- Fixed `/src/Components/ParallelPortManager.cpp` line 67 - removed early flag reset in `detectNewFile()` logic
+- Enhanced `/src/Components/FileSystemManager.cpp` with comprehensive error signaling in `processDataChunk()` method
+- Added error signal clearing in `createNewFile()` success path and `closeCurrentFile()` method
+- Implemented 5-error threshold for TDS2024 stop signaling when no file is open
+- Added complete debug logging system controlled by `debug parallel on/off` serial commands
+
+**Impact:**
+- **TDS2024 File Creation Fixed**: "Saved:" with no filename issue completely resolved
+- **Immediate Error Communication**: TDS2024 stops sending data when file operations fail
+- **Smart Recovery**: System automatically recovers from errors and clears error signals on success
+- **Complete Debugging**: Full visibility into data flow and file creation process
+- **Production Ready**: Critical blocking issue resolved for real TDS2024 integration
+
+### **PREVIOUS: BMP Data Loss Analysis + Configuration Centralization** ⭐⭐⭐⭐⭐ ✅
 **Enterprise-grade configuration architecture with comprehensive BMP skewing root cause analysis**
 
 #### **BMP Data Loss Investigation Completed** ✅

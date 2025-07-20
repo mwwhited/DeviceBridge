@@ -1,6 +1,7 @@
 #include "ParallelPortManager.h"
 #include "FileSystemManager.h"
 #include "DisplayManager.h"
+#include "SystemManager.h"
 #include "../Common/ConfigurationService.h"
 #include <string.h>
 
@@ -45,16 +46,25 @@ void ParallelPortManager::processData() {
         _idleCounter = 0;
         _lastDataTime = millis();
 
-        // Check for new file start
+        // Check for new file start - only set flag once per chunk
         if (detectNewFile()) {
             _currentChunk.isNewFile = 1;
             _fileInProgress = true;
             _currentFileBytes = 0;
             _filesReceived++;
             _chunkIndex = 0;
-        } else {
-            _currentChunk.isNewFile = 0;
+            
+            // Debug logging for new file detection
+            auto systemManager = getServices().getSystemManager();
+            if (systemManager && systemManager->isParallelDebugEnabled()) {
+                Serial.print(F("[DEBUG-LPT] NEW FILE DETECTED - File #"));
+                Serial.print(_filesReceived);
+                Serial.print(F(" started at "));
+                Serial.print(millis());
+                Serial.print(F("ms\r\n"));
+            }
         }
+        // NOTE: Don't reset isNewFile to 0 here - let it persist until chunk is sent
 
         // Read available data into current chunk
         if (_chunkIndex < sizeof(_currentChunk.data)) {
@@ -68,6 +78,20 @@ void ParallelPortManager::processData() {
                 _chunkIndex += bytesRead;
                 _totalBytesReceived += bytesRead;
                 _currentFileBytes += bytesRead;
+                
+                // Debug logging for data reading
+                auto systemManager = getServices().getSystemManager();
+                if (systemManager && systemManager->isParallelDebugEnabled()) {
+                    Serial.print(F("[DEBUG-LPT] Read "));
+                    Serial.print(bytesRead);
+                    Serial.print(F(" bytes, chunk: "));
+                    Serial.print(_chunkIndex);
+                    Serial.print(F("/"));
+                    Serial.print(sizeof(_currentChunk.data));
+                    Serial.print(F(", file: "));
+                    Serial.print(_currentFileBytes);
+                    Serial.print(F(" total\r\n"));
+                }
 
                 // If chunk is full, send it
                 if (_chunkIndex >= sizeof(_currentChunk.data)) {
@@ -86,6 +110,18 @@ void ParallelPortManager::processData() {
             // Send partial chunk if any data remains
             if (_chunkIndex > 0) {
                 sendChunk();
+            }
+
+            // Debug logging for end of file detection
+            auto systemManager = getServices().getSystemManager();
+            if (systemManager && systemManager->isParallelDebugEnabled()) {
+                Serial.print(F("[DEBUG-LPT] END OF FILE DETECTED - File #"));
+                Serial.print(_filesReceived);
+                Serial.print(F(", total bytes: "));
+                Serial.print(_currentFileBytes);
+                Serial.print(F(", idle cycles: "));
+                Serial.print(_idleCounter);
+                Serial.print(F("\r\n"));
             }
 
             // Send end-of-file marker
@@ -112,11 +148,23 @@ void ParallelPortManager::sendChunk() {
     _currentChunk.length = _chunkIndex;
     _currentChunk.timestamp = millis();
     _currentChunk.isEndOfFile = 0;
+    
+    // Debug logging for chunk sending
+    auto systemManager = getServices().getSystemManager();
+    if (systemManager && systemManager->isParallelDebugEnabled()) {
+        Serial.print(F("[DEBUG-LPT] SENDING CHUNK - Length: "));
+        Serial.print(_chunkIndex);
+        Serial.print(F(" bytes, new file: "));
+        Serial.print(_currentChunk.isNewFile ? F("YES") : F("NO"));
+        Serial.print(F(", timestamp: "));
+        Serial.print(_currentChunk.timestamp);
+        Serial.print(F("\r\n"));
+    }
 
     auto fileSystemManager = getServices().getFileSystemManager();
     fileSystemManager->processDataChunk(_currentChunk);
 
-    // Reset chunk for next data
+    // Reset chunk for next data - ONLY reset isNewFile after processing
     _chunkIndex = 0;
     _currentChunk.isNewFile = 0;
 }

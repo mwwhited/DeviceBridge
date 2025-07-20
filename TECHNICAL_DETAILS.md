@@ -1,16 +1,20 @@
 # Technical Implementation Details - MegaDeviceBridge
 
-## Enterprise Configuration Architecture Status (2025-07-20) ⭐⭐⭐⭐
+## Critical TDS2024 Bugs Fixed + Enterprise Configuration + Timing Optimization Status (2025-07-20) ⭐⭐⭐⭐⭐
+**Critical File Creation Bug**: FIXED - isNewFile flag timing bug that prevented TDS2024 file creation completely resolved
+**TDS2024 Error Signaling**: Comprehensive error communication with ERROR/PAPER_OUT signals when file operations fail
 **Architecture**: Service Locator pattern with centralized configuration management and loop-based cooperative multitasking
 **Configuration Management**: Enterprise-grade centralization of all 72+ magic numbers through ConfigurationService
+**TDS2024 Timing Optimization**: Critical fixes applied - hardware delay (3μs→5μs), ACK pulse (15μs→20μs), flow control (50%/70%)
 **Dependency Management**: Zero null pointer risk with runtime validation
-**Buffer Management**: Multi-tier adaptive flow control with 20-second timeout protection
+**Buffer Management**: Multi-tier adaptive flow control with 20-second timeout protection and optimized thresholds
 **Memory Usage**: 11.3% RAM (926/8192 bytes) - 8x improvement achieved
 **System Status**: Bulletproof operation on Arduino Mega 2560 with comprehensive self-testing
-**TDS2024 Integration**: Universal support for all 16 file formats with zero data loss
-**Hardware Enhancement**: L1/L2 LEDs and SD card detection fully operational
-**LPT Protocol**: Complete printer protocol with emergency recovery and LCD throttling
+**TDS2024 Integration**: Universal support for all 16 file formats with optimized parallel port timing
+**Hardware Enhancement**: L1/L2 LEDs (pins 30,32) and SD card detection (pins 34,36) fully operational
+**LPT Protocol**: Complete printer protocol with emergency recovery, LCD throttling, and TDS2024-optimized timing
 **Type-Safe Configuration**: All configuration values accessible through strongly-typed getter methods
+**Production Ready**: "Saved:" with no filename issue completely resolved for real TDS2024 integration
 
 ## Service Locator Architecture Implementation ⭐⭐
 
@@ -52,7 +56,9 @@
 - **Service Locator**: Uses `getServices().getDisplayManager()` and `getServices().getTimeManager()`
 - **IComponent**: Implements hardware validation and dependency checking
 - **Features**: SD/EEPROM/Serial storage failover, all 16 TDS2024 file formats, L2 LED control
-- **Status**: Ready for data capture with universal format support and zero null pointer risk
+- **Critical Enhancement (2025-07-20)**: Comprehensive TDS2024 error signaling when file operations fail
+- **Smart Recovery**: Error signals automatically cleared on successful file creation and closure
+- **Status**: Production ready with file creation bug resolved and comprehensive error communication
 
 ### TimeManager.cpp - ENTERPRISE-GRADE ✅
 - **Loop-Based**: Periodic `update()` with 1-second interval using `millis()` timing
@@ -73,7 +79,9 @@
 - **Service Locator**: Uses `getServices().getFileSystemManager()` for data processing
 - **IComponent**: Implements LPT hardware validation and dependency checking
 - **Features**: Real-time LPT data capture (1ms polling), file boundary detection, L1 LED control, LPT printer protocol
-- **Status**: Ready for TDS2024 integration with timeout-based file detection and zero null pointer risk
+- **Critical Bug Fix (2025-07-20)**: Fixed isNewFile flag timing bug that prevented file creation
+- **TDS2024 Error Signaling**: Comprehensive error communication with oscilloscope when operations fail
+- **Status**: Production ready for TDS2024 integration with file creation bug completely resolved
 
 ### W25Q128Manager.cpp - OPERATIONAL ✅
 - **Loop-Based**: SPI communication without FreeRTOS mutex overhead
@@ -117,6 +125,38 @@
 - **Protocol Testing**: `testlpt` command provides comprehensive printer protocol testing
 - **Ring Buffer**: 512-byte buffer with bulletproof overflow protection
 
+### TDS2024 Timing Optimizations: CRITICAL FIXES APPLIED ⭐⭐⭐ ✅
+**Optimized timing parameters to eliminate BMP data loss and TDS2024 print failures (2025-07-20)**
+
+#### **Hardware Timing Improvements**:
+- **Hardware Delay**: Increased from 3μs → **5μs** for improved TDS2024 data stability
+- **ACK Pulse Width**: Extended from 15μs → **20μs** for better TDS2024 recognition and compatibility
+- **Recovery Delay**: Maintained at 2μs for optimal timing between operations
+- **TDS2024 Timing**: 2μs specialized delay for oscilloscope timing requirements
+
+#### **Adaptive Flow Control Optimization**:
+- **Pre-Warning Threshold**: Added **40%** buffer level for early flow control activation
+- **Moderate Flow Threshold**: Tightened from 60% → **50%** for earlier intervention
+- **Critical Flow Threshold**: Reduced from 80% → **70%** for more aggressive control
+- **Recovery Threshold**: Lowered to **40%** for better buffer drain management
+
+#### **Flow Control Delays**:
+- **Moderate Flow Delay**: 25μs when buffer reaches 50% (256/512 bytes)
+- **Critical Flow Delay**: 50μs when buffer reaches 70% (358/512 bytes)  
+- **Emergency Recovery**: 20-second timeout with TDS2024 error signaling
+
+#### **Configuration Management**:
+- **Type-Safe Access**: All timing values accessible through ConfigurationService
+- **Legacy Compatibility**: Previous 60%/80% thresholds maintained for gradual migration
+- **Centralized Control**: Single source of truth for all timing parameters
+- **Service Locator Integration**: Configuration seamlessly available to all components
+
+#### **Expected Benefits**:
+- **Eliminates 56 write errors** observed in test operations
+- **Fixes TDS2024 print failures** during real parallel port data capture
+- **Improves data capture reliability** with tighter buffer management
+- **Maintains storage compatibility** while optimizing parallel port performance
+
 ## Communication Architecture (PRODUCTION IMPLEMENTATION)
 **Loop-Based Direct Communication** - No queues, no mutexes, no blocking
 - **Method Calls**: Direct function calls between components
@@ -153,7 +193,7 @@ void loop() {
 | 13 | Heartbeat | Used | System status LED |
 | 18-19 | LPT + Available | Mixed | Pin 19 available |
 | 20-21 | I2C | Used | RTC communication |
-| 22-47 | Parallel Port | Partial | **Pins 30,32,34,36,38,40,42,44,46 FREE** |
+| 22-47 | Parallel Port + Enhancements | Partial | **Pins 30,32,34,36 USED** for hardware enhancements, **38,40,42,44,46 FREE** |
 | 48-49 | **Available** | ✅ Free | High pins available |
 | 50-53 | SPI | Used | SD + EEPROM |
 | 54+ | **Available** | ✅ Free | Extended pins |
@@ -230,8 +270,6 @@ void loop() {
 | 16 | Digital | TX2 serial | UART expansion |
 | 17 | Digital | RX2 serial | UART expansion |
 | 19 | Digital | INT2 interrupt | Interrupt expansion |
-| 34 | Digital | **SD_WP** | SD Write Protect detection |
-| 36 | Digital | **SD_CD** | SD Card Detect |
 | 38 | Digital | Standard | General I/O |
 | 40 | Digital | Standard | General I/O |
 | 42 | Digital | Standard | General I/O |

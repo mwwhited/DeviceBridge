@@ -14,9 +14,9 @@ namespace DeviceBridge::Components {
 
 SystemManager::SystemManager()
     : _systemStatus(Common::SystemStatus::INITIALIZING), _lastError(Common::ErrorCode::NONE), _lastSystemCheck(0),
-      _uptimeSeconds(0), _errorCount(0), _commandsProcessed(0), _serialHeartbeatEnabled(false) // Default to off
-      ,
-      _lcdDebugEnabled(false) // Default to off
+      _uptimeSeconds(0), _errorCount(0), _commandsProcessed(0), _serialHeartbeatEnabled(false), // Default to off
+      _lcdDebugEnabled(false), // Default to off
+      _parallelDebugEnabled(false) // Default to off
 {}
 
 SystemManager::~SystemManager() { stop(); }

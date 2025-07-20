@@ -110,10 +110,10 @@ namespace Timing {
   constexpr unsigned long HEARTBEAT_INTERVAL = 500;   // 500ms for blink heartbeat LED
   constexpr unsigned long CONFIGURATION_INTERVAL = 50; // 50ms for configuration/serial commands
   
-  // Microsecond delays for hardware timing
-  constexpr uint16_t ACK_PULSE_US = 15;               // Extended pulse for reliable capture
+  // Microsecond delays for hardware timing - OPTIMIZED FOR TDS2024
+  constexpr uint16_t ACK_PULSE_US = 20;               // Extended pulse for TDS2024 recognition (was 15μs)
   constexpr uint16_t RECOVERY_DELAY_US = 2;           // Brief recovery time
-  constexpr uint16_t HARDWARE_DELAY_US = 3;           // General hardware timing
+  constexpr uint16_t HARDWARE_DELAY_US = 5;           // TDS2024 data stability delay (was 3μs)
   constexpr uint16_t TDS2024_TIMING_US = 2;           // Brief delay for TDS2024 timing stability
   constexpr uint16_t FLOW_CONTROL_DELAY_US = 5;       // Flow control timing
   constexpr uint16_t MODERATE_FLOW_DELAY_US = 25;     // Moderate delay to slow down sender
@@ -132,13 +132,18 @@ namespace Buffer {
   constexpr uint16_t EEPROM_BUFFER_SIZE = 64;         // EEPROM write buffer (64 * 4 bytes = 256 bytes)
   constexpr uint32_t CRITICAL_TIMEOUT_MS = 20000;     // 20 seconds emergency timeout
   
-  // Flow control thresholds (percentages as fractions)
+  // Flow control thresholds (percentages as fractions) - OPTIMIZED FOR TDS2024
+  constexpr uint8_t FLOW_CONTROL_50_PERCENT = 1;      // 1/2 = 50% moderate threshold (was 60%)
+  constexpr uint8_t FLOW_CONTROL_50_DIVISOR = 2;
+  constexpr uint8_t FLOW_CONTROL_70_PERCENT = 7;      // 7/10 = 70% critical threshold (was 80%)
+  constexpr uint8_t FLOW_CONTROL_70_DIVISOR = 10;
+  constexpr uint8_t FLOW_CONTROL_40_PERCENT = 2;      // 2/5 = 40% pre-warning threshold (NEW)
+  constexpr uint8_t FLOW_CONTROL_40_DIVISOR = 5;
+  // Legacy thresholds for compatibility
   constexpr uint8_t FLOW_CONTROL_60_PERCENT = 3;      // 3/5 = 60% threshold
   constexpr uint8_t FLOW_CONTROL_60_DIVISOR = 5;
   constexpr uint8_t FLOW_CONTROL_80_PERCENT = 4;      // 4/5 = 80% threshold  
   constexpr uint8_t FLOW_CONTROL_80_DIVISOR = 5;
-  constexpr uint8_t FLOW_CONTROL_50_PERCENT = 1;      // 1/2 = 50% threshold
-  constexpr uint8_t FLOW_CONTROL_50_DIVISOR = 2;
 }
 
 // Button Configuration
@@ -222,12 +227,13 @@ namespace DisplayRefresh {
   constexpr uint8_t LCD_HEIGHT = 2;                   // LCD character height
 }
 
-// Flow Control State Management
+// Flow Control State Management - OPTIMIZED FOR TDS2024
 namespace FlowControl {
-  // Buffer level thresholds for adaptive flow control
-  constexpr uint8_t MODERATE_THRESHOLD_PERCENT = 60;   // Start moderate flow control
-  constexpr uint8_t CRITICAL_THRESHOLD_PERCENT = 80;   // Start critical flow control
-  constexpr uint8_t RECOVERY_THRESHOLD_PERCENT = 50;   // Recovery threshold
+  // Buffer level thresholds for adaptive flow control - TIGHTER THRESHOLDS
+  constexpr uint8_t PRE_WARNING_THRESHOLD_PERCENT = 40;  // Early warning (NEW)
+  constexpr uint8_t MODERATE_THRESHOLD_PERCENT = 50;     // Moderate flow control (was 60%)
+  constexpr uint8_t CRITICAL_THRESHOLD_PERCENT = 70;     // Critical flow control (was 80%)
+  constexpr uint8_t RECOVERY_THRESHOLD_PERCENT = 40;     // Recovery threshold (was 50%)
 }
 
 } // namespace DeviceBridge::Common
