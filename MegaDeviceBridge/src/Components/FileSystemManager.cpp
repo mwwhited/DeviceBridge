@@ -2,6 +2,7 @@
 #include "DisplayManager.h"
 #include "ParallelPortManager.h"
 #include "TimeManager.h"
+#include "../Common/ConfigurationService.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
@@ -431,30 +432,32 @@ Common::FileType FileSystemManager::detectFileType(const uint8_t *data, uint16_t
         return Common::FileType::BINARY;
     }
 
-    // Check for common file format headers
+    // Check for common file format headers using ConfigurationService
+    auto* config = getServices().getConfigurationService();
+    
     // BMP files start with "BM"
-    if (data[0] == 0x42 && data[1] == 0x4D) {
+    if (data[0] == config->getBmpSignature1() && data[1] == config->getBmpSignature2()) {
         return Common::FileType::BMP;
     }
 
     // PCX files start with 0x0A
-    if (data[0] == 0x0A) {
+    if (data[0] == config->getPcxSignature()) {
         return Common::FileType::PCX;
     }
 
     // TIFF files start with "II" (little-endian) or "MM" (big-endian)
-    if ((data[0] == 0x49 && data[1] == 0x49 && data[2] == 0x2A && data[3] == 0x00) ||
-        (data[0] == 0x4D && data[1] == 0x4D && data[2] == 0x00 && data[3] == 0x2A)) {
+    if (config->isTiffLittleEndian(data[0], data[1], data[2], data[3]) ||
+        config->isTiffBigEndian(data[0], data[1], data[2], data[3])) {
         return Common::FileType::TIFF;
     }
 
     // PostScript/EPS files start with "%!"
-    if (data[0] == 0x25 && data[1] == 0x21) {
+    if (data[0] == config->getPsSignature1() && data[1] == config->getPsSignature2()) {
         return Common::FileType::EPSIMAGE;
     }
 
     // Check for printer command sequences (HP PCL commands often start with ESC)
-    if (data[0] == 0x1B) { // ESC character
+    if (data[0] == config->getEscCharacter()) { // ESC character
         if (length >= 3) {
             // HP PCL commands: ESC E (reset), ESC & (parameterized command)
             if (data[1] == 0x45 || data[1] == 0x26) {

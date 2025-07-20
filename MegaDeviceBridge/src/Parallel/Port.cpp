@@ -4,6 +4,8 @@
 #include "Control.h"
 #include "Status.h"
 #include "Data.h"
+#include "../Common/ServiceLocator.h"
+#include "../Common/ConfigurationService.h"
 #include <RingBuf.h>
 
 namespace DeviceBridge::Parallel
@@ -50,7 +52,7 @@ namespace DeviceBridge::Parallel
     _status.setBusy();
     
     // Brief delay to ensure TDS2024 sees the busy signal
-    delayMicroseconds(3);
+    delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getHardwareDelayUs());
     
     // Read the data byte from parallel port with timing critical section
     uint8_t value = _data.readValue();
@@ -74,27 +76,27 @@ namespace DeviceBridge::Parallel
         _criticalStartTime = millis();
       }
       setBusy(true);
-      delayMicroseconds(50); // Extended delay in critical state
+      delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getCriticalFlowDelayUs()); // Extended delay in critical state
     } else if (_criticalFlowControl) {
       // In critical recovery - stay busy until below warning level
       if (!isAlmostFull()) {
         // Buffer drained below warning level - exit critical state
         _criticalFlowControl = false;
         setBusy(false);
-        delayMicroseconds(2);
+        delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getTds2024TimingUs());
       } else {
         // Still above warning level - maintain critical flow control
         setBusy(true);
-        delayMicroseconds(50);
+        delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getCriticalFlowDelayUs());
       }
     } else if (isAlmostFull()) {
       // 60%+ full - WARNING: Hold busy with moderate delay
       setBusy(true);
-      delayMicroseconds(25); // Moderate delay to slow down sender
+      delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getModerateFlowDelayUs()); // Moderate delay to slow down sender
     } else {
       // <60% full - Normal operation
       setBusy(false);
-      delayMicroseconds(2); // Brief delay for TDS2024 timing stability
+      delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getTds2024TimingUs()); // Brief delay for TDS2024 timing stability
     }
     
     // Memory barrier to ensure all operations complete
@@ -149,13 +151,13 @@ namespace DeviceBridge::Parallel
   bool Port::isAlmostFull()
   {
     // 60% threshold for moderate flow control
-    return _buffer.size() >= (_buffer.maxSize() * 3 / 5);
+    return _buffer.size() >= ServiceLocator::getInstance().getConfigurationService()->getModerateFlowThreshold(_buffer.maxSize());
   }
 
   bool Port::isCriticallyFull()
   {
     // 80% threshold for extended flow control
-    return _buffer.size() >= (_buffer.maxSize() * 4 / 5);
+    return _buffer.size() >= ServiceLocator::getInstance().getConfigurationService()->getCriticalFlowThreshold(_buffer.maxSize());
   }
 
   bool Port::isFull()
@@ -196,13 +198,13 @@ namespace DeviceBridge::Parallel
     uint16_t bufferCapacity = _buffer.maxSize();
     
     if (cnt > 0) { // Only update if we actually read data
-      if (bufferLevelAfterRead < (bufferCapacity / 2)) {
+      if (bufferLevelAfterRead < ServiceLocator::getInstance().getConfigurationService()->getRecoveryFlowThreshold(bufferCapacity)) {
         // Less than 50% full - clear busy immediately
         setBusy(false);
-      } else if (bufferLevelAfterRead < (bufferCapacity * 3 / 5)) {
+      } else if (bufferLevelAfterRead < ServiceLocator::getInstance().getConfigurationService()->getModerateFlowThreshold(bufferCapacity)) {
         // 50-60% full - clear busy but with brief delay
         setBusy(false);
-        delayMicroseconds(5);
+        delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getFlowControlDelayUs());
       }
       // If still >60% full, keep busy active until next interrupt
     }

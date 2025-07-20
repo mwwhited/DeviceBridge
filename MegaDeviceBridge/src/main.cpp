@@ -16,6 +16,7 @@
 #include "./Common/Types.h"
 #include "./Common/Config.h"
 #include "./Common/ServiceLocator.h"
+#include "./Common/ConfigurationService.h"
 
 // Hardware instances
 DeviceBridge::Parallel::Port printerPort(
@@ -55,6 +56,7 @@ DeviceBridge::Components::DisplayManager* displayManager = nullptr;
 DeviceBridge::Components::TimeManager* timeManager = nullptr;
 DeviceBridge::Components::SystemManager* systemManager = nullptr;
 DeviceBridge::Components::ConfigurationManager* configurationManager = nullptr;
+DeviceBridge::Common::ConfigurationService* configurationService = nullptr;
 
 // Timing for cooperative multitasking
 unsigned long lastParallelUpdate = 0;
@@ -65,14 +67,7 @@ unsigned long lastSystemUpdate = 0;
 unsigned long lastHeartbeatUpdate = 0;
 unsigned long lastConfigurationUpdate = 0;
 
-// Update intervals (milliseconds)
-const unsigned long PARALLEL_INTERVAL = 1;      // 1ms for real-time data capture
-const unsigned long FILESYSTEM_INTERVAL = 10;   // 10ms for file operations
-const unsigned long DISPLAY_INTERVAL = 100;     // 100ms for display updates
-const unsigned long TIME_INTERVAL = 1000;       // 1s for time operations
-const unsigned long SYSTEM_INTERVAL = 5000;     // 5s for system monitoring
-const unsigned long HEARTBEAT_INTERVAL = 500;   // 500ms for blink heartbeat LED
-const unsigned long CONFIGURATION_INTERVAL = 50; // 50ms for configuration/serial commands
+// Update intervals (milliseconds) - now accessed via ConfigurationService
 
 void setup()
 {
@@ -99,10 +94,11 @@ void setup()
   timeManager = new DeviceBridge::Components::TimeManager();
   systemManager = new DeviceBridge::Components::SystemManager();
   configurationManager = new DeviceBridge::Components::ConfigurationManager();
+  configurationService = new DeviceBridge::Common::ConfigurationService();
   
   // Verify component creation
   if (!parallelPortManager || !fileSystemManager || !displayManager || 
-      !timeManager || !systemManager || !configurationManager) {
+      !timeManager || !systemManager || !configurationManager || !configurationService) {
     Serial.print(F("FATAL: Failed to create component managers\r\n"));
     while(1) { delay(1000); }
   }
@@ -116,6 +112,7 @@ void setup()
   services.registerTimeManager(timeManager);
   services.registerSystemManager(systemManager);
   services.registerConfigurationManager(configurationManager);
+  services.registerConfigurationService(configurationService);
   
   // Validate all dependencies are registered
   if (!services.validateAllDependencies()) {
@@ -178,43 +175,43 @@ void loop()
   unsigned long currentTime = millis();
   
   // Parallel port manager - highest priority, most frequent
-  if (currentTime - lastParallelUpdate >= PARALLEL_INTERVAL) {
+  if (currentTime - lastParallelUpdate >= configurationService->getParallelInterval()) {
     parallelPortManager->update();
     lastParallelUpdate = currentTime;
   }
   
   // File system manager - handle data storage
-  if (currentTime - lastFileSystemUpdate >= FILESYSTEM_INTERVAL) {
+  if (currentTime - lastFileSystemUpdate >= configurationService->getFileSystemInterval()) {
     fileSystemManager->update();
     lastFileSystemUpdate = currentTime;
   }
   
   // Display manager - user interface updates
-  if (currentTime - lastDisplayUpdate >= DISPLAY_INTERVAL) {
+  if (currentTime - lastDisplayUpdate >= configurationService->getDisplayInterval()) {
     displayManager->update();
     lastDisplayUpdate = currentTime;
   }
   
   // Time manager - RTC and time-based operations
-  if (currentTime - lastTimeUpdate >= TIME_INTERVAL) {
+  if (currentTime - lastTimeUpdate >= configurationService->getTimeInterval()) {
     timeManager->update();
     lastTimeUpdate = currentTime;
   }
   
   // System manager - monitoring and health checks
-  if (currentTime - lastSystemUpdate >= SYSTEM_INTERVAL) {
+  if (currentTime - lastSystemUpdate >= configurationService->getSystemInterval()) {
     systemManager->update();
     lastSystemUpdate = currentTime;
   }
 
   // Heartbeat manager
-  if (currentTime - lastHeartbeatUpdate >= HEARTBEAT_INTERVAL) {
+  if (currentTime - lastHeartbeatUpdate >= configurationService->getHeartbeatInterval()) {
     digitalWrite(DeviceBridge::Common::Pins::HEARTBEAT, !digitalRead(DeviceBridge::Common::Pins::HEARTBEAT));
     lastHeartbeatUpdate = currentTime;
   }
   
   // Configuration manager - serial commands and settings
-  if (currentTime - lastConfigurationUpdate >= CONFIGURATION_INTERVAL) {
+  if (currentTime - lastConfigurationUpdate >= configurationService->getConfigurationInterval()) {
     configurationManager->update();
     lastConfigurationUpdate = currentTime;
   }

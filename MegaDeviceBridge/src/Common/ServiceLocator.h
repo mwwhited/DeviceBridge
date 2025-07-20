@@ -15,6 +15,10 @@ namespace Components {
     class ConfigurationManager;
 }
 
+namespace Common {
+    class ConfigurationService;
+}
+
 namespace User {
     class Display;
 }
@@ -32,6 +36,7 @@ private:
     Components::TimeManager* _timeManager;
     Components::SystemManager* _systemManager;
     Components::ConfigurationManager* _configurationManager;
+    Common::ConfigurationService* _configurationService;
     User::Display* _display;
     
     // Singleton instance
@@ -52,6 +57,7 @@ public:
     void registerTimeManager(Components::TimeManager* manager);
     void registerSystemManager(Components::SystemManager* manager);
     void registerConfigurationManager(Components::ConfigurationManager* manager);
+    void registerConfigurationService(Common::ConfigurationService* service);
     void registerDisplay(User::Display* display);
     
     // Component access
@@ -61,6 +67,7 @@ public:
     Components::TimeManager* getTimeManager() const;
     Components::SystemManager* getSystemManager() const;
     Components::ConfigurationManager* getConfigurationManager() const;
+    Common::ConfigurationService* getConfigurationService() const;
     User::Display* getDisplay() const;
     
     // System validation
