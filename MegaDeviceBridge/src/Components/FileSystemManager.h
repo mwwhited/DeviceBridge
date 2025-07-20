@@ -42,7 +42,6 @@ private:
     // Storage operations
     bool initializeSD();
     bool initializeEEPROM();
-    bool createNewFile();
     bool writeDataChunk(const Common::DataChunk& chunk);
     bool closeCurrentFile();
     
@@ -62,6 +61,8 @@ private:
 public:
     FileSystemManager();
     ~FileSystemManager();
+    
+    bool createNewFile();
     
     // Set callback for display messages
     void setDisplayManager(DisplayManager* manager) { _displayManager = manager; }
@@ -89,7 +90,8 @@ public:
     bool isEEPROMAvailable() const { return _eepromAvailable; }
     
     // Statistics
-    uint32_t getFilesStored() const { return _fileCounter; }
+    uint32_t getFilesStored() const;  // Count files on SD card
+    uint32_t getSDCardFileCount() const;  // Explicitly count SD card files
     const char* getCurrentFilename() const { return _currentFilename; }
     uint32_t getTotalBytesWritten() const { return _totalBytesWritten; }
     uint16_t getWriteErrors() const { return _writeErrors; }

@@ -49,6 +49,7 @@ public:
     uint32_t getTimestamp();
     void getFormattedTime(char* buffer, size_t bufferSize);
     void getFormattedDateTime(char* buffer, size_t bufferSize);
+    RTC_DS1307 getRTC() const { return _rtc; }
     
     // Status inquiry
     bool isRTCAvailable() const { return _rtcAvailable; }

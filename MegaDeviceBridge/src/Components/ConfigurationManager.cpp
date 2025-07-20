@@ -455,9 +455,15 @@ void ConfigurationManager::handleTestWriteCommand(const String& command) {
     Serial.print(F("Test Data: "));
     Serial.print(testData);
     Serial.print(F("\r\n"));
-    
-    Serial.print(F("Current Storage: "));
+        
+    Serial.print(F("Active Storage: "));
     Serial.print(_fileSystemManager->getActiveStorage().toSimple());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Storage Status: SD="));
+    Serial.print(_fileSystemManager->isSDAvailable() ? F("OK") : F("FAIL"));
+    Serial.print(F(", EEPROM="));
+    Serial.print(_fileSystemManager->isEEPROMAvailable() ? F("OK") : F("FAIL"));
     Serial.print(F("\r\n"));
     
     // Create a test data chunk to simulate file write
@@ -499,6 +505,18 @@ void ConfigurationManager::handleTestWriteCommand(const String& command) {
     Serial.print(_fileSystemManager->getWriteErrors());
     Serial.print(F("\r\n"));
     
+    Serial.print(F("Final Storage Used: "));
+    Serial.print(_fileSystemManager->getActiveStorage().toSimple());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Files Now Stored: "));
+    Serial.print(_fileSystemManager->getFilesStored());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("New file: "));
+    Serial.print(_fileSystemManager->getCurrentFilename());
+    Serial.print(F("\r\n"));
+        
     Serial.print(F("Test write completed.\r\n"));
     Serial.print(F("=======================\r\n\r\n"));
 }

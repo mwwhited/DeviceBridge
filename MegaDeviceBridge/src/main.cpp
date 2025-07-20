@@ -105,6 +105,7 @@ void setup()
   // Set up component cross-references
   parallelPortManager->setFileSystemManager(fileSystemManager);
   fileSystemManager->setDisplayManager(displayManager);
+  fileSystemManager->setTimeManager(timeManager);
   displayManager->setTimeManager(timeManager);
   displayManager->setSystemManager(systemManager);
   

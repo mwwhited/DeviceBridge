@@ -127,6 +127,7 @@ bool FileSystemManager::createNewFile() {
         case Common::StorageType::SERIAL_TRANSFER:
             // For serial transfer, we'll send data directly
             _isFileOpen = true;
+            _fileCounter++;  // Increment counter for serial transfer files too
             return true;
             
         default:
@@ -206,26 +207,23 @@ void FileSystemManager::generateFilename(char* buffer, size_t bufferSize) {
 void FileSystemManager::generateTimestampFilename(char* buffer, size_t bufferSize) {
     const char* extension = getFileExtension();
     
-    if (_timeManager && _timeManager->isRTCAvailable()) {
-        // Get formatted datetime and parse it for compact format
-        char dateTimeBuffer[32];
-        _timeManager->getFormattedDateTime(dateTimeBuffer, sizeof(dateTimeBuffer));
-        
-        // Parse the formatted string to extract components
-        // Expected format from getFormattedDateTime: "2025-07-19 19:30:45"
-        int year, month, day, hour, minute, second;
-        if (sscanf(dateTimeBuffer, "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &minute, &second) == 6) {
-            // Format: yyyyMMddHHmmss.ext  
-            snprintf(buffer, bufferSize, "%04d%02d%02d%02d%02d%02d%s",
-                     year, month, day, hour, minute, second, extension);
-        } else {
-            // If parsing fails, fallback to millis
-            snprintf(buffer, bufferSize, "%lu%s", millis(), extension);
-        }
-    } else {
-        // Fallback to millis-based timestamp if no RTC
-        snprintf(buffer, bufferSize, "%lu%s", millis(), extension);
-    }
+    // if (_timeManager && _timeManager->isRTCAvailable()) {
+    //     // Get formatted datetime and parse it for compact format
+        auto rtc = _timeManager->getRTC();
+        auto now = rtc.now();
+        snprintf(buffer, bufferSize, "%04d%02d%02d%02d%02d%02d%s",
+            now.year(),
+            now.month(),
+            now.day(),
+            now.hour(),
+            now.minute(),
+            now.second(),
+            extension
+        );
+    // } else {
+    //     // Fallback to millis-based timestamp if no RTC
+    //     snprintf(buffer, bufferSize, "XXX%lu%s", millis(), extension);
+    // }
 }
 
 const char* FileSystemManager::getFileExtension() const {
@@ -280,6 +278,51 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
                 break;
         }
     }
+}
+
+uint32_t FileSystemManager::getFilesStored() const {
+    // Return count based on active storage type
+    switch (_activeStorage.value) {
+        case Common::StorageType::SD_CARD:
+            return getSDCardFileCount();
+        case Common::StorageType::EEPROM:
+            // For EEPROM, fall back to file counter for now
+            return _fileCounter;
+        case Common::StorageType::SERIAL_TRANSFER:
+            // For serial transfer, use file counter
+            return _fileCounter;
+        default:
+            return 0;
+    }
+}
+
+uint32_t FileSystemManager::getSDCardFileCount() const {
+    if (!_sdAvailable) {
+        return 0;
+    }
+    
+    uint32_t fileCount = 0;
+    File root = SD.open("/");
+    
+    if (!root) {
+        return 0;
+    }
+    
+    // Count all files in root directory
+    while (true) {
+        File entry = root.openNextFile();
+        if (!entry) {
+            break;  // No more files
+        }
+        
+        if (!entry.isDirectory()) {
+            fileCount++;
+        }
+        entry.close();
+    }
+    
+    root.close();
+    return fileCount;
 }
 
 Common::FileType FileSystemManager::detectFileType(const uint8_t* data, uint16_t length) {

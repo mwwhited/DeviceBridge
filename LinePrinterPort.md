@@ -102,3 +102,18 @@ Busy is low
 Data is ""
 
 ```
+
+
+Here is the timing diagram showing the transfer of characters **A to G** from a host to a printer via the LPT port:
+
+### Highlights:
+
+* **Each character** takes \~50 ms to send (data setup, STROBE, BUSY, ACK).
+* After character **D**, the printer raises **BUSY** for an additional **100 ms**, requesting a pause.
+* Control lines:
+
+  * **STROBE**: Host pulses it LOW to signal data is ready.
+  * **ACK**: Printer pulses it LOW to acknowledge data received.
+  * **BUSY**: Printer holds it HIGH when it's busy (including after D).
+
+Let me know if you'd like to extend this diagram, simulate reverse data (e.g., status readback), or export it.
