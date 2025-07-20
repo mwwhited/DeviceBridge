@@ -9,10 +9,7 @@
 namespace DeviceBridge::Components {
 
 FileSystemManager::FileSystemManager()
-    : _displayManager(nullptr)
-    , _timeManager(nullptr)
-    , _parallelPortManager(nullptr)
-    , _eeprom(Common::Pins::EEPROM_CS)
+    : _eeprom(Common::Pins::EEPROM_CS)
     , _sdAvailable(false)
     , _eepromAvailable(false)
     , _eepromCurrentAddress(0)
@@ -162,18 +159,15 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
     switch (_activeStorage.value) {
         case Common::StorageType::SD_CARD:
             if (_currentFile) {
+
                 // Lock LPT port during SPI operations to prevent interference
-                if (_parallelPortManager) {
-                    _parallelPortManager->lockPort();
-                }
+                getServices().getParallelPortManager()->lockPort();
                 
                 size_t written = _currentFile.write(chunk.data, chunk.length);
                 _currentFile.flush(); // Ensure data is written
                 
                 // Unlock LPT port
-                if (_parallelPortManager) {
-                    _parallelPortManager->unlockPort();
-                }
+                getServices().getParallelPortManager()->unlockPort();
                 
                 if (written == chunk.length) {
                     _totalBytesWritten += chunk.length;
@@ -238,9 +232,12 @@ void FileSystemManager::generateFilename(char* buffer, size_t bufferSize) {
 void FileSystemManager::generateTimestampFilename(char* buffer, size_t bufferSize) {
     const char* extension = getFileExtension();
     
-    // if (_timeManager && _timeManager->isRTCAvailable()) {
-    //     // Get formatted datetime and parse it for compact format
-        auto rtc = _timeManager->getRTC();
+    // Use ServiceLocator to get TimeManager safely
+    TimeManager* timeManager = getServices().getTimeManager();
+    
+    if (timeManager && timeManager->isRTCAvailable()) {
+        // Get formatted datetime and parse it for compact format
+        auto rtc = timeManager->getRTC();
         auto now = rtc.now();
         snprintf(buffer, bufferSize, "%04d%02d%02d%02d%02d%02d%s",
             now.year(),
@@ -251,10 +248,10 @@ void FileSystemManager::generateTimestampFilename(char* buffer, size_t bufferSiz
             now.second(),
             extension
         );
-    // } else {
-    //     // Fallback to millis-based timestamp if no RTC
-    //     snprintf(buffer, bufferSize, "XXX%lu%s", millis(), extension);
-    // }
+    } else {
+        // Fallback to millis-based timestamp if no RTC
+        snprintf(buffer, bufferSize, "DAT%lu%s", millis(), extension);
+    }
 }
 
 const char* FileSystemManager::getFileExtension() const {
@@ -262,14 +259,16 @@ const char* FileSystemManager::getFileExtension() const {
 }
 
 void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const char* message) {
-    if (_displayManager) {
-        _displayManager->displayMessage(type, message);
+    DisplayManager* displayManager = getServices().getDisplayManager();
+    if (displayManager) {
+        displayManager->displayMessage(type, message);
     }
 }
 
 void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message) {
-    if (_displayManager) {
-        _displayManager->displayMessage(type, message);
+    DisplayManager* displayManager = getServices().getDisplayManager();
+    if (displayManager) {
+        displayManager->displayMessage(type, message);
     }
 }
 
@@ -405,6 +404,72 @@ Common::FileType FileSystemManager::detectFileType(const uint8_t* data, uint16_t
     
     // If no specific format detected, assume binary
     return Common::FileType::BINARY;
+}
+
+// IComponent interface implementation
+bool FileSystemManager::selfTest() {
+    Serial.print(F("FileSystemManager Self-Test:\r\n"));
+    
+    bool result = true;
+    
+    // Test SD card
+    if (_sdAvailable) {
+        Serial.print(F("  SD Card: ✅ Available\r\n"));
+    } else {
+        Serial.print(F("  SD Card: ❌ Not Available\r\n"));
+        result = false;
+    }
+    
+    // Test EEPROM
+    if (_eepromAvailable) {
+        Serial.print(F("  EEPROM: ✅ Available\r\n"));
+    } else {
+        Serial.print(F("  EEPROM: ⚠️  Not Available\r\n"));
+        // EEPROM not critical for basic operation
+    }
+    
+    // Test dependencies
+    if (!validateDependencies()) {
+        result = false;
+    }
+    
+    return result;
+}
+
+const char* FileSystemManager::getComponentName() const {
+    return "FileSystemManager";
+}
+
+bool FileSystemManager::validateDependencies() const {
+    bool valid = true;
+    
+    DisplayManager* displayManager = getServices().getDisplayManager();
+    if (!displayManager) {
+        Serial.print(F("  Missing DisplayManager dependency\r\n"));
+        valid = false;
+    }
+    
+    TimeManager* timeManager = getServices().getTimeManager();
+    if (!timeManager) {
+        Serial.print(F("  Missing TimeManager dependency\r\n"));
+        valid = false;
+    }
+    
+    return valid;
+}
+
+void FileSystemManager::printDependencyStatus() const {
+    Serial.print(F("FileSystemManager Dependencies:\r\n"));
+    
+    DisplayManager* displayManager = getServices().getDisplayManager();
+    Serial.print(F("  DisplayManager: "));
+    Serial.print(displayManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(F("\r\n"));
+    
+    TimeManager* timeManager = getServices().getTimeManager();
+    Serial.print(F("  TimeManager: "));
+    Serial.print(timeManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(F("\r\n"));
 }
 
 } // namespace DeviceBridge::Components

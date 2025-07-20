@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "../Common/Types.h"
 #include "../Common/Config.h"
+#include "../Common/ServiceLocator.h"
 
 namespace DeviceBridge::Components {
 
@@ -12,13 +13,9 @@ class FileSystemManager;
 class DisplayManager;
 class TimeManager;
 
-class SystemManager {
+class SystemManager : public DeviceBridge::IComponent {
 private:
-    // Component references
-    ParallelPortManager* _parallelPortManager;
-    FileSystemManager* _fileSystemManager;
-    DisplayManager* _displayManager;
-    TimeManager* _timeManager;
+    // Note: No longer storing direct references - using ServiceLocator
     
     // System state
     Common::SystemStatus _systemStatus;
@@ -46,18 +43,18 @@ private:
 public:
     SystemManager();
     ~SystemManager();
+   
+    // Lifecycle management (IComponent interface)
+    bool initialize() override;
+    void update() override;  // Called from main loop
+    void stop() override;
     
-    // Component registration
-    void setParallelPortManager(ParallelPortManager* manager) { _parallelPortManager = manager; }
-    void setFileSystemManager(FileSystemManager* manager) { _fileSystemManager = manager; }
-    void setDisplayManager(DisplayManager* manager) { _displayManager = manager; }
-    void setTimeManager(TimeManager* manager) { _timeManager = manager; }
-    
-    // Lifecycle management
-    bool initialize();
-    void update();  // Called from main loop
-    void stop();
-    
+    // IComponent interface implementation
+    bool selfTest() override;
+    const char* getComponentName() const override;
+    bool validateDependencies() const override;
+    void printDependencyStatus() const override;
+
     // Command processing (called by other components)
     void processSystemCommand(const Common::SystemCommand& cmd);
     
@@ -86,11 +83,7 @@ public:
     // Debug mode control
     void setLCDDebugEnabled(bool enabled) { _lcdDebugEnabled = enabled; }
     bool isLCDDebugEnabled() const { return _lcdDebugEnabled; }
-    
-    // Component management
-    void setComponentManagers(ParallelPortManager* ppm, FileSystemManager* fsm, 
-                             DisplayManager* dm, TimeManager* tm);
-    
+        
 private:
     // Statistics tracking
     uint32_t _uptimeSeconds;

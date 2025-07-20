@@ -5,6 +5,7 @@
 #include "W25Q128Manager.h"
 #include "../Common/Types.h"
 #include "../Common/Config.h"
+#include "../Common/ServiceLocator.h"
 
 namespace DeviceBridge::Components {
 
@@ -13,11 +14,9 @@ class DisplayManager;
 class TimeManager;
 class ParallelPortManager;
 
-class FileSystemManager {
+class FileSystemManager : public DeviceBridge::IComponent {
 private:
-    DisplayManager* _displayManager;
-    TimeManager* _timeManager;
-    ParallelPortManager* _parallelPortManager;
+    // Note: No longer storing direct references - using ServiceLocator
     
     // Storage instances  
     File _currentFile;
@@ -66,15 +65,16 @@ public:
     
     bool createNewFile();
     
-    // Set callback for display messages
-    void setDisplayManager(DisplayManager* manager) { _displayManager = manager; }
-    void setTimeManager(TimeManager* manager) { _timeManager = manager; }
-    void setParallelPortManager(ParallelPortManager* manager) { _parallelPortManager = manager; }
+    // Lifecycle management (IComponent interface)
+    bool initialize() override;
+    void update() override;  // Called from main loop
+    void stop() override;
     
-    // Lifecycle management
-    bool initialize();
-    void update();  // Called from main loop
-    void stop();
+    // IComponent interface implementation
+    bool selfTest() override;
+    const char* getComponentName() const override;
+    bool validateDependencies() const override;
+    void printDependencyStatus() const override;
     
     // Data processing (called by ParallelPortManager)
     void processDataChunk(const Common::DataChunk& chunk);

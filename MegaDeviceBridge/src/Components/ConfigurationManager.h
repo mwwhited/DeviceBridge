@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "../Common/Types.h"
 #include "../Common/Config.h"
+#include "../Common/ServiceLocator.h"
 
 namespace DeviceBridge::Components {
 
@@ -13,14 +14,9 @@ class DisplayManager;
 class TimeManager;
 class SystemManager;
 
-class ConfigurationManager {
+class ConfigurationManager : public DeviceBridge::IComponent {
 private:
-    // Component references
-    ParallelPortManager* _parallelPortManager;
-    FileSystemManager* _fileSystemManager;
-    DisplayManager* _displayManager;
-    TimeManager* _timeManager;
-    SystemManager* _systemManager;
+    // Note: No longer storing direct references - using ServiceLocator
     
     // Serial command processing
     void processCommand(const String& command);
@@ -50,17 +46,16 @@ public:
     ConfigurationManager();
     ~ConfigurationManager();
     
-    // Component registration
-    void setParallelPortManager(ParallelPortManager* manager) { _parallelPortManager = manager; }
-    void setFileSystemManager(FileSystemManager* manager) { _fileSystemManager = manager; }
-    void setDisplayManager(DisplayManager* manager) { _displayManager = manager; }
-    void setTimeManager(TimeManager* manager) { _timeManager = manager; }
-    void setSystemManager(SystemManager* manager) { _systemManager = manager; }
+    // Lifecycle management (IComponent interface)
+    bool initialize() override;
+    void update() override;  // Called from main loop
+    void stop() override;
     
-    // Lifecycle management
-    bool initialize();
-    void update();  // Called from main loop
-    void stop();
+    // IComponent interface implementation
+    bool selfTest() override;
+    const char* getComponentName() const override;
+    bool validateDependencies() const override;
+    void printDependencyStatus() const override;
     
     // Component management
     void setComponentManagers(ParallelPortManager* ppm, FileSystemManager* fsm, 

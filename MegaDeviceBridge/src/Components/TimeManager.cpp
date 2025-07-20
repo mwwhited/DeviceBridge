@@ -1,22 +1,14 @@
 #include "TimeManager.h"
 #include "DisplayManager.h"
-#include <string.h>
-#include <stdio.h>
 #include <Arduino.h>
+#include <stdio.h>
+#include <string.h>
 
 namespace DeviceBridge::Components {
 
-TimeManager::TimeManager()
-    : _displayManager(nullptr)
-    , _rtcAvailable(false)
-    , _lastTimeUpdate(0)
-    , _timeValid(false)
-{
-}
+TimeManager::TimeManager() : _rtcAvailable(false), _lastTimeUpdate(0), _timeValid(false) {}
 
-TimeManager::~TimeManager() {
-    stop();
-}
+TimeManager::~TimeManager() { stop(); }
 
 bool TimeManager::initialize() {
     _rtcAvailable = initializeRTC();
@@ -27,7 +19,7 @@ void TimeManager::update() {
     // Update time display periodically (called from main loop)
     uint32_t currentTime = millis();
     if (currentTime - _lastTimeUpdate >= Common::RTOS::TIME_UPDATE_MS) {
-         updateTimeDisplay();
+        updateTimeDisplay();
         _lastTimeUpdate = currentTime;
     }
 }
@@ -54,37 +46,35 @@ void TimeManager::updateTimeDisplay() {
     if (!_rtcAvailable) {
         return;
     }
-    
+
     char timeBuffer[32];
     formatTime(timeBuffer, sizeof(timeBuffer));
-    
-    if (_displayManager) {
-        _displayManager->displayMessage(Common::DisplayMessage::TIME, timeBuffer);
-    }
+    auto displayManager = getServices().getDisplayManager();
+    displayManager->displayMessage(Common::DisplayMessage::TIME, timeBuffer);
 }
 
-void TimeManager::formatTime(char* buffer, size_t bufferSize) {
+void TimeManager::formatTime(char *buffer, size_t bufferSize) {
     if (!_rtcAvailable || !_timeValid) {
         strncpy(buffer, "Time: --:--:--", bufferSize - 1);
         buffer[bufferSize - 1] = '\0';
         return;
     }
-    
+
     DateTime now = _rtc.now();
     uint8_t hour = now.hour();
     uint8_t minute = now.minute();
     uint8_t second = now.second();
-    
+
     snprintf(buffer, bufferSize, "Time: %02d:%02d:%02d", hour, minute, second);
 }
 
-void TimeManager::formatDateTime(char* buffer, size_t bufferSize) {
+void TimeManager::formatDateTime(char *buffer, size_t bufferSize) {
     if (!_rtcAvailable || !_timeValid) {
         strncpy(buffer, "yyyy-MM-dd hh:mm:ss", bufferSize - 1);
         buffer[bufferSize - 1] = '\0';
         return;
     }
-    
+
     DateTime now = _rtc.now();
     uint8_t day = now.day();
     uint8_t month = now.month();
@@ -92,16 +82,15 @@ void TimeManager::formatDateTime(char* buffer, size_t bufferSize) {
     uint8_t hour = now.hour();
     uint8_t minute = now.minute();
     uint8_t second = now.second();
-    
-    snprintf(buffer, bufferSize, "%04d-%02d-%02d %02d:%02d:%02d", 
-            year, month, day, hour, minute, second);
+
+    snprintf(buffer, bufferSize, "%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second);
 }
 
 bool TimeManager::setTime(uint8_t hour, uint8_t minute, uint8_t second) {
     if (!_rtcAvailable) {
         return false;
     }
-    
+
     DateTime now = _rtc.now();
     DateTime newTime(now.year(), now.month(), now.day(), hour, minute, second);
     _rtc.adjust(newTime);
@@ -113,7 +102,7 @@ bool TimeManager::setDate(uint8_t day, uint8_t month, uint16_t year) {
     if (!_rtcAvailable) {
         return false;
     }
-    
+
     DateTime now = _rtc.now();
     DateTime newDate(year, month, day, now.hour(), now.minute(), now.second());
     _rtc.adjust(newDate);
@@ -126,33 +115,28 @@ uint32_t TimeManager::getTimestamp() {
         // Return system millis if RTC not available
         return millis();
     }
-    
+
     // Return Unix timestamp if RTC is available
     DateTime now = _rtc.now();
     return now.unixtime();
 }
 
-void TimeManager::getFormattedTime(char* buffer, size_t bufferSize) {
-    formatTime(buffer, bufferSize);
-}
+void TimeManager::getFormattedTime(char *buffer, size_t bufferSize) { formatTime(buffer, bufferSize); }
 
-void TimeManager::getFormattedDateTime(char* buffer, size_t bufferSize) {
-    formatDateTime(buffer, bufferSize);
-}
-
+void TimeManager::getFormattedDateTime(char *buffer, size_t bufferSize) { formatDateTime(buffer, bufferSize); }
 
 bool TimeManager::setDateTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second) {
     if (!_rtcAvailable) {
         return false;
     }
-    
+
     DateTime newDateTime(year, month, day, hour, minute, second);
     _rtc.adjust(newDateTime);
     _timeValid = true;
     return true;
 }
 
-void TimeManager::padNumber(char* buffer, uint8_t number, uint8_t digits) {
+void TimeManager::padNumber(char *buffer, uint8_t number, uint8_t digits) {
     if (digits == 2) {
         sprintf(buffer, "%02d", number);
     } else if (digits == 4) {
@@ -160,6 +144,58 @@ void TimeManager::padNumber(char* buffer, uint8_t number, uint8_t digits) {
     } else {
         sprintf(buffer, "%d", number);
     }
+}
+// IComponent interface implementation
+bool TimeManager::selfTest() {
+    Serial.print(F("TimeManager Self-Test:\r\n"));
+    
+    bool result = true;
+    
+    if (_rtcAvailable) {
+        Serial.print(F("  RTC: ✅ Available\r\n"));
+    } else {
+        Serial.print(F("  RTC: ❌ Not Available\r\n"));
+        result = false;
+    }
+    
+    if (_timeValid) {
+        Serial.print(F("  TIME: ✅ Valid\r\n"));
+    } else {
+        Serial.print(F("  TIME: ❌  Invalid\r\n"));
+        result = false;
+    }
+    
+    // Test dependencies
+    if (!validateDependencies()) {
+        result = false;
+    }
+    
+    return result;
+}
+
+const char* TimeManager::getComponentName() const {
+    return "TimeManager";
+}
+
+bool TimeManager::validateDependencies() const {
+    bool valid = true;
+    
+    auto displayManager = getServices().getDisplayManager();
+    if (!displayManager) {
+        Serial.print(F("  Missing DisplayManager dependency\r\n"));
+        valid = false;
+    }
+    
+    return valid;
+}
+
+void TimeManager::printDependencyStatus() const {
+    Serial.print(F("TimeManager Dependencies:\r\n"));
+    
+    auto displayManager = getServices().getDisplayManager();
+    Serial.print(F("  DisplayManager: "));
+    Serial.print(displayManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(F("\r\n"));
 }
 
 } // namespace DeviceBridge::Components

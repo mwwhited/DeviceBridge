@@ -15,6 +15,7 @@
 // Common definitions
 #include "./Common/Types.h"
 #include "./Common/Config.h"
+#include "./Common/ServiceLocator.h"
 
 // Hardware instances
 DeviceBridge::Parallel::Port printerPort(
@@ -87,6 +88,10 @@ void setup()
   printerPort.initialize();
   display.initialize();
   
+  // Initialize ServiceLocator
+  DeviceBridge::ServiceLocator::initialize();
+  DeviceBridge::ServiceLocator& services = DeviceBridge::ServiceLocator::getInstance();
+  
   // Create component managers (no queues/mutexes needed)
   parallelPortManager = new DeviceBridge::Components::ParallelPortManager(printerPort);
   fileSystemManager = new DeviceBridge::Components::FileSystemManager();
@@ -102,18 +107,21 @@ void setup()
     while(1) { delay(1000); }
   }
   
-  // Set up component cross-references
-  parallelPortManager->setFileSystemManager(fileSystemManager);
-  fileSystemManager->setDisplayManager(displayManager);
-  fileSystemManager->setTimeManager(timeManager);
-  displayManager->setTimeManager(timeManager);
-  displayManager->setSystemManager(systemManager);
+  // Register all components with ServiceLocator
+  Serial.print(F("Registering components with ServiceLocator...\r\n"));
+  services.registerDisplay(&display);
+  services.registerParallelPortManager(parallelPortManager);
+  services.registerFileSystemManager(fileSystemManager);
+  services.registerDisplayManager(displayManager);
+  services.registerTimeManager(timeManager);
+  services.registerSystemManager(systemManager);
+  services.registerConfigurationManager(configurationManager);
   
-  systemManager->setComponentManagers(parallelPortManager, fileSystemManager, 
-                                     displayManager, timeManager);
-  
-  configurationManager->setComponentManagers(parallelPortManager, fileSystemManager,
-                                            displayManager, timeManager, systemManager);
+  // Validate all dependencies are registered
+  if (!services.validateAllDependencies()) {
+    Serial.print(F("FATAL: Service dependency validation failed\r\n"));
+    while(1) { delay(1000); }
+  }
   
   // Initialize all components
   Serial.print(F("Initializing components...\r\n"));
@@ -143,7 +151,17 @@ void setup()
   }
   
   Serial.print(F("All systems initialized successfully!\r\n"));
-  Serial.print(F("Device Bridge ready for operation.\r\n"));
+  
+  // Run post-initialization system self-test
+  Serial.print(F("Running post-initialization system self-test...\r\n"));
+  bool selfTestPassed = services.runSystemSelfTest();
+  
+  if (selfTestPassed) {
+    Serial.print(F("✅ System self-test PASSED - Device Bridge ready for operation.\r\n"));
+  } else {
+    Serial.print(F("⚠️  System self-test completed with warnings - Check component status.\r\n"));
+  }
+  
   Serial.print(F("Connect TDS2024 to parallel port and use LCD buttons for control.\r\n"));
   
   // Initialize timing
