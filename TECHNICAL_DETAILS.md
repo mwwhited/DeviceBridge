@@ -1,6 +1,8 @@
 # Technical Implementation Details - MegaDeviceBridge
 
-## Enterprise Configuration + TDS2024 Timing Optimization Status (2025-07-20) ⭐⭐⭐⭐⭐
+## Critical TDS2024 Bugs Fixed + Enterprise Configuration + Timing Optimization Status (2025-07-20) ⭐⭐⭐⭐⭐
+**Critical File Creation Bug**: FIXED - isNewFile flag timing bug that prevented TDS2024 file creation completely resolved
+**TDS2024 Error Signaling**: Comprehensive error communication with ERROR/PAPER_OUT signals when file operations fail
 **Architecture**: Service Locator pattern with centralized configuration management and loop-based cooperative multitasking
 **Configuration Management**: Enterprise-grade centralization of all 72+ magic numbers through ConfigurationService
 **TDS2024 Timing Optimization**: Critical fixes applied - hardware delay (3μs→5μs), ACK pulse (15μs→20μs), flow control (50%/70%)
@@ -12,6 +14,7 @@
 **Hardware Enhancement**: L1/L2 LEDs (pins 30,32) and SD card detection (pins 34,36) fully operational
 **LPT Protocol**: Complete printer protocol with emergency recovery, LCD throttling, and TDS2024-optimized timing
 **Type-Safe Configuration**: All configuration values accessible through strongly-typed getter methods
+**Production Ready**: "Saved:" with no filename issue completely resolved for real TDS2024 integration
 
 ## Service Locator Architecture Implementation ⭐⭐
 
@@ -53,7 +56,9 @@
 - **Service Locator**: Uses `getServices().getDisplayManager()` and `getServices().getTimeManager()`
 - **IComponent**: Implements hardware validation and dependency checking
 - **Features**: SD/EEPROM/Serial storage failover, all 16 TDS2024 file formats, L2 LED control
-- **Status**: Ready for data capture with universal format support and zero null pointer risk
+- **Critical Enhancement (2025-07-20)**: Comprehensive TDS2024 error signaling when file operations fail
+- **Smart Recovery**: Error signals automatically cleared on successful file creation and closure
+- **Status**: Production ready with file creation bug resolved and comprehensive error communication
 
 ### TimeManager.cpp - ENTERPRISE-GRADE ✅
 - **Loop-Based**: Periodic `update()` with 1-second interval using `millis()` timing
@@ -74,7 +79,9 @@
 - **Service Locator**: Uses `getServices().getFileSystemManager()` for data processing
 - **IComponent**: Implements LPT hardware validation and dependency checking
 - **Features**: Real-time LPT data capture (1ms polling), file boundary detection, L1 LED control, LPT printer protocol
-- **Status**: Ready for TDS2024 integration with timeout-based file detection and zero null pointer risk
+- **Critical Bug Fix (2025-07-20)**: Fixed isNewFile flag timing bug that prevented file creation
+- **TDS2024 Error Signaling**: Comprehensive error communication with oscilloscope when operations fail
+- **Status**: Production ready for TDS2024 integration with file creation bug completely resolved
 
 ### W25Q128Manager.cpp - OPERATIONAL ✅
 - **Loop-Based**: SPI communication without FreeRTOS mutex overhead
