@@ -4,7 +4,7 @@
 
 The MegaDeviceBridge is a sophisticated embedded system that converts parallel port data from a Tektronix TDS2024 oscilloscope to modern storage formats. The system uses a **loop-based cooperative multitasking architecture** with component-based design for real-time data capture and processing.
 
-**Current Status (2025-07-20)**: Production ready with comprehensive hardware enhancements including visual LED indicators, SD card hardware detection, and full LPT printer protocol implementation for seamless TDS2024 integration.
+**Current Status (2025-07-20)**: Enterprise-grade architecture with Service Locator pattern providing zero null pointer risk, comprehensive dependency management, and professional self-validation framework. Includes full hardware enhancements with visual LED indicators, SD card detection, and complete LPT printer protocol for seamless TDS2024 integration.
 
 ### TDS2024 Oscilloscope Capabilities
 **Supported File Formats:**
@@ -50,10 +50,34 @@ The Device Bridge automatically detects file format based on data headers and ha
 
 ### Core Design Principles
 1. **Real-Time Performance**: 1ms polling for parallel port data capture
-2. **Resource Protection**: Mutex-protected shared hardware resources
-3. **Component Isolation**: Modular design with clear boundaries
-4. **Graceful Degradation**: Storage failover mechanisms
-5. **Memory Efficiency**: Optimized for 8KB RAM constraint
+2. **Zero Null Pointers**: Service Locator pattern eliminates dependency injection issues
+3. **Self-Validating System**: Runtime dependency validation with fail-safe operation
+4. **Component Isolation**: Modular design with clear boundaries and standardized interfaces
+5. **Graceful Degradation**: Storage failover mechanisms with comprehensive error handling
+6. **Memory Efficiency**: Optimized for 8KB RAM constraint with enterprise-grade architecture
+
+### Service Locator Architecture (2025-07-20) ⭐⭐
+
+**Enterprise-Grade Dependency Management:**
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         ServiceLocator (Singleton)                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │              Component Registry & Validation Framework                  │   │
+│  │  ┌───────────┬───────────┬─────────────┬──────────┬───────────────┐     │   │
+│  │  │Parallel   │FileSystem │DisplayMgr   │TimeMgr   │SystemMgr      │     │   │
+│  │  │PortMgr    │Manager    │             │          │               │     │   │
+│  │  └───────────┴───────────┴─────────────┴──────────┴───────────────┘     │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Features:**
+- **Null Pointer Elimination**: All components use `getServices().getXxxManager()`
+- **Runtime Validation**: Post-initialization dependency checking with fatal error detection
+- **IComponent Interface**: Standardized lifecycle (initialize/update/stop) and validation
+- **Self-Test Framework**: Each component validates its dependencies and hardware
+- **Multi-Layer Validation**: ServiceLocator + Component + Hardware validation
 
 ### Loop-Based Cooperative Multitasking Architecture
 

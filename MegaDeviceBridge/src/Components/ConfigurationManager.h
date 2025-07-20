@@ -57,10 +57,6 @@ public:
     bool validateDependencies() const override;
     void printDependencyStatus() const override;
     
-    // Component management
-    void setComponentManagers(ParallelPortManager* ppm, FileSystemManager* fsm, 
-                             DisplayManager* dm, TimeManager* tm, SystemManager* sm);
-    
     // Configuration interface
     void checkSerialCommands();
 };
