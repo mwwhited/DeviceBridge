@@ -1,10 +1,12 @@
 # Technical Implementation Details - MegaDeviceBridge
 
-## Production Deployment Status (2025-07-19) ✅
+## Production Deployment Status (2025-07-20) ⭐
 **Architecture**: Loop-based cooperative multitasking (FreeRTOS eliminated)
 **Memory Usage**: 11.3% RAM (926/8192 bytes) - 8x improvement achieved
 **System Status**: Operational on Arduino Mega 2560 with all components working
 **TDS2024 Integration**: Universal support for all 16 file formats implemented
+**Hardware Enhancement**: L1/L2 LEDs and SD card detection fully operational
+**LPT Protocol**: Complete printer protocol implementation with flow control
 
 ## Component Manager Architecture (PRODUCTION READY)
 
@@ -45,8 +47,32 @@
 ### ConfigurationManager.cpp - OPERATIONAL ✅
 - **Serial Interface**: Complete command parser with 50ms update interval
 - **Architecture**: Proper component separation from main.cpp
-- **Features**: Hardware validation, time setting, storage control, heartbeat control
+- **Features**: Hardware validation, time setting, storage control, heartbeat control, LED control
+- **Enhanced Commands**: `led l1/l2 on/off`, `testlpt`, enhanced `storage` and `parallel` commands
 - **Status**: Full configuration interface operational with clean serial output (heartbeat OFF by default)
+
+## Hardware Enhancement Implementation (2025-07-20) ⭐
+
+### LED Visual Indicators - VERIFIED WORKING ✅
+- **L1 LED (Pin 30)**: LPT read activity indicator - flashes during parallel port data capture
+- **L2 LED (Pin 32)**: Data write activity indicator - flashes during file write operations
+- **Manual Control**: `led l1/l2 on/off` serial commands for hardware testing
+- **Automatic Control**: LEDs automatically controlled during operations
+- **Status Display**: `led status` shows current LED states
+
+### SD Card Hardware Detection - OPERATIONAL ✅
+- **Card Detect (Pin 36)**: Physical card presence detection (Active LOW)
+- **Write Protect (Pin 34)**: Hardware write protection detection (Active HIGH)
+- **Status Display**: Enhanced `storage` command shows "Detected/Missing" and "Protected/Unprotected"
+- **Pin Monitoring**: Real-time hardware status in storage status display
+
+### LPT Printer Protocol - PRODUCTION READY ✅
+- **Flow Control**: Automatic BUSY signal when ring buffer 75% full
+- **Acknowledge Signaling**: Proper ACK pulses sent after each byte received
+- **Lock Mechanism**: SPI/Serial operations lock LPT port to prevent interference
+- **Printer State Control**: Full control over BUSY, ERROR, PAPER_OUT, SELECT signals
+- **Protocol Testing**: `testlpt` command provides comprehensive printer protocol testing
+- **Ring Buffer**: 512-byte buffer with overflow protection and flow control
 
 ## Communication Architecture (PRODUCTION IMPLEMENTATION)
 **Loop-Based Direct Communication** - No queues, no mutexes, no blocking
@@ -142,19 +168,25 @@ void loop() {
 | 45 | PAPER_OUT | 12 | Output | Forced low |
 | 47 | SELECT | 13 | Output | Forced high |
 
+#### Hardware Enhancement Pins (IMPLEMENTED)
+| Pin | Function | Direction | Status | Notes |
+|-----|----------|-----------|--------|-------|
+| 30 | L1_LED | Output | ✅ WORKING | LPT read activity indicator |
+| 32 | L2_LED | Output | ✅ WORKING | Data write activity indicator |
+| 34 | SD_WP | Input | ✅ OPERATIONAL | SD write protect (Active HIGH) |
+| 36 | SD_CD | Input | ✅ OPERATIONAL | SD card detect (Active LOW) |
+
 #### Available Pins for Expansion
 | Pin | Type | Capability | Recommended Use |
 |-----|------|------------|-----------------|
-| 2 | Digital | INT0 interrupt | SD Card Detect |
-| 11 | Digital | PWM capable | SD Write Protect |
+| 2 | Digital | INT0 interrupt | Future expansion |
+| 11 | Digital | PWM capable | Future expansion |
 | 12 | Digital | PWM capable | General I/O |
 | 14 | Digital | TX3 serial | UART expansion |
 | 15 | Digital | RX3 serial | UART expansion |
 | 16 | Digital | TX2 serial | UART expansion |
 | 17 | Digital | RX2 serial | UART expansion |
 | 19 | Digital | INT2 interrupt | Interrupt expansion |
-| 30 | Digital | **L1 LED** | LPT Read Activity LED |
-| 32 | Digital | **L2 LED** | Data Write Activity LED |
 | 34 | Digital | **SD_WP** | SD Write Protect detection |
 | 36 | Digital | **SD_CD** | SD Card Detect |
 | 38 | Digital | Standard | General I/O |

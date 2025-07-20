@@ -4,6 +4,8 @@
 
 The MegaDeviceBridge is a sophisticated embedded system that converts parallel port data from a Tektronix TDS2024 oscilloscope to modern storage formats. The system uses a **loop-based cooperative multitasking architecture** with component-based design for real-time data capture and processing.
 
+**Current Status (2025-07-20)**: Production ready with comprehensive hardware enhancements including visual LED indicators, SD card hardware detection, and full LPT printer protocol implementation for seamless TDS2024 integration.
+
 ### TDS2024 Oscilloscope Capabilities
 **Supported File Formats:**
 - **Image Formats**: BMP, PCX, TIFF, RLE, EPSIMAGE
@@ -35,6 +37,14 @@ The Device Bridge automatically detects file format based on data headers and ha
 - **RTC**: DS1307 Real-Time Clock
 - **Storage**: SD Card (up to 32GB supported)
 - **Interface**: IEEE 1284 Parallel Port (LPT/Centronics)
+
+### Hardware Enhancements (2025-07-20) ⭐
+- **L1 LED (Pin 30)**: Visual LPT read activity indicator - flashes during data capture
+- **L2 LED (Pin 32)**: Visual data write activity indicator - flashes during file writes
+- **SD Card Detect (Pin 36)**: Hardware-level card presence detection (Active LOW)
+- **SD Write Protect (Pin 34)**: Hardware-level write protection detection (Active HIGH)
+- **LPT Printer Protocol**: Full busy/acknowledge signaling with flow control
+- **Enhanced Debugging**: Comprehensive serial commands for hardware monitoring
 
 ## System Architecture
 
