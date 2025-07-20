@@ -2,22 +2,20 @@
 #include "TimeManager.h"
 #include "SystemManager.h"
 #include "../Common/Types.h"
+#include "../Common/ServiceLocator.h"
+#include "../Common/ConfigurationService.h"
 #include <string.h>
 #include <Arduino.h>
 
 namespace DeviceBridge::Components
 {
 
-    // Button constants for OSEPP LCD Keypad Shield v1 (verified specifications)
-    constexpr uint16_t BUTTON_RIGHT = 0;
-    constexpr uint16_t BUTTON_UP = 144;
-    constexpr uint16_t BUTTON_DOWN = 329;
-    constexpr uint16_t BUTTON_LEFT = 504;
-    constexpr uint16_t BUTTON_SELECT = 741;
-    constexpr uint16_t BUTTON_NONE = 1023;
+    // Button constants now accessed via ConfigurationService
 
     DisplayManager::DisplayManager(User::Display &display)
-        : _display(display), _lastMessageTime(0), _showingTime(false), _inMenu(false), _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(BUTTON_NONE)
+        : _display(display), _lastMessageTime(0), _showingTime(false), _inMenu(false), 
+          _storageOperationActive(false), _lastDisplayUpdate(0), _normalUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getNormalDisplayInterval()), _storageUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getStorageDisplayInterval()),
+          _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(ServiceLocator::getInstance().getConfigurationService()->getButtonNoneValue())
     {
         memset(_currentMessage, 0, sizeof(_currentMessage));
         memset(_currentLine2, 0, sizeof(_currentLine2));
@@ -37,21 +35,28 @@ namespace DeviceBridge::Components
 
     void DisplayManager::update()
     {
-        // Check for button presses
+        // Check for button presses (always responsive)
         uint16_t buttonValue = readButtons();
-        if (buttonValue != BUTTON_NONE && buttonValue != _lastButtonState)
+        auto* config = ServiceLocator::getInstance().getConfigurationService();
+        if (buttonValue != config->getButtonNoneValue() && buttonValue != _lastButtonState)
         {
             handleButtonPress(buttonValue);
             _lastButtonState = buttonValue;
             _lastButtonTime = millis();
         }
-        else if (buttonValue == BUTTON_NONE)
+        else if (buttonValue == config->getButtonNoneValue())
         {
-            _lastButtonState = BUTTON_NONE;
+            _lastButtonState = config->getButtonNoneValue();
         }
 
-        // Update display content
-        updateDisplay();
+        // Adaptive display update based on storage operation state
+        uint32_t currentTime = millis();
+        uint32_t updateInterval = _storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
+        
+        if (currentTime - _lastDisplayUpdate >= updateInterval) {
+            updateDisplay();
+            _lastDisplayUpdate = currentTime;
+        }
     }
 
     void DisplayManager::stop()
@@ -60,11 +65,22 @@ namespace DeviceBridge::Components
         _showingTime = false;
     }
 
+    void DisplayManager::setStorageOperationActive(bool active)
+    {
+        _storageOperationActive = active;
+        
+        // If storage operation is ending, allow immediate display update and clock refresh
+        if (!active) {
+            _lastDisplayUpdate = 0;
+            _showingTime = false; // Allow clock to refresh when idle
+        }
+    }
+
     void DisplayManager::updateDisplay()
     {
         auto timeManager = getServices().getTimeManager();
-        // Check if we should show time when idle
-        if (!_inMenu && (millis() - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
+        // Check if we should show time when truly idle (not in menu, not during storage operations)
+        if (!_inMenu && !_storageOperationActive && (millis() - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
         {
             if (!_showingTime)
             {
@@ -145,19 +161,20 @@ namespace DeviceBridge::Components
 
         uint16_t buttonValue = analogRead(A0);
 
-        // Tolerance for analog readings
-        if (buttonValue < 50)
-            return BUTTON_RIGHT;
-        if (buttonValue < 200)
-            return BUTTON_UP;
-        if (buttonValue < 400)
-            return BUTTON_DOWN;
-        if (buttonValue < 600)
-            return BUTTON_LEFT;
-        if (buttonValue < 800)
-            return BUTTON_SELECT;
+        // Tolerance for analog readings using ConfigurationService
+        auto* config = ServiceLocator::getInstance().getConfigurationService();
+        if (buttonValue < config->getRightThreshold())
+            return config->getButtonRightValue();
+        if (buttonValue < config->getUpThreshold())
+            return config->getButtonUpValue();
+        if (buttonValue < config->getDownThreshold())
+            return config->getButtonDownValue();
+        if (buttonValue < config->getLeftThreshold())
+            return config->getButtonLeftValue();
+        if (buttonValue < config->getSelectThreshold())
+            return config->getButtonSelectValue();
 
-        return BUTTON_NONE;
+        return config->getButtonNoneValue();
     }
 
     void DisplayManager::handleButtonPress(uint16_t button)
@@ -175,31 +192,30 @@ namespace DeviceBridge::Components
 
     void DisplayManager::navigateMenu(uint16_t button)
     {
-        switch (button)
-        {
-        case BUTTON_UP:
+        // Reset idle timer on any menu interaction
+        _lastMessageTime = millis();
+        
+        auto* config = ServiceLocator::getInstance().getConfigurationService();
+        
+        if (button == config->getButtonUpValue()) {
             if (_menuSelection > 0)
             {
                 _menuSelection--;
             }
             showMenuScreen();
-            break;
-
-        case BUTTON_DOWN:
+        }
+        else if (button == config->getButtonDownValue()) {
             if (_menuSelection < getMenuOptionCount(_menuState) - 1)
             {
                 _menuSelection++;
             }
             showMenuScreen();
-            break;
-
-        case BUTTON_SELECT:
+        }
+        else if (button == config->getButtonSelectValue()) {
             executeMenuSelection();
-            break;
-
-        case BUTTON_LEFT:
+        }
+        else if (button == config->getButtonLeftValue()) {
             exitMenu();
-            break;
         }
     }
 
@@ -308,12 +324,15 @@ namespace DeviceBridge::Components
         _inMenu = true;
         _menuState = MAIN_MENU;
         _menuSelection = 0;
+        _lastMessageTime = millis(); // Reset idle timer when entering menu
+        _showingTime = false; // Ensure we're not showing time
         showMenuScreen();
     }
 
     void DisplayManager::exitMenu()
     {
         _inMenu = false;
+        _showingTime = false; // Allow clock to refresh when idle
         showMainScreen();
     }
 

@@ -1,5 +1,7 @@
 #include "ParallelPortManager.h"
 #include "FileSystemManager.h"
+#include "DisplayManager.h"
+#include "../Common/ConfigurationService.h"
 #include <string.h>
 
 namespace DeviceBridge::Components {
@@ -21,7 +23,14 @@ bool ParallelPortManager::initialize() {
     return true;
 }
 
-void ParallelPortManager::update() { processData(); }
+void ParallelPortManager::update() { 
+    processData(); 
+    
+    // Check for critical buffer timeout
+    if (checkCriticalTimeout()) {
+        handleCriticalTimeout();
+    }
+}
 
 void ParallelPortManager::stop() {
     _fileInProgress = false;
@@ -92,6 +101,9 @@ void ParallelPortManager::processData() {
             _idleCounter = 0;
             _currentFileBytes = 0;
             _chunkIndex = 0;
+            
+            // Clear any remaining data in buffer to prevent corruption of next file
+            _port.clearBuffer();
         }
     }
 }
@@ -121,23 +133,24 @@ bool ParallelPortManager::detectEndOfFile() {
     }
 
     // Use millis() based timing for loop-based architecture
-    const uint32_t FILE_TIMEOUT_MS = 2000; // 2 second timeout
+    uint32_t fileTimeoutMs = getServices().getConfigurationService()->getKeepBusyMs(); // Use configured timeout
     uint32_t currentTime = millis();
     uint32_t timeSinceLastData = currentTime - _lastDataTime;
 
-    return timeSinceLastData >= FILE_TIMEOUT_MS;
+    return timeSinceLastData >= fileTimeoutMs;
 }
 
 uint16_t ParallelPortManager::getBufferLevel() const {
-    // Return approximate buffer fill level
-    if (_port.isFull()) {
-        return 512;
-    } else if (_port.isAlmostFull()) {
-        return 384; // 75%
-    } else if (_port.hasData()) {
-        return 128; // Estimate for "some data"
-    }
-    return 0;
+    // Return exact buffer fill level using the new getBufferSize method
+    return _port.getBufferSize();
+}
+
+bool ParallelPortManager::isBufferAlmostFull() const {
+    return _port.isAlmostFull();
+}
+
+bool ParallelPortManager::isBufferCriticallyFull() const {
+    return _port.isCriticallyFull();
 }
 
 uint32_t ParallelPortManager::getTotalBytesReceived() const { return _totalBytesReceived; }
@@ -163,6 +176,80 @@ void ParallelPortManager::setPrinterPaperOut(bool paperOut) { _port.setPaperOut(
 void ParallelPortManager::setPrinterSelect(bool select) { _port.setSelect(select); }
 
 void ParallelPortManager::sendPrinterAcknowledge() { _port.sendAcknowledge(); }
+
+void ParallelPortManager::clearBuffer() { 
+    _port.clearBuffer(); 
+    // Also reset internal state
+    _chunkIndex = 0;
+    _fileInProgress = false;
+    _idleCounter = 0;
+}
+
+uint16_t ParallelPortManager::getBufferSize() const { 
+    return _port.getBufferSize(); 
+}
+
+bool ParallelPortManager::isCriticalFlowControlActive() const {
+    return _port.isCriticalFlowControlActive();
+}
+
+bool ParallelPortManager::checkCriticalTimeout() const {
+    return _port.checkCriticalTimeout();
+}
+
+void ParallelPortManager::resetCriticalState() {
+    _port.resetCriticalState();
+}
+
+void ParallelPortManager::handleCriticalTimeout() {
+    // Critical buffer hasn't cleared in 20 seconds - emergency recovery
+    
+    // 1. Signal error to TDS2024 via printer status
+    _port.setError(true);    // Set ERROR signal active (goes LOW due to active-low nature)
+    _port.setPaperOut(true); // Set PAPER_OUT signal to indicate problem
+    
+    // 2. Send error to LCD and Serial
+    auto fileSystemManager = getServices().getFileSystemManager();
+    auto displayManager = getServices().getDisplayManager();
+    
+    Serial.print(F("\r\n*** CRITICAL BUFFER TIMEOUT ***\r\n"));
+    Serial.print(F("Buffer failed to clear in 20 seconds\r\n"));
+    Serial.print(F("Emergency recovery: Closing file and clearing buffer\r\n"));
+    
+    displayManager->displayMessage(Common::DisplayMessage::ERROR, F("Buffer Timeout!"));
+    displayManager->displayMessage(Common::DisplayMessage::ERROR, F("Emergency Clear"));
+    
+    // 3. Close current file if open
+    if (_fileInProgress) {
+        // Send end-of-file marker to properly close the file
+        Common::DataChunk endChunk;
+        memset(&endChunk, 0, sizeof(endChunk));
+        endChunk.isEndOfFile = 1;
+        endChunk.timestamp = millis();
+        
+        fileSystemManager->processDataChunk(endChunk);
+        
+        _fileInProgress = false;
+        _currentFileBytes = 0;
+        _chunkIndex = 0;
+        
+        Serial.print(F("Current file forcibly closed\r\n"));
+    }
+    
+    // 4. Clear buffer and reset critical state
+    _port.clearBuffer();
+    _port.resetCriticalState();
+    
+    // 5. Reset error signals after brief delay
+    delay(100);
+    _port.setError(false);   // Clear ERROR signal
+    _port.setPaperOut(false); // Clear PAPER_OUT signal
+    
+    Serial.print(F("Emergency recovery completed\r\n"));
+    Serial.print(F("System ready for new data\r\n"));
+    
+    displayManager->displayMessage(Common::DisplayMessage::INFO, F("Recovery Done"));
+}
 
 // IComponent interface implementation
 bool ParallelPortManager::selfTest() {

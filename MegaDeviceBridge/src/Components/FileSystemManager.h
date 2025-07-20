@@ -28,7 +28,7 @@ private:
     
     // EEPROM file management
     uint32_t _eepromCurrentAddress;
-    uint32_t _eepromWriteBuffer[64]; // 256-byte buffer (64 * 4 bytes)
+    uint32_t _eepromWriteBuffer[Common::Buffer::EEPROM_BUFFER_SIZE]; // 256-byte buffer (64 * 4 bytes)
     uint16_t _eepromBufferIndex;
     Common::StorageType _activeStorage;
     Common::StorageType _preferredStorage;
@@ -104,6 +104,8 @@ public:
     bool isSDWriteProtected() const;  // Write protect detection
     
 private:
+    // Helper methods
+    uint32_t countFilesRecursive(const char* dirPath) const;
     // Statistics
     uint32_t _totalBytesWritten;
     uint16_t _writeErrors;

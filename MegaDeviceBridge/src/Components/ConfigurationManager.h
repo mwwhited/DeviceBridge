@@ -37,7 +37,11 @@ private:
     void printLastFileInfo();
     void printStorageStatus();
     void handleTestWriteCommand(const String& command);
+    void handleTestWriteLongCommand(const String& command);
     void testPrinterProtocol();
+    void clearLPTBuffer();
+    void resetCriticalState();
+    void handleLCDThrottleCommand(const String& command);
     
     // Timing for updates
     unsigned long _lastCommandCheck;
@@ -56,10 +60,6 @@ public:
     const char* getComponentName() const override;
     bool validateDependencies() const override;
     void printDependencyStatus() const override;
-    
-    // Component management
-    void setComponentManagers(ParallelPortManager* ppm, FileSystemManager* fsm, 
-                             DisplayManager* dm, TimeManager* tm, SystemManager* sm);
     
     // Configuration interface
     void checkSerialCommands();

@@ -99,4 +99,135 @@ namespace Pins {
   constexpr uint8_t LPT_D7 = 39;
 }
 
+// Timing Configuration (Microseconds and Milliseconds)
+namespace Timing {
+  // Main loop intervals (milliseconds)
+  constexpr unsigned long PARALLEL_INTERVAL = 1;      // 1ms for real-time data capture
+  constexpr unsigned long FILESYSTEM_INTERVAL = 10;   // 10ms for file operations
+  constexpr unsigned long DISPLAY_INTERVAL = 100;     // 100ms for display updates
+  constexpr unsigned long TIME_INTERVAL = 1000;       // 1s for time operations
+  constexpr unsigned long SYSTEM_INTERVAL = 5000;     // 5s for system monitoring
+  constexpr unsigned long HEARTBEAT_INTERVAL = 500;   // 500ms for blink heartbeat LED
+  constexpr unsigned long CONFIGURATION_INTERVAL = 50; // 50ms for configuration/serial commands
+  
+  // Microsecond delays for hardware timing
+  constexpr uint16_t ACK_PULSE_US = 15;               // Extended pulse for reliable capture
+  constexpr uint16_t RECOVERY_DELAY_US = 2;           // Brief recovery time
+  constexpr uint16_t HARDWARE_DELAY_US = 3;           // General hardware timing
+  constexpr uint16_t TDS2024_TIMING_US = 2;           // Brief delay for TDS2024 timing stability
+  constexpr uint16_t FLOW_CONTROL_DELAY_US = 5;       // Flow control timing
+  constexpr uint16_t MODERATE_FLOW_DELAY_US = 25;     // Moderate delay to slow down sender
+  constexpr uint16_t CRITICAL_FLOW_DELAY_US = 50;     // Extended delay in critical state
+  
+  // Millisecond delays for recovery operations
+  constexpr uint16_t EMERGENCY_RECOVERY_MS = 100;     // Emergency recovery delay
+  constexpr uint16_t GENERAL_DELAY_MS = 100;          // General operation delay
+  constexpr uint16_t KEEP_BUSY_MS = 2000;             // Keep busy for operations
+  constexpr uint16_t SHORT_DELAY_MS = 500;            // Short delay operations
+}
+
+// Buffer and Memory Configuration
+namespace Buffer {
+  constexpr uint16_t RING_BUFFER_SIZE = 512;          // Main parallel port ring buffer
+  constexpr uint16_t EEPROM_BUFFER_SIZE = 64;         // EEPROM write buffer (64 * 4 bytes = 256 bytes)
+  constexpr uint32_t CRITICAL_TIMEOUT_MS = 20000;     // 20 seconds emergency timeout
+  
+  // Flow control thresholds (percentages as fractions)
+  constexpr uint8_t FLOW_CONTROL_60_PERCENT = 3;      // 3/5 = 60% threshold
+  constexpr uint8_t FLOW_CONTROL_60_DIVISOR = 5;
+  constexpr uint8_t FLOW_CONTROL_80_PERCENT = 4;      // 4/5 = 80% threshold  
+  constexpr uint8_t FLOW_CONTROL_80_DIVISOR = 5;
+  constexpr uint8_t FLOW_CONTROL_50_PERCENT = 1;      // 1/2 = 50% threshold
+  constexpr uint8_t FLOW_CONTROL_50_DIVISOR = 2;
+}
+
+// Button Configuration
+namespace Buttons {
+  // Analog threshold values for button detection
+  constexpr uint16_t BUTTON_RIGHT_VALUE = 0;
+  constexpr uint16_t BUTTON_UP_VALUE = 144;
+  constexpr uint16_t BUTTON_DOWN_VALUE = 329;
+  constexpr uint16_t BUTTON_LEFT_VALUE = 504;
+  constexpr uint16_t BUTTON_SELECT_VALUE = 741;
+  constexpr uint16_t BUTTON_NONE_VALUE = 1023;
+  
+  // Detection thresholds with tolerance
+  constexpr uint16_t RIGHT_THRESHOLD = 50;
+  constexpr uint16_t UP_THRESHOLD = 200;
+  constexpr uint16_t DOWN_THRESHOLD = 400;
+  constexpr uint16_t LEFT_THRESHOLD = 600;
+  constexpr uint16_t SELECT_THRESHOLD = 800;
+}
+
+// File Format Detection Constants
+namespace FileFormats {
+  // BMP file signature
+  constexpr uint8_t BMP_SIGNATURE_1 = 0x42;  // 'B'
+  constexpr uint8_t BMP_SIGNATURE_2 = 0x4D;  // 'M'
+  
+  // PCX file signature
+  constexpr uint8_t PCX_SIGNATURE = 0x0A;
+  
+  // TIFF file signatures (little-endian)
+  constexpr uint8_t TIFF_LE_1 = 0x49;  // 'I'
+  constexpr uint8_t TIFF_LE_2 = 0x49;  // 'I'
+  constexpr uint8_t TIFF_LE_3 = 0x2A;
+  constexpr uint8_t TIFF_LE_4 = 0x00;
+  
+  // TIFF file signatures (big-endian)
+  constexpr uint8_t TIFF_BE_1 = 0x4D;  // 'M'
+  constexpr uint8_t TIFF_BE_2 = 0x4D;  // 'M'
+  constexpr uint8_t TIFF_BE_3 = 0x00;
+  constexpr uint8_t TIFF_BE_4 = 0x2A;
+  
+  // PostScript file signature
+  constexpr uint8_t PS_SIGNATURE_1 = 0x25;  // '%'
+  constexpr uint8_t PS_SIGNATURE_2 = 0x21;  // '!'
+  
+  // ESC character for printer commands
+  constexpr uint8_t ESC_CHARACTER = 0x1B;
+}
+
+// W25Q128 Flash Memory Configuration
+namespace Flash {
+  // Command constants
+  constexpr uint8_t CMD_WRITE_ENABLE = 0x06;
+  constexpr uint8_t CMD_WRITE_DISABLE = 0x04;
+  constexpr uint8_t CMD_READ_STATUS = 0x05;
+  constexpr uint8_t CMD_WRITE_STATUS = 0x01;
+  constexpr uint8_t CMD_PAGE_PROGRAM = 0x02;
+  constexpr uint8_t CMD_SECTOR_ERASE = 0x20;
+  constexpr uint8_t CMD_BLOCK_ERASE_32K = 0x52;
+  constexpr uint8_t CMD_BLOCK_ERASE_64K = 0xD8;
+  constexpr uint8_t CMD_CHIP_ERASE = 0xC7;
+  constexpr uint8_t CMD_READ_DATA = 0x03;
+  constexpr uint8_t CMD_FAST_READ = 0x0B;
+  constexpr uint8_t CMD_READ_JEDEC_ID = 0x9F;
+  constexpr uint8_t CMD_POWER_DOWN = 0xB9;
+  constexpr uint8_t CMD_RELEASE_POWER_DOWN = 0xAB;
+  
+  // Memory layout constants
+  constexpr uint32_t PAGE_SIZE = 256;
+  constexpr uint32_t SECTOR_SIZE = 4096;  // 4KB
+  
+  // JEDEC ID for W25Q128
+  constexpr uint32_t W25Q128_JEDEC_ID = 0xEF4018;
+}
+
+// Display Refresh Configuration
+namespace DisplayRefresh {
+  constexpr uint32_t NORMAL_INTERVAL_MS = 100;        // Normal LCD refresh rate
+  constexpr uint32_t STORAGE_INTERVAL_MS = 500;       // Throttled refresh during storage operations
+  constexpr uint8_t LCD_WIDTH = 16;                   // LCD character width
+  constexpr uint8_t LCD_HEIGHT = 2;                   // LCD character height
+}
+
+// Flow Control State Management
+namespace FlowControl {
+  // Buffer level thresholds for adaptive flow control
+  constexpr uint8_t MODERATE_THRESHOLD_PERCENT = 60;   // Start moderate flow control
+  constexpr uint8_t CRITICAL_THRESHOLD_PERCENT = 80;   // Start critical flow control
+  constexpr uint8_t RECOVERY_THRESHOLD_PERCENT = 50;   // Recovery threshold
+}
+
 } // namespace DeviceBridge::Common

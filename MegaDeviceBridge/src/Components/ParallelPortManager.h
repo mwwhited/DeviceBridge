@@ -34,6 +34,9 @@ private:
     void processData();
     void sendChunk();
     
+    // Critical timeout handling
+    void handleCriticalTimeout();
+    
 public:
     ParallelPortManager(Parallel::Port& port);
     ~ParallelPortManager();
@@ -52,6 +55,8 @@ public:
     // Status inquiry
     bool isReceiving() const { return _fileInProgress; }
     uint16_t getBufferLevel() const;
+    bool isBufferAlmostFull() const;
+    bool isBufferCriticallyFull() const;
     
     // Statistics
     uint32_t getTotalBytesReceived() const;
@@ -72,6 +77,15 @@ public:
     void setPrinterPaperOut(bool paperOut);
     void setPrinterSelect(bool select);
     void sendPrinterAcknowledge();
+    
+    // Buffer management methods
+    void clearBuffer();
+    uint16_t getBufferSize() const;
+    
+    // Critical state management
+    bool isCriticalFlowControlActive() const;
+    bool checkCriticalTimeout() const;
+    void resetCriticalState();
     
 private:
     // Statistics tracking

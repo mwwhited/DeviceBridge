@@ -4,6 +4,7 @@
 #include "ParallelPortManager.h"
 #include "SystemManager.h"
 #include "TimeManager.h"
+#include "../Common/ConfigurationService.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -84,6 +85,8 @@ void ConfigurationManager::processCommand(const String &command) {
         printStorageStatus();
     } else if (command.equalsIgnoreCase(F("testwrite")) || command.startsWith(F("testwrite "))) {
         handleTestWriteCommand(command);
+    } else if (command.equalsIgnoreCase(F("testwritelong")) || command.startsWith(F("testwritelong "))) {
+        handleTestWriteLongCommand(command);
     } else if (command.startsWith(F("heartbeat "))) {
         handleHeartbeatCommand(command);
     } else if (command.startsWith(F("debug "))) {
@@ -98,6 +101,12 @@ void ConfigurationManager::processCommand(const String &command) {
         testInterruptPin();
     } else if (command.equalsIgnoreCase(F("testlpt")) || command.equalsIgnoreCase(F("testprinter"))) {
         testPrinterProtocol();
+    } else if (command.equalsIgnoreCase(F("clearbuffer")) || command.equalsIgnoreCase(F("clearport"))) {
+        clearLPTBuffer();
+    } else if (command.equalsIgnoreCase(F("resetcritical")) || command.equalsIgnoreCase(F("clearcritical"))) {
+        resetCriticalState();
+    } else if (command.startsWith(F("lcdthrottle "))) {
+        handleLCDThrottleCommand(command);
     } else if (command.startsWith(F("led "))) {
         handleLEDCommand(command);
     } else if (command.equalsIgnoreCase(F("files")) || command.equalsIgnoreCase(F("lastfile"))) {
@@ -131,6 +140,9 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  parallel/lpt      - Show parallel port status with hex data\r\n"));
     Serial.print(F("  testint           - Test interrupt pin response\r\n"));
     Serial.print(F("  testlpt           - Test LPT printer protocol signals\r\n"));
+    Serial.print(F("  clearbuffer       - Clear LPT data buffer and reset state\r\n"));
+    Serial.print(F("  resetcritical     - Reset critical flow control state\r\n"));
+    Serial.print(F("  lcdthrottle on/off - Control LCD refresh throttling for storage ops\r\n"));
     Serial.print(F("  led l1/l2 on/off  - Control L1 (LPT) and L2 (Write) LEDs\r\n"));
     Serial.print(F("  debug lcd on/off  - Enable/disable LCD debug output to serial\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
@@ -142,6 +154,7 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  storage serial    - Use serial transfer\r\n"));
     Serial.print(F("  storage auto      - Auto-select storage\r\n"));
     Serial.print(F("  testwrite         - Write test file to current storage\r\n"));
+    Serial.print(F("  testwritelong     - Write test file with multiple chunks (tests LED/buffer)\r\n"));
     Serial.print(F("\r\nSystem Commands:\r\n"));
     Serial.print(F("  heartbeat on/off  - Enable/disable serial heartbeat\r\n"));
     Serial.print(F("  restart/reset     - Restart the system\r\n"));
@@ -470,6 +483,8 @@ void ConfigurationManager::testPrinterProtocol() {
 void ConfigurationManager::printStorageStatus() {
     auto fileSystem = getServices().getFileSystemManager();
     auto systemManager = getServices().getSystemManager();
+    auto parallelPort = getServices().getParallelPortManager();
+    
     Serial.print(F("\r\n=== Storage Device Status ===\r\n"));
 
     Serial.print(F("SD Card: "));
@@ -490,6 +505,81 @@ void ConfigurationManager::printStorageStatus() {
 
     Serial.print(F("EEPROM: "));
     Serial.print(fileSystem->isEEPROMAvailable() ? F("Available") : F("Not Available"));
+    Serial.print(F("\r\n"));
+
+    // Add LPT buffer status for debugging data loss issues
+    auto config = getServices().getConfigurationService();
+    uint16_t bufferCapacity = config->getRingBufferSize();
+    uint16_t moderateThreshold = config->getModerateFlowThreshold(bufferCapacity);
+    uint16_t criticalThreshold = config->getCriticalFlowThreshold(bufferCapacity);
+    uint16_t recoveryThreshold = config->getRecoveryFlowThreshold(bufferCapacity);
+    
+    Serial.print(F("\r\n=== LPT Buffer Status ===\r\n"));
+    uint16_t bufferLevel = parallelPort->getBufferLevel();
+    Serial.print(F("Buffer Level: "));
+    Serial.print(bufferLevel);
+    Serial.print(F("/"));
+    Serial.print(bufferCapacity);
+    Serial.print(F(" bytes ("));
+    Serial.print((bufferLevel * 100) / bufferCapacity);
+    Serial.print(F("% full)\r\n"));
+    
+    Serial.print(F("Flow Control Thresholds:\r\n"));
+    Serial.print(F("  60% ("));
+    Serial.print(moderateThreshold);
+    Serial.print(F(" bytes): Moderate busy delay ("));
+    Serial.print(config->getModerateFlowDelayUs());
+    Serial.print(F("μs)\r\n"));
+    Serial.print(F("  80% ("));
+    Serial.print(criticalThreshold);
+    Serial.print(F(" bytes): Extended busy delay ("));
+    Serial.print(config->getCriticalFlowDelayUs());
+    Serial.print(F("μs)\r\n"));
+    
+    Serial.print(F("Buffer Status: "));
+    if (bufferLevel >= bufferCapacity) {
+        Serial.print(F("❌ FULL - DATA LOSS RISK!"));
+    } else if (bufferLevel >= criticalThreshold) {  // 80% threshold
+        Serial.print(F("🔴 CRITICAL - Extended flow control ("));
+        Serial.print(config->getCriticalFlowDelayUs());
+        Serial.print(F("μs)"));
+    } else if (bufferLevel >= moderateThreshold) {  // 60% threshold
+        Serial.print(F("⚠️  WARNING - Moderate flow control ("));
+        Serial.print(config->getModerateFlowDelayUs());
+        Serial.print(F("μs)"));
+    } else if (bufferLevel >= recoveryThreshold) {  // 50% threshold
+        Serial.print(F("🟡 ELEVATED - Ready for flow control"));
+    } else if (bufferLevel > 0) {
+        Serial.print(F("✅ Normal - Data available"));
+    } else {
+        Serial.print(F("✅ Empty"));
+    }
+    Serial.print(F("\r\n"));
+    
+    // Add critical state information
+    if (parallelPort->isCriticalFlowControlActive()) {
+        Serial.print(F("⚠️  CRITICAL FLOW CONTROL ACTIVE\r\n"));
+        Serial.print(F("Critical State Duration: "));
+        // Calculate duration (approximation)
+        Serial.print(F("Active\r\n"));
+    }
+    
+    // Add interrupt statistics
+    Serial.print(F("Interrupt Count: "));
+    Serial.print(parallelPort->getInterruptCount());
+    Serial.print(F("\r\n"));
+    Serial.print(F("Data Count: "));
+    Serial.print(parallelPort->getDataCount());
+    Serial.print(F("\r\n"));
+    
+    // Add LCD refresh status
+    auto displayManager = getServices().getDisplayManager();
+    Serial.print(F("\r\n=== LCD Refresh Status ===\r\n"));
+    Serial.print(F("Storage Operation Active: "));
+    Serial.print(displayManager->isStorageOperationActive() ? F("YES") : F("NO"));
+    Serial.print(F("\r\n"));
+    Serial.print(F("Current Refresh Rate: "));
+    Serial.print(displayManager->isStorageOperationActive() ? F("500ms (Throttled)") : F("100ms (Normal)"));
     Serial.print(F("\r\n"));
 
     Serial.print(F("Active Storage: "));
@@ -617,6 +707,126 @@ void ConfigurationManager::handleTestWriteCommand(const String &command) {
 
     Serial.print(F("Test write completed.\r\n"));
     Serial.print(F("=======================\r\n\r\n"));
+}
+
+void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
+    auto fileSystem = getServices().getFileSystemManager();
+    auto timeManager = getServices().getTimeManager();
+    auto systemManager = getServices().getSystemManager();
+    
+    Serial.print(F("\r\n=== Long Test File Write (Multiple Chunks) ===\r\n"));
+    
+    // Parse optional chunk count parameter (default 10)
+    int chunkCount = 10;
+    if (command.length() > 14) { // "testwritelong "
+        String param = command.substring(14);
+        param.trim();
+        if (param.length() > 0) {
+            chunkCount = param.toInt();
+            if (chunkCount < 1 || chunkCount > 500) {
+                chunkCount = 10; // Safe default
+            }
+        }
+    }
+    
+    Serial.print(F("Chunks to write: "));
+    Serial.print(chunkCount);
+    Serial.print(F("\r\n"));
+    
+    // Create base test data with timestamp
+    char baseData[48];
+    if (timeManager->isRTCAvailable()) {
+        char timeBuffer[32];
+        timeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
+        snprintf(baseData, sizeof(baseData), "LONG-TEST %s", timeBuffer);
+    } else {
+        snprintf(baseData, sizeof(baseData), "LONG-TEST %lu", millis());
+    }
+    
+    Serial.print(F("Base Data: "));
+    Serial.print(baseData);
+    Serial.print(F("\r\n"));
+    Serial.print(F("Active Storage: "));
+    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Writing long test file...\r\n"));
+    Serial.print(F("Watch L2 LED for activity!\r\n"));
+    
+    // First chunk - new file
+    Common::DataChunk chunk;
+    memset(&chunk, 0, sizeof(chunk));
+    
+    chunk.isNewFile = 1;
+    chunk.isEndOfFile = 0;
+    chunk.timestamp = millis();
+    
+    // Create first chunk data
+    char chunkData[80];
+    snprintf(chunkData, sizeof(chunkData), "%s - Chunk 1/%d - Memory: %d\r\n", 
+             baseData, chunkCount, systemManager->getFreeMemory());
+    chunk.length = strlen(chunkData);
+    strncpy((char *)chunk.data, chunkData, sizeof(chunk.data) - 1);
+    
+    // Process first chunk (creates file)
+    fileSystem->processDataChunk(chunk);
+    Serial.print(F("Chunk 1 written\r\n"));
+    
+    // Write remaining chunks with delays to show L2 LED activity
+    for (int i = 2; i <= chunkCount; i++) {
+        delay(100); // 100ms delay between chunks to make LED visible
+        
+        // Prepare next chunk
+        memset(&chunk, 0, sizeof(chunk));
+        chunk.isNewFile = 0;
+        chunk.isEndOfFile = 0;
+        chunk.timestamp = millis();
+        
+        snprintf(chunkData, sizeof(chunkData), "%s - Chunk %d/%d - Free: %d\r\n", 
+                 baseData, i, chunkCount, systemManager->getFreeMemory());
+        chunk.length = strlen(chunkData);
+        strncpy((char *)chunk.data, chunkData, sizeof(chunk.data) - 1);
+        
+        // Process chunk
+        fileSystem->processDataChunk(chunk);
+        
+        Serial.print(F("Chunk "));
+        Serial.print(i);
+        Serial.print(F(" written\r\n"));
+    }
+    
+    // Final chunk - end of file
+    delay(100);
+    memset(&chunk, 0, sizeof(chunk));
+    chunk.isNewFile = 0;
+    chunk.isEndOfFile = 1;
+    chunk.length = 0;
+    chunk.timestamp = millis();
+    
+    // Process end chunk (closes file)
+    fileSystem->processDataChunk(chunk);
+    
+    // Check final status
+    Serial.print(F("Write errors after completion: "));
+    Serial.print(fileSystem->getWriteErrors());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Final Storage Used: "));
+    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Files Now Stored: "));
+    Serial.print(fileSystem->getFilesStored());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("New file: "));
+    Serial.print(fileSystem->getCurrentFilename());
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Long test write completed - "));
+    Serial.print(chunkCount);
+    Serial.print(F(" chunks written.\r\n"));
+    Serial.print(F("===============================================\r\n\r\n"));
 }
 
 void ConfigurationManager::printLastFileInfo() {
@@ -795,26 +1005,50 @@ void ConfigurationManager::handleListCommand(const String &command) {
 
         Serial.print(F("SD Card Files:\r\n"));
 
-        while (true) {
-            File entry = root.openNextFile();
-            if (!entry) {
-                break; // No more files
-            }
+       while (true) {
+    File entry = root.openNextFile();
+    if (!entry) break;
 
-            if (!entry.isDirectory()) {
-                fileCount++;
-                uint32_t fileSize = entry.size();
-                totalSize += fileSize;
+    if (entry.isDirectory()) {
+        Serial.print(F("Dir: "));
+        Serial.println(entry.name());
 
-                // Print filename with size
-                Serial.print(F("  "));
-                Serial.print(entry.name());
-                Serial.print(F(" ("));
-                Serial.print(fileSize);
-                Serial.print(F(" bytes)\r\n"));
+        File subDir = SD.open(entry.name());
+        if (subDir && subDir.isDirectory()) {
+            while (true) {
+                File subEntry = subDir.openNextFile();
+                if (!subEntry) break;
+
+                if (!subEntry.isDirectory()) {
+                    fileCount++;
+                    uint32_t fileSize = subEntry.size();
+                    totalSize += fileSize;
+
+                    Serial.print(F("  "));
+                    Serial.print(subEntry.name());
+                    Serial.print(F(" ("));
+                    Serial.print(fileSize);
+                    Serial.println(F(" bytes)"));
+                }
+                subEntry.close();
             }
-            entry.close();
+            subDir.close();
+        } else {
+            Serial.println(F("Failed to open subdirectory"));
         }
+    } else {
+        fileCount++;
+        uint32_t fileSize = entry.size();
+        totalSize += fileSize;
+
+        Serial.print(F("  "));
+        Serial.print(entry.name());
+        Serial.print(F(" ("));
+        Serial.print(fileSize);
+        Serial.println(F(" bytes)"));
+    }
+    entry.close();
+}
 
         root.close();
 
@@ -867,6 +1101,94 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
         Serial.print(F("  debug lcd off    - Disable LCD message mirroring\r\n"));
         Serial.print(F("  debug lcd status - Show current LCD debug status\r\n"));
     }
+}
+
+void ConfigurationManager::clearLPTBuffer() {
+    auto parallelPort = getServices().getParallelPortManager();
+    auto displayManager = getServices().getDisplayManager();
+    
+    Serial.print(F("\r\n=== Clearing LPT Buffer ===\r\n"));
+    
+    // Show buffer status before clearing
+    uint16_t bufferLevel = parallelPort->getBufferLevel();
+    Serial.print(F("Buffer level before: "));
+    Serial.print(bufferLevel);
+    Serial.print(F("/512 bytes\r\n"));
+    
+    // Clear the buffer
+    parallelPort->clearBuffer();
+    
+    // Show buffer status after clearing
+    bufferLevel = parallelPort->getBufferLevel();
+    Serial.print(F("Buffer level after: "));
+    Serial.print(bufferLevel);
+    Serial.print(F("/512 bytes\r\n"));
+    
+    Serial.print(F("LPT buffer cleared successfully\r\n"));
+    Serial.print(F("===========================\r\n"));
+    
+    displayManager->displayMessage(Common::DisplayMessage::INFO, F("Buffer Cleared"));
+}
+
+void ConfigurationManager::resetCriticalState() {
+    auto parallelPort = getServices().getParallelPortManager();
+    auto displayManager = getServices().getDisplayManager();
+    
+    Serial.print(F("\r\n=== Resetting Critical State ===\r\n"));
+    
+    bool wasCritical = parallelPort->isCriticalFlowControlActive();
+    
+    // Reset the critical state
+    parallelPort->resetCriticalState();
+    
+    Serial.print(F("Critical flow control state: "));
+    Serial.print(wasCritical ? F("WAS ACTIVE - Now Reset") : F("Was not active"));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Buffer and flow control reset\r\n"));
+    Serial.print(F("===============================\r\n"));
+    
+    if (wasCritical) {
+        displayManager->displayMessage(Common::DisplayMessage::INFO, F("Critical Reset"));
+    } else {
+        displayManager->displayMessage(Common::DisplayMessage::INFO, F("No Critical State"));
+    }
+}
+
+void ConfigurationManager::handleLCDThrottleCommand(const String& command) {
+    auto displayManager = getServices().getDisplayManager();
+    String params = command.substring(12); // Remove "lcdthrottle "
+    params.trim();
+    params.toLowerCase();
+    
+    Serial.print(F("\r\n=== LCD Throttle Control ===\r\n"));
+    
+    if (params == F("on") || params == F("enable") || params == F("true")) {
+        displayManager->setStorageOperationActive(true);
+        Serial.print(F("LCD refresh throttled to 500ms\r\n"));
+        Serial.print(F("Storage operation mode: ACTIVE\r\n"));
+        displayManager->displayMessage(Common::DisplayMessage::INFO, F("LCD Throttled"));
+    } else if (params == F("off") || params == F("disable") || params == F("false")) {
+        displayManager->setStorageOperationActive(false);
+        Serial.print(F("LCD refresh restored to 100ms\r\n"));
+        Serial.print(F("Storage operation mode: INACTIVE\r\n"));
+        displayManager->displayMessage(Common::DisplayMessage::INFO, F("LCD Normal"));
+    } else if (params == F("status")) {
+        bool isThrottled = displayManager->isStorageOperationActive();
+        Serial.print(F("Storage Operation Active: "));
+        Serial.print(isThrottled ? F("YES") : F("NO"));
+        Serial.print(F("\r\n"));
+        Serial.print(F("Current Refresh Rate: "));
+        Serial.print(isThrottled ? F("500ms (Throttled)") : F("100ms (Normal)"));
+        Serial.print(F("\r\n"));
+    } else {
+        Serial.print(F("Usage: lcdthrottle [on|off|status]\r\n"));
+        Serial.print(F("  on/enable  - Throttle LCD to 500ms refresh\r\n"));
+        Serial.print(F("  off/disable - Restore LCD to 100ms refresh\r\n"));
+        Serial.print(F("  status     - Show current throttle status\r\n"));
+    }
+    
+    Serial.print(F("============================\r\n"));
 }
 
 // IComponent interface implementation

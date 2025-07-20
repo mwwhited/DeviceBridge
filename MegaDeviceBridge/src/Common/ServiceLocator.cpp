@@ -5,6 +5,7 @@
 #include "../Components/TimeManager.h"
 #include "../Components/SystemManager.h"
 #include "../Components/ConfigurationManager.h"
+#include "ConfigurationService.h"
 #include "../User/Display.h"
 #include <Arduino.h>
 
@@ -20,6 +21,7 @@ ServiceLocator::ServiceLocator()
     , _timeManager(nullptr)
     , _systemManager(nullptr)
     , _configurationManager(nullptr)
+    , _configurationService(nullptr)
     , _display(nullptr)
 {
 }
@@ -65,6 +67,10 @@ void ServiceLocator::registerConfigurationManager(Components::ConfigurationManag
     _configurationManager = manager;
 }
 
+void ServiceLocator::registerConfigurationService(Common::ConfigurationService* service) {
+    _configurationService = service;
+}
+
 void ServiceLocator::registerDisplay(User::Display* display) {
     _display = display;
 }
@@ -92,6 +98,10 @@ Components::SystemManager* ServiceLocator::getSystemManager() const {
 
 Components::ConfigurationManager* ServiceLocator::getConfigurationManager() const {
     return _configurationManager;
+}
+
+Common::ConfigurationService* ServiceLocator::getConfigurationService() const {
+    return _configurationService;
 }
 
 User::Display* ServiceLocator::getDisplay() const {
@@ -124,6 +134,9 @@ bool ServiceLocator::validateAllDependencies() const {
     
     printComponentStatus(F("ConfigurationManager"), _configurationManager);
     if (!_configurationManager) allValid = false;
+    
+    printComponentStatus(F("ConfigurationService"), _configurationService);
+    if (!_configurationService) allValid = false;
     
     Serial.print(F("\r\nDependency Validation: "));
     if (allValid) {

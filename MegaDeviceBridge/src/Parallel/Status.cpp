@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <Arduino.h>
 #include "Status.h"
+#include "../Common/ServiceLocator.h"
+#include "../Common/ConfigurationService.h"
 
 namespace DeviceBridge::Parallel
 {
@@ -58,10 +60,12 @@ namespace DeviceBridge::Parallel
   }
 
   void Status::sendAcknowledgePulse() {
-    // Send a brief acknowledge pulse
+    // Send proper acknowledge pulse for TDS2024 timing
+    // TDS2024 requires minimum 10μs acknowledge pulse width
     digitalWrite(_acknowledge, false);
-    delayMicroseconds(5);  // Brief pulse
+    delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getAckPulseUs());  // Extended pulse for reliable capture
     digitalWrite(_acknowledge, true);
+    delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getRecoveryDelayUs());   // Brief recovery time
   }
 
   void Status::setError(bool error) {
