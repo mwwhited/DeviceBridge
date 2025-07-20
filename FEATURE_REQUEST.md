@@ -1,20 +1,11 @@
-- check the timing diagram of a LPT port
-- this device should be working as a printer.  the device should report as busy while it is doing anything other than reading from the lpt port.
-- update testint to include the hex value of the data lines as well as all of the data control lines for both in and out
-- Each component should have a self test that is used by the validate test function
-  - one of the steps in the self test should make sure the objects are properly initialized and have no null pointers from required components.
-- the serial menu needs the ability to write the current configuration to the eeprom on the arduino
-- when the ring buffer is nearly full the lpt port should hold the busy pin high giving time for other devices to write out the content
-- devices that require interrupts or dma such as serial and spi should have the ability to force lpt to be busy.  
-  - add a lock/unlock to lpt
-- create a service locator class that can hold instances of all component objects
-  - inject the service locator into each class at construction
-  - only allow communication between components though the references on the service locator
-- instead of using EEFS use LittleFS for the EEPROM
-- serial commands
-  - add list {device} commands for listing files devices
-  - add get {device} {filename} command for downloading a file from the device over serial
-  - add delete {device} {filename} command for removing a file from device
-- all pinouts should be defined on `src\Common\Config.h`.  
-- all configuration such as pinouts for devices should be injected though a configuration object
-  - currently 
+- refactor file system
+  - create an interface for each file system supported by FileSystemManager
+  - refactor each filesystem to its own class
+  - import the supported file sytems into file system manager
+- improve debugging
+  - add a port buffer size to storage status
+- something is wrong with the buffer.  after the file closes or there is a long wait the buffer should be cleared and the file should be ensured closed
+- I was finally able to extract and image after putting the files into directories.  but the bmp was skewed.  this tells me some of the data in the buffer was being lost.
+- check the timing for the lpt port.  you might want to stretch the times especially the busy/ack while reading the bytes.  this should allow for better capture of each byte
+- I need the ability to set all configuration from the serial
+  - need the ability to get/set all menu options like file type

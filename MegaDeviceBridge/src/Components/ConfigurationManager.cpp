@@ -795,26 +795,50 @@ void ConfigurationManager::handleListCommand(const String &command) {
 
         Serial.print(F("SD Card Files:\r\n"));
 
-        while (true) {
-            File entry = root.openNextFile();
-            if (!entry) {
-                break; // No more files
-            }
+       while (true) {
+    File entry = root.openNextFile();
+    if (!entry) break;
 
-            if (!entry.isDirectory()) {
-                fileCount++;
-                uint32_t fileSize = entry.size();
-                totalSize += fileSize;
+    if (entry.isDirectory()) {
+        Serial.print(F("Dir: "));
+        Serial.println(entry.name());
 
-                // Print filename with size
-                Serial.print(F("  "));
-                Serial.print(entry.name());
-                Serial.print(F(" ("));
-                Serial.print(fileSize);
-                Serial.print(F(" bytes)\r\n"));
+        File subDir = SD.open(entry.name());
+        if (subDir && subDir.isDirectory()) {
+            while (true) {
+                File subEntry = subDir.openNextFile();
+                if (!subEntry) break;
+
+                if (!subEntry.isDirectory()) {
+                    fileCount++;
+                    uint32_t fileSize = subEntry.size();
+                    totalSize += fileSize;
+
+                    Serial.print(F("  "));
+                    Serial.print(subEntry.name());
+                    Serial.print(F(" ("));
+                    Serial.print(fileSize);
+                    Serial.println(F(" bytes)"));
+                }
+                subEntry.close();
             }
-            entry.close();
+            subDir.close();
+        } else {
+            Serial.println(F("Failed to open subdirectory"));
         }
+    } else {
+        fileCount++;
+        uint32_t fileSize = entry.size();
+        totalSize += fileSize;
+
+        Serial.print(F("  "));
+        Serial.print(entry.name());
+        Serial.print(F(" ("));
+        Serial.print(fileSize);
+        Serial.println(F(" bytes)"));
+    }
+    entry.close();
+}
 
         root.close();
 
