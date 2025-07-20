@@ -14,6 +14,9 @@
 
 The original intention of this device is to bridge the old world line printer port world of the Tektronics TDS2024 with the more modern world of USB. This project is loosly based on the work from [Boriz](https://github.com/boriz/CentronicsArduino) but is a total rewrite of my own design.
 
+![Device Bridge](IMG_9864.jpg)
+
+
 ## Table of Contents
 
 * [Line Printer Terminal](./LinePrinterPort.md)
