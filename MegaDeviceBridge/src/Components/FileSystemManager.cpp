@@ -1,6 +1,7 @@
 #include "FileSystemManager.h"
 #include "DisplayManager.h"
 #include "TimeManager.h"
+#include "ParallelPortManager.h"
 #include <string.h>
 #include <stdio.h>
 #include <Arduino.h>
@@ -10,6 +11,7 @@ namespace DeviceBridge::Components {
 FileSystemManager::FileSystemManager()
     : _displayManager(nullptr)
     , _timeManager(nullptr)
+    , _parallelPortManager(nullptr)
     , _eeprom(Common::Pins::EEPROM_CS)
     , _sdAvailable(false)
     , _eepromAvailable(false)
@@ -160,8 +162,18 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
     switch (_activeStorage.value) {
         case Common::StorageType::SD_CARD:
             if (_currentFile) {
+                // Lock LPT port during SPI operations to prevent interference
+                if (_parallelPortManager) {
+                    _parallelPortManager->lockPort();
+                }
+                
                 size_t written = _currentFile.write(chunk.data, chunk.length);
                 _currentFile.flush(); // Ensure data is written
+                
+                // Unlock LPT port
+                if (_parallelPortManager) {
+                    _parallelPortManager->unlockPort();
+                }
                 
                 if (written == chunk.length) {
                     _totalBytesWritten += chunk.length;

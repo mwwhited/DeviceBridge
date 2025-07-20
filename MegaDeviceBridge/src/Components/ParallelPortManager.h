@@ -56,6 +56,18 @@ public:
     uint32_t getInterruptCount() const;
     uint32_t getDataCount() const;
     
+    // LPT locking for SPI/Serial operations
+    void lockPort();
+    void unlockPort();
+    bool isPortLocked() const;
+    
+    // Printer protocol test methods
+    void setPrinterBusy(bool busy);
+    void setPrinterError(bool error);
+    void setPrinterPaperOut(bool paperOut);
+    void setPrinterSelect(bool select);
+    void sendPrinterAcknowledge();
+    
 private:
     // Statistics tracking
     uint32_t _totalBytesReceived;

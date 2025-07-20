@@ -27,6 +27,7 @@ private:
     void handleTimeSetCommand(const String& command);
     void handleStorageCommand(const String& command);
     void handleHeartbeatCommand(const String& command);
+    void handleLEDCommand(const String& command);
     
     // Command output methods
     void printHelpMenu();
@@ -38,6 +39,7 @@ private:
     void printLastFileInfo();
     void printStorageStatus();
     void handleTestWriteCommand(const String& command);
+    void testPrinterProtocol();
     
     // Timing for updates
     unsigned long _lastCommandCheck;

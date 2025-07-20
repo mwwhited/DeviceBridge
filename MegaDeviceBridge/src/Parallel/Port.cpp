@@ -19,7 +19,8 @@ namespace DeviceBridge::Parallel
                             _buffer(),
                             _whichIsr(_isrSeed++),
                             _interruptCount(0),
-                            _dataCount(0)
+                            _dataCount(0),
+                            _locked(false)
   {
   }
 
@@ -27,6 +28,11 @@ namespace DeviceBridge::Parallel
   {
     // Count all interrupt calls for debugging
     _interruptCount++;
+    
+    // Check if port is locked (SPI/Serial operations in progress)
+    if (_locked) {
+      return; // Ignore data while locked
+    }
     
     // TDS2024 strobe pulses are very fast - on FALLING edge, capture data immediately
     // Don't check strobe state as it returns to HIGH before we can read it
@@ -40,11 +46,18 @@ namespace DeviceBridge::Parallel
     // Read the data byte from parallel port
     uint8_t value = _data.readValue();
     
-    // Set acknowledge to confirm data received
-    _status.setAck();
-
     // Store data in ring buffer for processing
     _buffer.push(value);
+    
+    // Send acknowledge pulse to confirm data received
+    sendAcknowledge();
+    
+    // Check if buffer is getting full and set busy accordingly
+    if (isAlmostFull()) {
+      setBusy(true);  // Hold busy high to slow down sender
+    } else {
+      setBusy(false); // Clear busy when buffer has space
+    }
   }
 
   byte Port::_isrSeed = 0;
@@ -124,6 +137,26 @@ namespace DeviceBridge::Parallel
       }
     }
     return cnt;
+  }
+
+  void Port::setBusy(bool busy) {
+    _status.setBusy(busy);
+  }
+
+  void Port::setError(bool error) {
+    _status.setError(error);
+  }
+
+  void Port::setPaperOut(bool paperOut) {
+    _status.setPaperOut(paperOut);
+  }
+
+  void Port::setSelect(bool select) {
+    _status.setSelect(select);
+  }
+
+  void Port::sendAcknowledge() {
+    _status.sendAcknowledgePulse();
   }
 
   /*

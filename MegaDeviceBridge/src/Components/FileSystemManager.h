@@ -11,11 +11,13 @@ namespace DeviceBridge::Components {
 // Forward declarations for callbacks
 class DisplayManager;
 class TimeManager;
+class ParallelPortManager;
 
 class FileSystemManager {
 private:
     DisplayManager* _displayManager;
     TimeManager* _timeManager;
+    ParallelPortManager* _parallelPortManager;
     
     // Storage instances  
     File _currentFile;
@@ -67,6 +69,7 @@ public:
     // Set callback for display messages
     void setDisplayManager(DisplayManager* manager) { _displayManager = manager; }
     void setTimeManager(TimeManager* manager) { _timeManager = manager; }
+    void setParallelPortManager(ParallelPortManager* manager) { _parallelPortManager = manager; }
     
     // Lifecycle management
     bool initialize();

@@ -170,4 +170,36 @@ uint32_t ParallelPortManager::getDataCount() const {
     return _port.getDataCount();
 }
 
+void ParallelPortManager::lockPort() {
+    _port.lock();
+}
+
+void ParallelPortManager::unlockPort() {
+    _port.unlock();
+}
+
+bool ParallelPortManager::isPortLocked() const {
+    return _port.isLocked();
+}
+
+void ParallelPortManager::setPrinterBusy(bool busy) {
+    _port.setBusy(busy);
+}
+
+void ParallelPortManager::setPrinterError(bool error) {
+    _port.setError(error);
+}
+
+void ParallelPortManager::setPrinterPaperOut(bool paperOut) {
+    _port.setPaperOut(paperOut);
+}
+
+void ParallelPortManager::setPrinterSelect(bool select) {
+    _port.setSelect(select);
+}
+
+void ParallelPortManager::sendPrinterAcknowledge() {
+    _port.sendAcknowledge();
+}
+
 } // namespace DeviceBridge::Components

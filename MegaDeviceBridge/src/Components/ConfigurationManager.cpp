@@ -93,6 +93,12 @@ void ConfigurationManager::processCommand(const String& command) {
     } else if (command.equalsIgnoreCase(F("testint")) || command.equalsIgnoreCase(F("testinterrupt"))) {
         testInterruptPin();
         
+    } else if (command.equalsIgnoreCase(F("testlpt")) || command.equalsIgnoreCase(F("testprinter"))) {
+        testPrinterProtocol();
+        
+    } else if (command.startsWith(F("led "))) {
+        handleLEDCommand(command);
+        
     } else if (command.equalsIgnoreCase(F("files")) || command.equalsIgnoreCase(F("lastfile"))) {
         printLastFileInfo();
         
@@ -124,6 +130,8 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  buttons           - Show button analog values\r\n"));
     Serial.print(F("  parallel/lpt      - Show parallel port status with hex data\r\n"));
     Serial.print(F("  testint           - Test interrupt pin response\r\n"));
+    Serial.print(F("  testlpt           - Test LPT printer protocol signals\r\n"));
+    Serial.print(F("  led l1/l2 on/off  - Control L1 (LPT) and L2 (Write) LEDs\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage           - Show storage/hardware status\r\n"));
@@ -420,6 +428,58 @@ void ConfigurationManager::testInterruptPin() {
     Serial.print(F("==============================\r\n\r\n"));
 }
 
+void ConfigurationManager::testPrinterProtocol() {
+    Serial.print(F("\r\n=== Testing LPT Printer Protocol ===\r\n"));
+    Serial.print(F("Testing busy/acknowledge signaling for 5 seconds...\r\n"));
+    
+    if (!_parallelPortManager) {
+        Serial.print(F("ParallelPortManager not available\r\n"));
+        return;
+    }
+    
+    // Test sequence: Set various printer states
+    Serial.print(F("Setting printer to READY state...\r\n"));
+    _parallelPortManager->setPrinterBusy(false);
+    _parallelPortManager->setPrinterError(false);
+    _parallelPortManager->setPrinterPaperOut(false);
+    _parallelPortManager->setPrinterSelect(true);
+    delay(500);
+    
+    Serial.print(F("Testing BUSY signal (should block TDS2024)...\r\n"));
+    _parallelPortManager->setPrinterBusy(true);
+    delay(2000);  // Keep busy for 2 seconds
+    _parallelPortManager->setPrinterBusy(false);
+    Serial.print(F("BUSY signal cleared\r\n"));
+    
+    Serial.print(F("Testing ERROR signal...\r\n"));
+    _parallelPortManager->setPrinterError(true);
+    delay(500);
+    _parallelPortManager->setPrinterError(false);
+    Serial.print(F("ERROR signal cleared\r\n"));
+    
+    Serial.print(F("Testing SELECT signal...\r\n"));
+    _parallelPortManager->setPrinterSelect(false);
+    delay(500);
+    _parallelPortManager->setPrinterSelect(true);
+    Serial.print(F("SELECT signal restored\r\n"));
+    
+    Serial.print(F("Testing ACKNOWLEDGE pulse...\r\n"));
+    for (int i = 0; i < 3; i++) {
+        _parallelPortManager->sendPrinterAcknowledge();
+        delay(100);
+    }
+    Serial.print(F("ACK pulses sent\r\n"));
+    
+    Serial.print(F("Returning to READY state...\r\n"));
+    _parallelPortManager->setPrinterBusy(false);
+    _parallelPortManager->setPrinterError(false);
+    _parallelPortManager->setPrinterPaperOut(false);
+    _parallelPortManager->setPrinterSelect(true);
+    
+    Serial.print(F("LPT Printer Protocol test completed.\r\n"));
+    Serial.print(F("=====================================\r\n\r\n"));
+}
+
 void ConfigurationManager::printStorageStatus() {
     Serial.print(F("\r\n=== Storage Device Status ===\r\n"));
     
@@ -430,11 +490,15 @@ void ConfigurationManager::printStorageStatus() {
         
         Serial.print(F("SD Card Present: "));
         Serial.print(_fileSystemManager->isSDCardPresent() ? F("YES") : F("NO"));
-        Serial.print(F("\r\n"));
+        Serial.print(F(" (CD Pin 36: "));
+        Serial.print(digitalRead(Common::Pins::SD_CD) ? F("Missing") : F("Detected"));
+        Serial.print(F(")\r\n"));
         
         Serial.print(F("SD Write Protected: "));
         Serial.print(_fileSystemManager->isSDWriteProtected() ? F("YES") : F("NO"));
-        Serial.print(F("\r\n"));
+        Serial.print(F(" (WP Pin 34: "));
+        Serial.print(digitalRead(Common::Pins::SD_WP) ? F("Protected") : F("Unprotected"));
+        Serial.print(F(")\r\n"));
         
         Serial.print(F("EEPROM: "));
         Serial.print(_fileSystemManager->isEEPROMAvailable() ? F("Available") : F("Not Available"));
@@ -472,6 +536,14 @@ void ConfigurationManager::printStorageStatus() {
     
     Serial.print(F("L2 LED (Pin 32): "));
     Serial.print(digitalRead(Common::Pins::DATA_WRITE_LED) ? F("ON") : F("OFF"));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("SD Card Detect (Pin 36): "));
+    Serial.print(digitalRead(Common::Pins::SD_CD) ? F("Missing") : F("Detected"));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("SD Write Protect (Pin 34): "));
+    Serial.print(digitalRead(Common::Pins::SD_WP) ? F("Protected") : F("Unprotected"));
     Serial.print(F("\r\n"));
     
     Serial.print(F("=============================\r\n\r\n"));
@@ -641,6 +713,75 @@ void ConfigurationManager::handleHeartbeatCommand(const String& command) {
         Serial.print(F("  on/enable/true/1  - Enable serial heartbeat\r\n"));
         Serial.print(F("  off/disable/false/0 - Disable serial heartbeat\r\n"));
         Serial.print(F("  status - Show current status\r\n"));
+    }
+}
+
+void ConfigurationManager::handleLEDCommand(const String& command) {
+    // Expected format: "led l1 on", "led l2 off", "led status"
+    String params = command.substring(4); // Remove "led "
+    params.trim();
+    params.toLowerCase();
+    
+    if (params.startsWith(F("l1 "))) {
+        String action = params.substring(3);
+        action.trim();
+        
+        if (action == F("on") || action == F("1") || action == F("true")) {
+            digitalWrite(Common::Pins::LPT_READ_LED, HIGH);
+            Serial.print(F("L1 LED (LPT Read Activity) turned ON\r\n"));
+            if (_displayManager) {
+                _displayManager->displayMessage(Common::DisplayMessage::INFO, F("L1 LED ON"));
+            }
+        } else if (action == F("off") || action == F("0") || action == F("false")) {
+            digitalWrite(Common::Pins::LPT_READ_LED, LOW);
+            Serial.print(F("L1 LED (LPT Read Activity) turned OFF\r\n"));
+            if (_displayManager) {
+                _displayManager->displayMessage(Common::DisplayMessage::INFO, F("L1 LED OFF"));
+            }
+        } else {
+            Serial.print(F("Invalid action for L1. Use: led l1 on/off\r\n"));
+        }
+        
+    } else if (params.startsWith(F("l2 "))) {
+        String action = params.substring(3);
+        action.trim();
+        
+        if (action == F("on") || action == F("1") || action == F("true")) {
+            digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
+            Serial.print(F("L2 LED (Data Write Activity) turned ON\r\n"));
+            if (_displayManager) {
+                _displayManager->displayMessage(Common::DisplayMessage::INFO, F("L2 LED ON"));
+            }
+        } else if (action == F("off") || action == F("0") || action == F("false")) {
+            digitalWrite(Common::Pins::DATA_WRITE_LED, LOW);
+            Serial.print(F("L2 LED (Data Write Activity) turned OFF\r\n"));
+            if (_displayManager) {
+                _displayManager->displayMessage(Common::DisplayMessage::INFO, F("L2 LED OFF"));
+            }
+        } else {
+            Serial.print(F("Invalid action for L2. Use: led l2 on/off\r\n"));
+        }
+        
+    } else if (params == F("status")) {
+        Serial.print(F("\r\n=== LED Status ===\r\n"));
+        Serial.print(F("L1 LED (Pin 30 - LPT Read): "));
+        Serial.print(digitalRead(Common::Pins::LPT_READ_LED) ? F("ON") : F("OFF"));
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("L2 LED (Pin 32 - Data Write): "));
+        Serial.print(digitalRead(Common::Pins::DATA_WRITE_LED) ? F("ON") : F("OFF"));
+        Serial.print(F("\r\n"));
+        Serial.print(F("==================\r\n"));
+        
+    } else {
+        Serial.print(F("Usage: led <led> <action>\r\n"));
+        Serial.print(F("  led l1 on/off    - Control L1 LED (LPT Read Activity, Pin 30)\r\n"));
+        Serial.print(F("  led l2 on/off    - Control L2 LED (Data Write Activity, Pin 32)\r\n"));
+        Serial.print(F("  led status       - Show current LED status\r\n"));
+        Serial.print(F("Examples:\r\n"));
+        Serial.print(F("  led l1 on        - Turn on L1 LED\r\n"));
+        Serial.print(F("  led l2 off       - Turn off L2 LED\r\n"));
+        Serial.print(F("  led status       - Show both LED states\r\n"));
     }
 }
 
