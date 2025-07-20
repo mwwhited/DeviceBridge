@@ -164,6 +164,9 @@ public:
     static constexpr uint8_t getLptD5Pin() { return Pins::LPT_D5; }
     static constexpr uint8_t getLptD6Pin() { return Pins::LPT_D6; }
     static constexpr uint8_t getLptD7Pin() { return Pins::LPT_D7; }
+    
+    // Debug configuration access
+    static constexpr uint8_t getHeaderHexBytes() { return Debug::HEADER_HEX_BYTES; }
 };
 
 } // namespace DeviceBridge::Common

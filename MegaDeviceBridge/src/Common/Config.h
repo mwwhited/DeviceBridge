@@ -52,6 +52,11 @@ namespace Serial {
   constexpr uint8_t BUFFER_SIZE = 64;
 }
 
+// Debug Configuration
+namespace Debug {
+  constexpr uint8_t HEADER_HEX_BYTES = 10;     // Number of bytes to show in hex dump for new files
+}
+
 // Hardware Pin Assignments (from Pinouts.md)
 namespace Pins {  
   constexpr uint8_t HEARTBEAT = 13;

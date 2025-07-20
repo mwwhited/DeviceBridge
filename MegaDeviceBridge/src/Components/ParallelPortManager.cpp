@@ -92,11 +92,12 @@ void ParallelPortManager::processData() {
                     Serial.print(_currentFileBytes);
                     Serial.print(F(" total"));
                     
-                    // Show hex dump of first 10 bytes for new files
-                    if (_currentFileBytes <= 10 && _currentChunk.isNewFile) {
+                    // Show hex dump of first N bytes for new files once we have enough data
+                    auto config = getServices().getConfigurationService();
+                    uint8_t headerBytes = config->getHeaderHexBytes();
+                    if (_currentFileBytes >= headerBytes && _currentChunk.isNewFile) {
                         Serial.print(F(" - HEADER HEX: "));
-                        uint16_t headerBytes = min(10, _currentFileBytes);
-                        for (uint16_t i = 0; i < headerBytes; i++) {
+                        for (uint8_t i = 0; i < headerBytes; i++) {
                             if (_currentChunk.data[i] < 0x10) Serial.print(F("0"));
                             Serial.print(_currentChunk.data[i], HEX);
                             if (i < headerBytes - 1) Serial.print(F(" "));
@@ -119,11 +120,6 @@ void ParallelPortManager::processData() {
 
         // Check for end of file
         if (detectEndOfFile()) {
-            // Send partial chunk if any data remains
-            if (_chunkIndex > 0) {
-                sendChunk();
-            }
-
             // Debug logging for end of file detection
             auto systemManager = getServices().getSystemManager();
             if (systemManager && systemManager->isParallelDebugEnabled()) {
@@ -136,10 +132,10 @@ void ParallelPortManager::processData() {
                 Serial.print(F("\r\n"));
             }
 
-            // Send end-of-file marker
+            // Send final chunk with end-of-file marker
             _currentChunk.isEndOfFile = 1;
             _currentChunk.isNewFile = 0;
-            _currentChunk.length = 0;
+            _currentChunk.length = _chunkIndex;  // Use actual data length, not 0
             _currentChunk.timestamp = millis();
 
             auto fileSystemManager = getServices().getFileSystemManager();
