@@ -144,7 +144,8 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  resetcritical     - Reset critical flow control state\r\n"));
     Serial.print(F("  lcdthrottle on/off - Control LCD refresh throttling for storage ops\r\n"));
     Serial.print(F("  led l1/l2 on/off  - Control L1 (LPT) and L2 (Write) LEDs\r\n"));
-    Serial.print(F("  debug lcd on/off  - Enable/disable LCD debug output to serial\r\n"));
+    Serial.print(F("  debug lcd on/off      - Enable/disable LCD debug output to serial\r\n"));
+    Serial.print(F("  debug parallel on/off - Enable/disable parallel port debug logging\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
     Serial.print(F("  list sd           - List all files on SD card\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
@@ -1093,13 +1094,41 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
             Serial.print(F("  debug lcd off    - Disable LCD debug output\r\n"));
             Serial.print(F("  debug lcd status - Show current debug mode status\r\n"));
         }
+    } else if (params.startsWith(F("parallel")) || params.startsWith(F("lpt"))) {
+        String lptParams = params.startsWith(F("parallel")) ? params.substring(9) : params.substring(4); // Remove "parallel " or "lpt "
+        lptParams.trim();
+
+        if (lptParams == F("on")) {
+            systemManager->setParallelDebugEnabled(true);
+            Serial.print(F("Parallel port debug mode enabled - All LPT operations will be logged to serial\r\n"));
+            Serial.print(F("Warning: This will generate significant serial output during data capture!\r\n"));
+        } else if (lptParams == F("off")) {
+            systemManager->setParallelDebugEnabled(false);
+            Serial.print(F("Parallel port debug mode disabled\r\n"));
+        } else if (lptParams == F("status")) {
+            bool enabled = systemManager->isParallelDebugEnabled();
+            Serial.print(F("Parallel port debug mode: "));
+            Serial.print(enabled ? F("ENABLED") : F("DISABLED"));
+            Serial.print(F("\r\n"));
+        } else {
+            Serial.print(F("Usage: debug parallel [on|off|status] or debug lpt [on|off|status]\r\n"));
+            Serial.print(F("  debug parallel on     - Enable parallel port debug output to serial\r\n"));
+            Serial.print(F("  debug parallel off    - Disable parallel port debug output\r\n"));
+            Serial.print(F("  debug parallel status - Show current parallel debug mode status\r\n"));
+            Serial.print(F("Warning: Parallel debug generates extensive output during data capture\r\n"));
+        }
     } else {
         Serial.print(F("Debug Commands:\r\n"));
-        Serial.print(F("  debug lcd on/off/status  - Control LCD debug output to serial\r\n"));
+        Serial.print(F("  debug lcd on/off/status      - Control LCD debug output to serial\r\n"));
+        Serial.print(F("  debug parallel on/off/status - Control parallel port debug logging\r\n"));
+        Serial.print(F("  debug lpt on/off/status      - Same as parallel (alias)\r\n"));
         Serial.print(F("Examples:\r\n"));
-        Serial.print(F("  debug lcd on     - Enable LCD message mirroring to serial\r\n"));
-        Serial.print(F("  debug lcd off    - Disable LCD message mirroring\r\n"));
-        Serial.print(F("  debug lcd status - Show current LCD debug status\r\n"));
+        Serial.print(F("  debug lcd on         - Enable LCD message mirroring to serial\r\n"));
+        Serial.print(F("  debug lcd off        - Disable LCD message mirroring\r\n"));
+        Serial.print(F("  debug lcd status     - Show current LCD debug status\r\n"));
+        Serial.print(F("  debug parallel on    - Enable parallel port debug logging\r\n"));
+        Serial.print(F("  debug parallel off   - Disable parallel port debug logging\r\n"));
+        Serial.print(F("  debug parallel status - Show parallel port debug status\r\n"));
     }
 }
 

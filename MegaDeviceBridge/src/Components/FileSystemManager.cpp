@@ -1,6 +1,7 @@
 #include "FileSystemManager.h"
 #include "DisplayManager.h"
 #include "ParallelPortManager.h"
+#include "SystemManager.h"
 #include "TimeManager.h"
 #include "../Common/ConfigurationService.h"
 #include <Arduino.h>
@@ -48,13 +49,40 @@ void FileSystemManager::update() {
 void FileSystemManager::stop() { closeCurrentFile(); }
 
 void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
+    // Debug logging for data chunk processing
+    auto systemManager = getServices().getSystemManager();
+    if (systemManager && systemManager->isParallelDebugEnabled()) {
+        Serial.print(F("[DEBUG-FS] PROCESSING CHUNK - Length: "));
+        Serial.print(chunk.length);
+        Serial.print(F(", new file: "));
+        Serial.print(chunk.isNewFile ? F("YES") : F("NO"));
+        Serial.print(F(", end of file: "));
+        Serial.print(chunk.isEndOfFile ? F("YES") : F("NO"));
+        Serial.print(F("\r\n"));
+    }
+
     // Handle new file
     if (chunk.isNewFile) {
         closeCurrentFile();
+        
+        if (systemManager && systemManager->isParallelDebugEnabled()) {
+            Serial.print(F("[DEBUG-FS] CREATING NEW FILE...\r\n"));
+        }
+        
         if (!createNewFile()) {
+            if (systemManager && systemManager->isParallelDebugEnabled()) {
+                Serial.print(F("[DEBUG-FS] FILE CREATION FAILED!\r\n"));
+            }
             sendDisplayMessage(Common::DisplayMessage::ERROR, F("File Create Failed"));
             return;
         }
+        
+        if (systemManager && systemManager->isParallelDebugEnabled()) {
+            Serial.print(F("[DEBUG-FS] FILE CREATED SUCCESSFULLY: "));
+            Serial.print(_currentFilename);
+            Serial.print(F("\r\n"));
+        }
+        
         sendDisplayMessage(Common::DisplayMessage::STATUS, F("Storing..."));
 
         // Detect file type from first chunk if auto-detection is enabled
@@ -73,14 +101,38 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         // Flash L2 LED to show write activity attempt
         digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
         
+        if (systemManager && systemManager->isParallelDebugEnabled()) {
+            Serial.print(F("[DEBUG-FS] WRITING DATA - "));
+            Serial.print(chunk.length);
+            Serial.print(F(" bytes, file open: "));
+            Serial.print(_isFileOpen ? F("YES") : F("NO"));
+            Serial.print(F("\r\n"));
+        }
+        
         if (_isFileOpen) {
             if (!writeDataChunk(chunk)) {
                 _writeErrors++;
+                if (systemManager && systemManager->isParallelDebugEnabled()) {
+                    Serial.print(F("[DEBUG-FS] WRITE FAILED - Error count now: "));
+                    Serial.print(_writeErrors);
+                    Serial.print(F("\r\n"));
+                }
                 sendDisplayMessage(Common::DisplayMessage::ERROR, F("Write Failed"));
+            } else {
+                if (systemManager && systemManager->isParallelDebugEnabled()) {
+                    Serial.print(F("[DEBUG-FS] WRITE SUCCESS - "));
+                    Serial.print(chunk.length);
+                    Serial.print(F(" bytes written\r\n"));
+                }
             }
         } else {
             // File not open - don't spam errors, just count them
             _writeErrors++;
+            if (systemManager && systemManager->isParallelDebugEnabled()) {
+                Serial.print(F("[DEBUG-FS] WRITE ERROR - No file open! Error count: "));
+                Serial.print(_writeErrors);
+                Serial.print(F("\r\n"));
+            }
             // Only send error message once per file to avoid LCD spam
             static bool errorSent = false;
             if (chunk.isNewFile || !errorSent) {
@@ -99,11 +151,28 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
 
     // Handle end of file
     if (chunk.isEndOfFile) {
+        if (systemManager && systemManager->isParallelDebugEnabled()) {
+            Serial.print(F("[DEBUG-FS] END OF FILE - Closing file: "));
+            Serial.print(_currentFilename);
+            Serial.print(F("\r\n"));
+        }
+        
         if (closeCurrentFile()) {
             char message[32];
             snprintf(message, sizeof(message), "Saved: %s", _currentFilename);
             sendDisplayMessage(Common::DisplayMessage::INFO, message);
+            
+            if (systemManager && systemManager->isParallelDebugEnabled()) {
+                Serial.print(F("[DEBUG-FS] FILE CLOSED SUCCESSFULLY - "));
+                Serial.print(_currentFilename);
+                Serial.print(F("\r\n"));
+            }
         } else {
+            if (systemManager && systemManager->isParallelDebugEnabled()) {
+                Serial.print(F("[DEBUG-FS] FILE CLOSE FAILED - "));
+                Serial.print(_currentFilename);
+                Serial.print(F("\r\n"));
+            }
             sendDisplayMessage(Common::DisplayMessage::ERROR, F("Close Failed"));
         }
     }
