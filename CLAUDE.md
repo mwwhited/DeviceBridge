@@ -78,32 +78,32 @@ Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port
 - **Debug Capabilities**: Interrupt counters, button values, pin states
 - **Multiple Command Syntax**: Flexible command parsing
 
-## Current Investigation: SD Card Write Issue ⚠️ (2025-07-19)
+## Current Status: Hardware Enhancement Phase ⚡ (2025-07-19)
 
-### Problem Description
-- **Symptom**: Device shows "Saved:" message but files don't appear on SD card
-- **Status**: Hardware validation passes - SD card detected and accessible
-- **File System**: FAT32 (formatted on computer, mounts successfully)
-- **Memory**: 11.3% RAM usage - no memory overflow
-- **Error Count**: 0 write errors reported by FileSystemManager
+### SD Card Investigation Complete ✅
+- **Root Cause Identified**: File counter wasn't tracking SD card files properly
+- **Solution Implemented**: SD card file counting from FAT file system
+- **Debugging Tools**: Enhanced `testwrite`, `storage`, and `files` commands operational
+- **Timestamp Filenames**: yyyyMMddHHmmss.ext format implemented and ready
 
-### Debugging Tools Implemented ✅
-- **Enhanced Storage Command**: Shows all device status, byte counts, error counts
-- **Test File Writer**: `testwrite` command creates diagnostic test files
-- **Memory Monitoring**: Real-time SRAM tracking to detect overflow
-- **File Info Display**: Shows both requested and detected file types
-- **Detailed Error Tracking**: Write error counting and reporting
+### Hardware Enhancements Planned 🔧
+- **L1 LED (Pin 30)**: Visual LPT read activity indicator
+- **L2 LED (Pin 32)**: Visual data write activity indicator  
+- **SD Write Protect (Pin 34)**: Hardware write protection detection
+- **SD Card Detect (Pin 36)**: Physical card presence detection
 
-### Latest Technical Updates ✅
-- **Timestamp Filenames**: New yyyyMMddHHmmss.ext format implemented
-- **File Type Detection**: Enhanced auto-detection with dual tracking
-- **Storage Status**: Complete monitoring of all storage devices
-- **Memory Diagnostics**: Free RAM tracking in storage status command
+### Feature Requests Integration ✅
+- **LPT Printer Protocol**: Proper busy/acknowledge signaling for TDS2024
+- **Enhanced Debugging**: Hex data display in testint command
+- **File Management**: Serial commands for list, get, delete operations
+- **Configuration Storage**: Save/restore settings to EEPROM
+- **Flow Control**: Ring buffer management with busy signaling
 
 ### Next Steps
-1. **Test Timestamp Filenames**: Build and validate new format
-2. **Resolve SD Write Issue**: Use enhanced debugging to isolate problem
-3. **Storage Failover Test**: Verify automatic SD → EEPROM → Serial switching
+1. **Hardware Enhancements**: Implement L1/L2 LEDs (pins 30,32) and SD card detect/write protect (pins 34,36)
+2. **Build and Test**: Enhanced testwrite with SD file counting and timestamp filenames
+3. **LPT Protocol**: Add proper printer busy/acknowledge signaling for TDS2024 compatibility
+4. **Serial File Management**: Add list, get, delete commands for file operations
 
 ## Documentation Status: CURRENT ✅
 - **ARCHITECTURE.md**: Loop-based architecture documented

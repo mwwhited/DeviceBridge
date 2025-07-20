@@ -73,22 +73,120 @@ void loop() {
 }
 ```
 
-## Pin Assignments (Arduino Mega)
-```cpp
-// System Status
-HEARTBEAT: 13 (Built-in LED - 500ms blink indicates system operational)
+## Complete Pin Assignments (Arduino Mega 2560)
 
-// LCD Shield (OSEPP)
-LCD_RESET: 8, LCD_ENABLE: 9, LCD_D4-D7: 4-7, Buttons: A0
+### Pin Allocation Summary
+| Pin Range | Function | Status | Notes |
+|-----------|----------|--------|-------|
+| 0-1 | Serial USB | Reserved | System communication |
+| 2, 11-12, 14-17 | **Available** | ✅ Free | Can be used for expansions |
+| 3-10 | Shields | Used | LCD + Storage |
+| 13 | Heartbeat | Used | System status LED |
+| 18-19 | LPT + Available | Mixed | Pin 19 available |
+| 20-21 | I2C | Used | RTC communication |
+| 22-47 | Parallel Port | Partial | **Pins 30,32,34,36,38,40,42,44,46 FREE** |
+| 48-49 | **Available** | ✅ Free | High pins available |
+| 50-53 | SPI | Used | SD + EEPROM |
+| 54+ | **Available** | ✅ Free | Extended pins |
 
-// Storage  
-SD_CS: 10, EEPROM_CS: 3, SPI: 50-53, I2C: 20-21
+### Detailed Pin Assignments
 
-// Parallel Port (LPT)
-Control: Strobe(18), AutoFeed(22), Initialize(26), SelectIn(28)
-Status: Ack(41), Busy(43), PaperOut(45), Select(47), Error(24)
-Data: D0-D7 (25,27,29,31,33,35,37,39)
+#### System Pins
+| Pin | Function | Direction | Notes |
+|-----|----------|-----------|-------|
+| 0 | USB RX | Input | Serial communication |
+| 1 | USB TX | Output | Serial communication |
+| 13 | HEARTBEAT | Output | Built-in LED, 500ms blink |
+
+#### OSEPP LCD Keypad Shield
+| Pin | Function | Direction | Notes |
+|-----|----------|-----------|-------|
+| 4 | LCD_D4 | Output | 4-bit data line |
+| 5 | LCD_D5 | Output | 4-bit data line |
+| 6 | LCD_D6 | Output | 4-bit data line |
+| 7 | LCD_D7 | Output | 4-bit data line |
+| 8 | LCD_RESET | Output | Reset signal |
+| 9 | LCD_ENABLE | Output | Enable signal |
+| A0 | LCD_BUTTONS | Input | Analog button matrix |
+
+#### Deek Robot Data Logger Shield
+| Pin | Function | Direction | Notes |
+|-----|----------|-----------|-------|
+| 3 | EEPROM_CS | Output | W25Q128 chip select |
+| 10 | SD_CS | Output | SD card chip select |
+| 20 | I2C_SDA | Bidirectional | DS1307 RTC data |
+| 21 | I2C_SCL | Output | DS1307 RTC clock |
+| 50 | SPI_MISO | Input | SPI data in |
+| 51 | SPI_MOSI | Output | SPI data out |
+| 52 | SPI_SCK | Output | SPI clock |
+| 53 | SPI_SS | Output | SPI slave select (unused) |
+
+#### TDS2024 Parallel Port Interface
+| Pin | LPT Signal | DB25 | Direction | Notes |
+|-----|------------|------|-----------|-------|
+| 18 | /STROBE | 1 | Input | Interrupt trigger (FALLING) |
+| 22 | /AUTO_FEED | 14 | Input | Pullup enabled |
+| 24 | /ERROR | 15 | Output | Forced high |
+| 25 | D0 | 2 | Input | Data bit 0 |
+| 26 | /INITIALIZE | 16 | Input | Pullup enabled |
+| 27 | D1 | 3 | Input | Data bit 1 |
+| 28 | /SELECT_IN | 17 | Input | Pullup enabled |
+| 29 | D2 | 4 | Input | Data bit 2 |
+| 31 | D3 | 5 | Input | Data bit 3 |
+| 33 | D4 | 6 | Input | Data bit 4 |
+| 35 | D5 | 7 | Input | Data bit 5 |
+| 37 | D6 | 8 | Input | Data bit 6 |
+| 39 | D7 | 9 | Input | Data bit 7 |
+| 41 | /ACK | 10 | Output | Acknowledge signal |
+| 43 | BUSY | 11 | Output | Busy signal |
+| 45 | PAPER_OUT | 12 | Output | Forced low |
+| 47 | SELECT | 13 | Output | Forced high |
+
+#### Available Pins for Expansion
+| Pin | Type | Capability | Recommended Use |
+|-----|------|------------|-----------------|
+| 2 | Digital | INT0 interrupt | SD Card Detect |
+| 11 | Digital | PWM capable | SD Write Protect |
+| 12 | Digital | PWM capable | General I/O |
+| 14 | Digital | TX3 serial | UART expansion |
+| 15 | Digital | RX3 serial | UART expansion |
+| 16 | Digital | TX2 serial | UART expansion |
+| 17 | Digital | RX2 serial | UART expansion |
+| 19 | Digital | INT2 interrupt | Interrupt expansion |
+| 30 | Digital | **L1 LED** | LPT Read Activity LED |
+| 32 | Digital | **L2 LED** | Data Write Activity LED |
+| 34 | Digital | **SD_WP** | SD Write Protect detection |
+| 36 | Digital | **SD_CD** | SD Card Detect |
+| 38 | Digital | Standard | General I/O |
+| 40 | Digital | Standard | General I/O |
+| 42 | Digital | Standard | General I/O |
+| 44 | Digital | Standard | General I/O |
+| 46 | Digital | Standard | General I/O |
+| 48 | Digital | Standard | General I/O |
+| 49 | Digital | Standard | General I/O |
+| A1-A15 | Analog | ADC input | Sensor inputs |
+
+#### Hardware Enhancement Pins (Sequential Even Numbers)
+| Pin | Function | Connection | Notes |
+|-----|----------|------------|-------|
+| 30 | L1 | LPT Read LED | Visual parallel port activity (flicker during capture) |
+| 32 | L2 | Data Write LED | Visual file write activity (steady during writes) |
+| 34 | SD_WP | Write Protect | Active HIGH detection |
+| 36 | SD_CD | Card Detect | Active LOW detection |
+
+### Hardware Connections
 ```
+L1 LED:  Pin 30 → 220Ω resistor → LED → GND
+L2 LED:  Pin 32 → 220Ω resistor → LED → GND
+SD_WP:   Pin 34 → SD Card Write Protect pin
+SD_CD:   Pin 36 → SD Card Detect pin (Active LOW)
+```
+
+### Visual Debugging System
+- **Pin 13**: HEARTBEAT - System operational (500ms blink)
+- **Pin 30**: L1 - LPT activity (rapid flicker during TDS2024 capture)
+- **Pin 32**: L2 - Write activity (steady during file operations)
+- **Combined**: Real-time visual feedback on data flow and storage operations
 
 ## OSEPP Button Specifications
 **✅ HARDWARE VALIDATED (2025-07-19) - Actual measured values:**

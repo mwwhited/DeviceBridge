@@ -15,4 +15,6 @@
   - add list {device} commands for listing files devices
   - add get {device} {filename} command for downloading a file from the device over serial
   - add delete {device} {filename} command for removing a file from device
-  
+- all pinouts should be defined on `src\Common\Config.h`.  
+- all configuration such as pinouts for devices should be injected though a configuration object
+  - currently 

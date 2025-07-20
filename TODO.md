@@ -81,29 +81,36 @@
 - [x] **Memory Monitoring** - Real-time SRAM usage tracking in storage status
 - [x] **Timestamp Filename Format** - Implemented yyyyMMddHHmmss.ext format
 
-### **CURRENT PRIORITY: SD Card Write Issue Investigation** ⚠️ (2025-07-19)
-- **Status**: ACTIVE INVESTIGATION
-- **Problem**: Files show "Saved:" but don't appear on SD card despite hardware validation passing
-- **Tools Implemented**: Enhanced `storage` and `testwrite` commands for diagnostics
+### **CURRENT PRIORITY: Hardware Enhancement Implementation** 🔧 (2025-07-19)
+- **Status**: FEATURE DEVELOPMENT
+- **Phase**: Hardware enhancements and LPT protocol improvements
+- **Pin Allocation**: L1=30, L2=32, WP=34, CD=36 (sequential even pins)
 - **Next Actions**: 
-  1. Build and test timestamp filename changes
-  2. Use enhanced debugging tools to isolate SD card write issue
-  3. Verify new yyyyMMddHHmmss.ext filename format
+  1. Implement L1/L2 LED visual indicators for LPT/write activity
+  2. Add SD card detect and write protect hardware support
+  3. Enhance LPT protocol with proper printer busy/acknowledge signaling
+  4. Add file management commands (list, get, delete)
 
 ### **System Validation** (Medium Priority)
 - [ ] **Menu Navigation Testing** - Verify LCD button navigation with calibrated values
 - [ ] **File Format Testing** - Test auto-detection with actual TDS2024 file outputs
 - [ ] **Storage Failover Testing** - Verify SD → EEPROM → Serial fallback works
 
-### **Feature Requests from FEATURE_REQUEST.md** (Medium Priority)
-- [ ] **Time Display Optimization** - Remove seconds from time display, update once per minute
-- [ ] **Print Status Display** - Show "PRINTING...{filename}" on LCD when data capture starts
-- [ ] **Save Status Display** - Show "Saving to {device}...{filename}" on LCD during file writes
-- [ ] **Display Update Optimization** - Skip display updates when actively capturing/saving files
+### **Feature Requests Integration** (High Priority)
+- [ ] **Hardware Enhancements** - L1/L2 LEDs (pins 30,32) and SD detect/WP (pins 34,36)
+- [ ] **LPT Printer Protocol** - Proper busy/acknowledge signaling for TDS2024 compatibility
+- [ ] **Enhanced testint Command** - Show hex values of data lines and all control pins
+- [ ] **Component Self-Tests** - Individual validation methods for each manager
+- [ ] **Configuration EEPROM** - Save/restore settings via serial menu
+- [ ] **Ring Buffer Flow Control** - LPT busy signal when buffer nearly full
+- [ ] **LPT Lock Mechanism** - Prevent conflicts during SPI/Serial operations
+- [ ] **Serial File Management** - list, get, delete commands for file operations
+- [ ] **Service Locator Pattern** - Centralized component communication (Low Priority)
+- [ ] **LittleFS Integration** - Replace EEFS with LittleFS for EEPROM (Low Priority)
+- [ ] **Configuration Injection** - Dependency injection pattern (Low Priority)
 - [x] **Time Setting Menu** - Add time set command to device menu and serial interface ✅ COMPLETED
 - [x] **Serial Configuration Menu** - Add simple menu to serial port for device configuration ✅ COMPLETED
 - [x] **Serial Heartbeat Control** - Add ability to turn off/on serial status messages ✅ COMPLETED
-- [ ] **Serial Test Mode** - Add test button mode accessible from serial port
 
 ### **Optional Enhancements** (Low Priority)  
 - [ ] Test parallel port data capture timing optimization (1ms polling)
