@@ -81,6 +81,9 @@ void ConfigurationManager::processCommand(const String& command) {
     } else if (command.startsWith(F("heartbeat "))) {
         handleHeartbeatCommand(command);
         
+    } else if (command.startsWith(F("debug "))) {
+        handleDebugCommand(command);
+        
     } else if (command.equalsIgnoreCase(F("time"))) {
         printCurrentTime();
         
@@ -101,6 +104,9 @@ void ConfigurationManager::processCommand(const String& command) {
         
     } else if (command.equalsIgnoreCase(F("files")) || command.equalsIgnoreCase(F("lastfile"))) {
         printLastFileInfo();
+        
+    } else if (command.startsWith(F("list "))) {
+        handleListCommand(command);
         
     } else if (command.equalsIgnoreCase(F("restart")) || command.equalsIgnoreCase(F("reset"))) {
         Serial.print(F("Restarting system...\r\n"));
@@ -132,7 +138,9 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  testint           - Test interrupt pin response\r\n"));
     Serial.print(F("  testlpt           - Test LPT printer protocol signals\r\n"));
     Serial.print(F("  led l1/l2 on/off  - Control L1 (LPT) and L2 (Write) LEDs\r\n"));
-    Serial.print(F("  files/lastfile    - Show last saved file info\r\n"));
+    Serial.print(F("  debug lcd on/off  - Enable/disable LCD debug output to serial\r\n"));
+    Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
+    Serial.print(F("  list sd           - List all files on SD card\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage           - Show storage/hardware status\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
@@ -642,6 +650,20 @@ void ConfigurationManager::printLastFileInfo() {
     Serial.print(F("\r\n=== Last Saved File Information ===\r\n"));
     
     if (_fileSystemManager) {
+        // Check SD card insertion first
+        Serial.print(F("SD Card Status: "));
+        if (_fileSystemManager->isSDCardPresent()) {
+            Serial.print(F("Detected"));
+            if (_fileSystemManager->isSDAvailable()) {
+                Serial.print(F(" and Available"));
+            } else {
+                Serial.print(F(" but Not Available"));
+            }
+        } else {
+            Serial.print(F("Missing"));
+        }
+        Serial.print(F("\r\n"));
+        
         Serial.print(F("Files Stored: "));
         Serial.print(_fileSystemManager->getFilesStored());
         Serial.print(F("\r\n"));
@@ -782,6 +804,131 @@ void ConfigurationManager::handleLEDCommand(const String& command) {
         Serial.print(F("  led l1 on        - Turn on L1 LED\r\n"));
         Serial.print(F("  led l2 off       - Turn off L2 LED\r\n"));
         Serial.print(F("  led status       - Show both LED states\r\n"));
+    }
+}
+
+void ConfigurationManager::handleListCommand(const String& command) {
+    String target = command.substring(5); // Remove "list "
+    target.trim();
+    target.toLowerCase();
+    
+    if (target == F("sd")) {
+        Serial.print(F("\r\n=== SD Card File Listing ===\r\n"));
+        
+        if (!_fileSystemManager) {
+            Serial.print(F("FileSystemManager not available\r\n"));
+            return;
+        }
+        
+        // Check SD card status first
+        if (!_fileSystemManager->isSDCardPresent()) {
+            Serial.print(F("SD Card: Not Detected\r\n"));
+            Serial.print(F("=============================\r\n"));
+            return;
+        }
+        
+        if (!_fileSystemManager->isSDAvailable()) {
+            Serial.print(F("SD Card: Detected but not available\r\n"));
+            Serial.print(F("=============================\r\n"));
+            return;
+        }
+        
+        // List files on SD card
+        File root = SD.open("/");
+        if (!root) {
+            Serial.print(F("Failed to open root directory\r\n"));
+            Serial.print(F("=============================\r\n"));
+            return;
+        }
+        
+        uint16_t fileCount = 0;
+        uint32_t totalSize = 0;
+        
+        Serial.print(F("SD Card Files:\r\n"));
+        
+        while (true) {
+            File entry = root.openNextFile();
+            if (!entry) {
+                break; // No more files
+            }
+            
+            if (!entry.isDirectory()) {
+                fileCount++;
+                uint32_t fileSize = entry.size();
+                totalSize += fileSize;
+                
+                // Print filename with size
+                Serial.print(F("  "));
+                Serial.print(entry.name());
+                Serial.print(F(" ("));
+                Serial.print(fileSize);
+                Serial.print(F(" bytes)\r\n"));
+            }
+            entry.close();
+        }
+        
+        root.close();
+        
+        Serial.print(F("\r\nSummary:\r\n"));
+        Serial.print(F("  Files: "));
+        Serial.print(fileCount);
+        Serial.print(F("\r\n"));
+        Serial.print(F("  Total Size: "));
+        Serial.print(totalSize);
+        Serial.print(F(" bytes\r\n"));
+        Serial.print(F("=============================\r\n"));
+        
+    } else {
+        Serial.print(F("Usage: list sd\r\n"));
+        Serial.print(F("  list sd  - Show all files on SD card root directory\r\n"));
+    }
+}
+
+void ConfigurationManager::handleDebugCommand(const String& command) {
+    String params = command.substring(6); // Remove "debug "
+    params.trim();
+    params.toLowerCase();
+    
+    if (params.startsWith(F("lcd"))) {
+        String lcdParams = params.substring(4); // Remove "lcd "
+        lcdParams.trim();
+        
+        if (lcdParams == F("on")) {
+            if (_systemManager) {
+                _systemManager->setLCDDebugEnabled(true);
+                Serial.print(F("LCD debug mode enabled - LCD messages will be output to serial\r\n"));
+            } else {
+                Serial.print(F("SystemManager not available\r\n"));
+            }
+        } else if (lcdParams == F("off")) {
+            if (_systemManager) {
+                _systemManager->setLCDDebugEnabled(false);
+                Serial.print(F("LCD debug mode disabled\r\n"));
+            } else {
+                Serial.print(F("SystemManager not available\r\n"));
+            }
+        } else if (lcdParams == F("status")) {
+            if (_systemManager) {
+                bool enabled = _systemManager->isLCDDebugEnabled();
+                Serial.print(F("LCD debug mode: "));
+                Serial.print(enabled ? F("ENABLED") : F("DISABLED"));
+                Serial.print(F("\r\n"));
+            } else {
+                Serial.print(F("SystemManager not available\r\n"));
+            }
+        } else {
+            Serial.print(F("Usage: debug lcd [on|off|status]\r\n"));
+            Serial.print(F("  debug lcd on     - Enable LCD debug output to serial\r\n"));
+            Serial.print(F("  debug lcd off    - Disable LCD debug output\r\n"));
+            Serial.print(F("  debug lcd status - Show current debug mode status\r\n"));
+        }
+    } else {
+        Serial.print(F("Debug Commands:\r\n"));
+        Serial.print(F("  debug lcd on/off/status  - Control LCD debug output to serial\r\n"));
+        Serial.print(F("Examples:\r\n"));
+        Serial.print(F("  debug lcd on     - Enable LCD message mirroring to serial\r\n"));
+        Serial.print(F("  debug lcd off    - Disable LCD message mirroring\r\n"));
+        Serial.print(F("  debug lcd status - Show current LCD debug status\r\n"));
     }
 }
 

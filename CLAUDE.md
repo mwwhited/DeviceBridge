@@ -63,6 +63,7 @@ Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port
 - `testlpt/testprinter` - **NEW**: Test LPT printer protocol signals
 - `led l1/l2 on/off` - **NEW**: Manual LED control for hardware testing
 - `led status` - **NEW**: Show current LED states
+- `debug lcd on/off` - **NEW**: Enable/disable LCD debug output to serial port
 - `files/lastfile` - Show last saved file details with format detection
 - `restart/reset` - Software reset
 - `help` - Show command menu
@@ -103,6 +104,7 @@ Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port
 **All debugging and control commands fully operational**:
 - `led l1/l2 on/off` - **NEW**: Manual LED control for hardware testing
 - `led status` - **NEW**: Show current LED states  
+- `debug lcd on/off` - **NEW**: LCD display mirroring to serial port for debugging
 - `testlpt/testprinter` - **NEW**: Complete LPT printer protocol testing
 - `storage` - **ENHANCED**: Clean status display (Detected/Missing, Protected/Unprotected)
 - `parallel/lpt` - **ENHANCED**: Hex data display with all pin states
@@ -118,8 +120,9 @@ Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port
 ### Ready for Production Use ✅
 1. **Hardware Verified**: All LEDs and detection pins working correctly
 2. **Protocol Complete**: LPT printer protocol fully implemented  
-3. **Interface Polished**: Professional serial command interface
+3. **Interface Polished**: Professional serial command interface with LCD debug mode
 4. **Status Monitoring**: Comprehensive hardware and system status display
+5. **Debug Capabilities**: LCD message mirroring to serial for real-time troubleshooting
 
 ## Documentation Status: CURRENT ✅
 - **ARCHITECTURE.md**: Loop-based architecture documented

@@ -213,6 +213,7 @@ bool FileSystemManager::closeCurrentFile() {
         case Common::StorageType::SD_CARD:
             if (_currentFile) {
                 _currentFile.close();
+                _fileCounter++; // Increment counter for successful SD card file
             }
             break;
             

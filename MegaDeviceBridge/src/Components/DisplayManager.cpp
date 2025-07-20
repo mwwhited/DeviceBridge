@@ -282,6 +282,23 @@ void DisplayManager::exitMenu() {
 }
 
 void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const char* message, const char* line2) {
+    // Debug mode: output LCD messages to serial
+    if (_systemManager && _systemManager->isLCDDebugEnabled()) {
+        Serial.print(F("[LCD] "));
+        switch (type) {
+            case Common::DisplayMessage::INFO: Serial.print(F("INFO: ")); break;
+            case Common::DisplayMessage::ERROR: Serial.print(F("ERROR: ")); break;
+            case Common::DisplayMessage::STATUS: Serial.print(F("STATUS: ")); break;
+            default: Serial.print(F("MSG: ")); break;
+        }
+        Serial.print(message);
+        if (line2 && strlen(line2) > 0) {
+            Serial.print(F(" | "));
+            Serial.print(line2);
+        }
+        Serial.print(F("\r\n"));
+    }
+    
     Common::DisplayMessage msg;
     msg.type = type;
     strncpy(msg.message, message, sizeof(msg.message) - 1);
@@ -297,6 +314,23 @@ void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const cha
     processMessage(msg);
 }
 void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message, const __FlashStringHelper* line2) {
+    // Debug mode: output LCD messages to serial
+    if (_systemManager && _systemManager->isLCDDebugEnabled()) {
+        Serial.print(F("[LCD] "));
+        switch (type) {
+            case Common::DisplayMessage::INFO: Serial.print(F("INFO: ")); break;
+            case Common::DisplayMessage::ERROR: Serial.print(F("ERROR: ")); break;
+            case Common::DisplayMessage::STATUS: Serial.print(F("STATUS: ")); break;
+            default: Serial.print(F("MSG: ")); break;
+        }
+        Serial.print(message);
+        if (line2) {
+            Serial.print(F(" | "));
+            Serial.print(line2);
+        }
+        Serial.print(F("\r\n"));
+    }
+    
     Common::DisplayMessage msg;
     msg.type = type;
 

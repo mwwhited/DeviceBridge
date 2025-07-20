@@ -28,6 +28,8 @@ private:
     void handleStorageCommand(const String& command);
     void handleHeartbeatCommand(const String& command);
     void handleLEDCommand(const String& command);
+    void handleListCommand(const String& command);
+    void handleDebugCommand(const String& command);
     
     // Command output methods
     void printHelpMenu();

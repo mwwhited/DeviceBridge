@@ -24,6 +24,7 @@ SystemManager::SystemManager()
     , _errorCount(0)
     , _commandsProcessed(0)
     , _serialHeartbeatEnabled(false)  // Default to off
+    , _lcdDebugEnabled(false)  // Default to off
 {
 }
 

@@ -83,6 +83,10 @@ public:
     void setSerialHeartbeatEnabled(bool enabled) { _serialHeartbeatEnabled = enabled; }
     bool isSerialHeartbeatEnabled() const { return _serialHeartbeatEnabled; }
     
+    // Debug mode control
+    void setLCDDebugEnabled(bool enabled) { _lcdDebugEnabled = enabled; }
+    bool isLCDDebugEnabled() const { return _lcdDebugEnabled; }
+    
     // Component management
     void setComponentManagers(ParallelPortManager* ppm, FileSystemManager* fsm, 
                              DisplayManager* dm, TimeManager* tm);
@@ -93,6 +97,7 @@ private:
     uint32_t _errorCount;
     uint32_t _commandsProcessed;
     bool _serialHeartbeatEnabled;
+    bool _lcdDebugEnabled;
 };
 
 } // namespace DeviceBridge::Components
