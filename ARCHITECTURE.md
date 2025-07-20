@@ -4,7 +4,7 @@
 
 The MegaDeviceBridge is a sophisticated embedded system that converts parallel port data from a Tektronix TDS2024 oscilloscope to modern storage formats. The system uses a **loop-based cooperative multitasking architecture** with component-based design for real-time data capture and processing.
 
-**Current Status (2025-07-20)**: **Bulletproof enterprise-grade architecture** with Service Locator pattern providing zero null pointer risk, multi-tier adaptive flow control, 20-second timeout protection, and intelligent LCD throttling. Includes comprehensive hardware enhancements, emergency recovery systems, and complete TDS2024 printer protocol for **zero data loss** high-speed oscilloscope data capture.
+**Current Status (2025-07-20)**: **Enterprise-grade configuration architecture** with comprehensive centralization of all magic numbers and configuration values through Service Locator pattern. Features bulletproof buffer management, zero null pointer risk, multi-tier adaptive flow control, 20-second timeout protection, and intelligent LCD throttling. Includes comprehensive hardware enhancements, emergency recovery systems, complete TDS2024 printer protocol, and **type-safe configuration management** for **zero data loss** high-speed oscilloscope data capture.
 
 ### TDS2024 Oscilloscope Capabilities
 **Supported File Formats:**
@@ -77,11 +77,42 @@ The Device Bridge automatically detects file format based on data headers and ha
 
 **Key Features:**
 - **Null Pointer Elimination**: All components use `getServices().getXxxManager()`
+- **Configuration Centralization**: All components access configuration via `getServices().getConfigurationService()`
 - **Runtime Validation**: Post-initialization dependency checking with fatal error detection
 - **IComponent Interface**: Standardized lifecycle (initialize/update/stop) and validation
 - **Self-Test Framework**: Each component validates its dependencies and hardware
 - **Multi-Layer Validation**: ServiceLocator + Component + Hardware validation
-- **6 Component Architecture**: All managers integrated with bulletproof dependency management
+- **7 Service Architecture**: All managers + ConfigurationService integrated with bulletproof dependency management
+- **Type-Safe Configuration**: 72+ configuration constants accessible through strongly-typed getter methods
+
+### Enterprise Configuration Architecture (2025-07-20) ⭐⭐⭐⭐
+
+**Complete Configuration Centralization:**
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         ConfigurationService (via ServiceLocator)             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Common::Config Namespaces (72+ Constants)                                     │
+├─────────┬─────────┬─────────┬─────────┬─────────┬─────────┬─────────┬─────────┤
+│ Timing  │ Buffer  │ Buttons │ File    │ Flash   │ Display │ Flow    │ Pins    │
+│ (17)    │ (8)     │ (11)    │ Formats │ (16)    │ Refresh │ Control │ (All)   │
+│         │         │         │ (13)    │         │ (4)     │ (3)     │         │
+├─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
+│Loop     │Ring     │Analog   │BMP/PCX/ │W25Q128  │LCD      │Buffer   │Hardware │
+│intervals│buffer   │threshold│TIFF/PS/ │Commands │refresh  │%thresh  │pin      │
+│µs delays│sizes    │values   │ESC bytes│JEDEC ID │rates    │levels   │mapping  │
+│recovery │flow ctrl│button   │magic    │page/    │normal/  │60%/80%/ │LPT/LCD/ │
+│timing   │levels   │detection│numbers  │sector   │storage  │recovery │SD/LED   │
+└─────────┴─────────┴─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+```
+
+**Configuration Benefits:**
+- **Single Source of Truth**: All magic numbers centralized in Common::Config namespace  
+- **Type-Safe Access**: Strongly-typed getter methods prevent configuration errors
+- **Service Integration**: Available to all components via `getServices().getConfigurationService()`
+- **Maintainable Code**: Zero scattered hardcoded values throughout codebase
+- **Professional Architecture**: Enterprise-grade configuration management patterns
+- **Compile-Time Safety**: Type checking of all configuration value usage
 
 ### Loop-Based Cooperative Multitasking Architecture
 
