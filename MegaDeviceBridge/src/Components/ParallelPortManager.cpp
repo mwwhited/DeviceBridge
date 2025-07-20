@@ -46,7 +46,7 @@ void ParallelPortManager::processData() {
         _idleCounter = 0;
         _lastDataTime = millis();
 
-        // Check for new file start
+        // Check for new file start - only set flag once per chunk
         if (detectNewFile()) {
             _currentChunk.isNewFile = 1;
             _fileInProgress = true;
@@ -63,9 +63,8 @@ void ParallelPortManager::processData() {
                 Serial.print(millis());
                 Serial.print(F("ms\r\n"));
             }
-        } else {
-            _currentChunk.isNewFile = 0;
         }
+        // NOTE: Don't reset isNewFile to 0 here - let it persist until chunk is sent
 
         // Read available data into current chunk
         if (_chunkIndex < sizeof(_currentChunk.data)) {
@@ -165,7 +164,7 @@ void ParallelPortManager::sendChunk() {
     auto fileSystemManager = getServices().getFileSystemManager();
     fileSystemManager->processDataChunk(_currentChunk);
 
-    // Reset chunk for next data
+    // Reset chunk for next data - ONLY reset isNewFile after processing
     _chunkIndex = 0;
     _currentChunk.isNewFile = 0;
 }

@@ -71,8 +71,21 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         
         if (!createNewFile()) {
             if (systemManager && systemManager->isParallelDebugEnabled()) {
-                Serial.print(F("[DEBUG-FS] FILE CREATION FAILED!\r\n"));
+                Serial.print(F("[DEBUG-FS] FILE CREATION FAILED! Signaling error to TDS2024\r\n"));
             }
+            
+            // Signal error to TDS2024 to stop sending data
+            auto parallelPortManager = getServices().getParallelPortManager();
+            if (parallelPortManager) {
+                parallelPortManager->setPrinterError(true);    // Set ERROR signal active
+                parallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
+                parallelPortManager->clearBuffer();           // Clear any buffered data
+                
+                if (systemManager && systemManager->isParallelDebugEnabled()) {
+                    Serial.print(F("[DEBUG-FS] ERROR signals sent to TDS2024, buffer cleared\r\n"));
+                }
+            }
+            
             sendDisplayMessage(Common::DisplayMessage::ERROR, F("File Create Failed"));
             return;
         }
@@ -81,6 +94,13 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
             Serial.print(F("[DEBUG-FS] FILE CREATED SUCCESSFULLY: "));
             Serial.print(_currentFilename);
             Serial.print(F("\r\n"));
+        }
+        
+        // Clear any error signals to TDS2024 on successful file creation
+        auto parallelPortManager = getServices().getParallelPortManager();
+        if (parallelPortManager) {
+            parallelPortManager->setPrinterError(false);   // Clear ERROR signal
+            parallelPortManager->setPrinterPaperOut(false); // Clear PAPER_OUT signal
         }
         
         sendDisplayMessage(Common::DisplayMessage::STATUS, F("Storing..."));
@@ -133,6 +153,20 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
                 Serial.print(_writeErrors);
                 Serial.print(F("\r\n"));
             }
+            
+            // Signal error to TDS2024 after multiple consecutive write errors
+            if (_writeErrors >= 5) {  // After 5 errors, signal TDS2024 to stop
+                auto parallelPortManager = getServices().getParallelPortManager();
+                if (parallelPortManager) {
+                    parallelPortManager->setPrinterError(true);    // Set ERROR signal active
+                    parallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
+                    
+                    if (systemManager && systemManager->isParallelDebugEnabled()) {
+                        Serial.print(F("[DEBUG-FS] Multiple write errors - signaling TDS2024 to stop\r\n"));
+                    }
+                }
+            }
+            
             // Only send error message once per file to avoid LCD spam
             static bool errorSent = false;
             if (chunk.isNewFile || !errorSent) {
@@ -354,6 +388,13 @@ bool FileSystemManager::closeCurrentFile() {
     }
 
     _isFileOpen = false;
+    
+    // Clear any error signals to TDS2024 on successful file closure
+    auto parallelPortManager = getServices().getParallelPortManager();
+    if (parallelPortManager) {
+        parallelPortManager->setPrinterError(false);   // Clear ERROR signal
+        parallelPortManager->setPrinterPaperOut(false); // Clear PAPER_OUT signal
+    }
     
     // Notify display manager that storage operation is ending
     auto displayManager = getServices().getDisplayManager();
