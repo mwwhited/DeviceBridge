@@ -154,10 +154,18 @@ void ParallelPortManager::processData() {
 
         // Check for end of file
         if (detectEndOfFile()) {
-            // Debug logging for end of file detection
+            // Send final chunk with end-of-file marker FIRST
+            _currentChunk.isEndOfFile = 1;
+            _currentChunk.isNewFile = 0;
+            _currentChunk.length = _chunkIndex;  // Use actual data length, not 0
+            _currentChunk.timestamp = millis();
+
+            auto fileSystemManager = getServices().getFileSystemManager();
+            fileSystemManager->processDataChunk(_currentChunk);
+
+            // Debug logging for end of file detection AFTER final chunk is written
             auto systemManager = getServices().getSystemManager();
             if (systemManager && systemManager->isParallelDebugEnabled()) {
-                auto fileSystemManager = getServices().getFileSystemManager();
                 Serial.print(F("[DEBUG-LPT] END OF FILE DETECTED - File #"));
                 Serial.print(_filesReceived);
                 Serial.print(F(", bytes read: "));
@@ -167,21 +175,12 @@ void ParallelPortManager::processData() {
                 Serial.print(F(", idle cycles: "));
                 Serial.print(_idleCounter);
                 
-                // Check for data loss
+                // Check for data loss AFTER final write
                 if (_currentFileBytes != fileSystemManager->getCurrentFileBytesWritten()) {
                     Serial.print(F(" **DATA MISMATCH**"));
                 }
                 Serial.print(F("\r\n"));
             }
-
-            // Send final chunk with end-of-file marker
-            _currentChunk.isEndOfFile = 1;
-            _currentChunk.isNewFile = 0;
-            _currentChunk.length = _chunkIndex;  // Use actual data length, not 0
-            _currentChunk.timestamp = millis();
-
-            auto fileSystemManager = getServices().getFileSystemManager();
-            fileSystemManager->processDataChunk(_currentChunk);
 
             _fileInProgress = false;
             _idleCounter = 0;
