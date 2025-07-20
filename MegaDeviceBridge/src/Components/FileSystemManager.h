@@ -96,6 +96,10 @@ public:
     uint32_t getTotalBytesWritten() const { return _totalBytesWritten; }
     uint16_t getWriteErrors() const { return _writeErrors; }
     
+    // Hardware status
+    bool isSDCardPresent() const;     // Physical card detect
+    bool isSDWriteProtected() const;  // Write protect detection
+    
 private:
     // Statistics
     uint32_t _totalBytesWritten;

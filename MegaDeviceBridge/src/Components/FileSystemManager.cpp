@@ -100,6 +100,14 @@ void FileSystemManager::processDataChunk(const Common::DataChunk& chunk) {
 }
 
 bool FileSystemManager::initializeSD() {
+    // Initialize LED pins
+    pinMode(Common::Pins::DATA_WRITE_LED, OUTPUT);
+    digitalWrite(Common::Pins::DATA_WRITE_LED, LOW);
+    
+    // Initialize SD hardware detect pins
+    pinMode(Common::Pins::SD_CD, INPUT_PULLUP);   // Card Detect (active LOW)
+    pinMode(Common::Pins::SD_WP, INPUT_PULLUP);   // Write Protect (active HIGH)
+    
     return SD.begin(Common::Pins::SD_CS);
 }
 
@@ -144,6 +152,11 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
         return false;
     }
     
+    // Turn on write activity LED
+    digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
+    
+    bool success = false;
+    
     switch (_activeStorage.value) {
         case Common::StorageType::SD_CARD:
             if (_currentFile) {
@@ -152,7 +165,7 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
                 
                 if (written == chunk.length) {
                     _totalBytesWritten += chunk.length;
-                    return true;
+                    success = true;
                 }
             }
             break;
@@ -163,13 +176,18 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk& chunk) {
             
         case Common::StorageType::SERIAL_TRANSFER:
             // TODO: Implement serial transfer
-            return true;
+            success = true;
+            break;
             
         default:
-            return false;
+            success = false;
+            break;
     }
     
-    return false;
+    // Turn off write activity LED
+    digitalWrite(Common::Pins::DATA_WRITE_LED, LOW);
+    
+    return success;
 }
 
 bool FileSystemManager::closeCurrentFile() {
@@ -323,6 +341,14 @@ uint32_t FileSystemManager::getSDCardFileCount() const {
     
     root.close();
     return fileCount;
+}
+
+bool FileSystemManager::isSDCardPresent() const {
+    return digitalRead(Common::Pins::SD_CD) == LOW;  // Active LOW
+}
+
+bool FileSystemManager::isSDWriteProtected() const {
+    return digitalRead(Common::Pins::SD_WP) == HIGH; // Active HIGH
 }
 
 Common::FileType FileSystemManager::detectFileType(const uint8_t* data, uint16_t length) {

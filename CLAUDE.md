@@ -86,24 +86,25 @@ Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port
 - **Debugging Tools**: Enhanced `testwrite`, `storage`, and `files` commands operational
 - **Timestamp Filenames**: yyyyMMddHHmmss.ext format implemented and ready
 
-### Hardware Enhancements Planned 🔧
-- **L1 LED (Pin 30)**: Visual LPT read activity indicator
-- **L2 LED (Pin 32)**: Visual data write activity indicator  
-- **SD Write Protect (Pin 34)**: Hardware write protection detection
-- **SD Card Detect (Pin 36)**: Physical card presence detection
+### Hardware Enhancements Implemented ✅
+- **L1 LED (Pin 30)**: Visual LPT read activity indicator - OPERATIONAL
+- **L2 LED (Pin 32)**: Visual data write activity indicator - OPERATIONAL
+- **SD Write Protect (Pin 34)**: Hardware write protection detection - IMPLEMENTED
+- **SD Card Detect (Pin 36)**: Physical card presence detection - IMPLEMENTED
 
 ### Feature Requests Integration ✅
-- **LPT Printer Protocol**: Proper busy/acknowledge signaling for TDS2024
-- **Enhanced Debugging**: Hex data display in testint command
-- **File Management**: Serial commands for list, get, delete operations
-- **Configuration Storage**: Save/restore settings to EEPROM
-- **Flow Control**: Ring buffer management with busy signaling
+- **Enhanced Debugging**: Hex data display in parallel/lpt command - COMPLETED
+- **Hardware Status**: SD card detect/write protect in storage command - COMPLETED
+- **Visual Feedback**: L1/L2 LEDs for real-time activity monitoring - COMPLETED
+- **LPT Printer Protocol**: Proper busy/acknowledge signaling for TDS2024 - IN PROGRESS
+- **File Management**: Serial commands for list, get, delete operations - PLANNED
+- **Configuration Storage**: Save/restore settings to EEPROM - PLANNED
 
 ### Next Steps
-1. **Hardware Enhancements**: Implement L1/L2 LEDs (pins 30,32) and SD card detect/write protect (pins 34,36)
-2. **Build and Test**: Enhanced testwrite with SD file counting and timestamp filenames
-3. **LPT Protocol**: Add proper printer busy/acknowledge signaling for TDS2024 compatibility
-4. **Serial File Management**: Add list, get, delete commands for file operations
+1. **Build and Test**: Complete hardware enhancements and enhanced debugging commands
+2. **LPT Protocol**: Add proper printer busy/acknowledge signaling for TDS2024 compatibility  
+3. **Serial File Management**: Add list, get, delete commands for file operations
+4. **Configuration Storage**: Save/restore settings to EEPROM via serial menu
 
 ## Documentation Status: CURRENT ✅
 - **ARCHITECTURE.md**: Loop-based architecture documented

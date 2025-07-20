@@ -23,6 +23,10 @@ ParallelPortManager::~ParallelPortManager() {
 }
 
 bool ParallelPortManager::initialize() {
+    // Initialize LPT read activity LED
+    pinMode(Common::Pins::LPT_READ_LED, OUTPUT);
+    digitalWrite(Common::Pins::LPT_READ_LED, LOW);
+    
     // Port should already be initialized by main
     return true;
 }
@@ -57,6 +61,9 @@ void ParallelPortManager::processData() {
         
         // Read available data into current chunk
         if (_chunkIndex < sizeof(_currentChunk.data)) {
+            // Turn on LPT read activity LED
+            digitalWrite(Common::Pins::LPT_READ_LED, HIGH);
+            
             uint16_t bytesToRead = sizeof(_currentChunk.data) - _chunkIndex;
             uint16_t bytesRead = _port.readData(_currentChunk.data, _chunkIndex, bytesToRead);
             
@@ -70,6 +77,9 @@ void ParallelPortManager::processData() {
                     sendChunk();
                 }
             }
+            
+            // Turn off LPT read activity LED
+            digitalWrite(Common::Pins::LPT_READ_LED, LOW);
         }
     } else {
         _idleCounter++;

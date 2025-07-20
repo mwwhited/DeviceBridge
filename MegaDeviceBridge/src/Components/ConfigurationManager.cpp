@@ -122,11 +122,11 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  time set YYYY-MM-DD HH:MM - Set RTC time\r\n"));
     Serial.print(F("\r\nDebug Commands:\r\n"));
     Serial.print(F("  buttons           - Show button analog values\r\n"));
-    Serial.print(F("  parallel/lpt      - Show parallel port status\r\n"));
+    Serial.print(F("  parallel/lpt      - Show parallel port status with hex data\r\n"));
     Serial.print(F("  testint           - Test interrupt pin response\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
-    Serial.print(F("  storage           - Show storage device status\r\n"));
+    Serial.print(F("  storage           - Show storage/hardware status\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
     Serial.print(F("  storage eeprom    - Use EEPROM storage\r\n"));
     Serial.print(F("  storage serial    - Use serial transfer\r\n"));
@@ -324,21 +324,49 @@ void ConfigurationManager::printParallelPortStatus() {
     Serial.print(digitalRead(Common::Pins::LPT_STROBE));
     Serial.print(F("\r\n"));
     
+    // Read data pins and calculate hex value
+    uint8_t dataPins[] = {Common::Pins::LPT_D0, Common::Pins::LPT_D1, Common::Pins::LPT_D2, 
+                          Common::Pins::LPT_D3, Common::Pins::LPT_D4, Common::Pins::LPT_D5, 
+                          Common::Pins::LPT_D6, Common::Pins::LPT_D7};
+    
+    uint8_t dataValue = 0;
     Serial.print(F("  Data pins (D0-D7): "));
     for (int i = 0; i < 8; i++) {
-        uint8_t dataPins[] = {Common::Pins::LPT_D0, Common::Pins::LPT_D1, Common::Pins::LPT_D2, 
-                              Common::Pins::LPT_D3, Common::Pins::LPT_D4, Common::Pins::LPT_D5, 
-                              Common::Pins::LPT_D6, Common::Pins::LPT_D7};
-        Serial.print(digitalRead(dataPins[i]));
+        int pinState = digitalRead(dataPins[i]);
+        Serial.print(pinState);
+        if (pinState) {
+            dataValue |= (1 << i);  // Set bit i if pin is HIGH
+        }
     }
+    Serial.print(F(" (0x"));
+    if (dataValue < 16) Serial.print(F("0"));  // Leading zero for single hex digit
+    Serial.print(dataValue, HEX);
+    Serial.print(F(")"));
     Serial.print(F("\r\n"));
     
-    Serial.print(F("\r\nStatus pins:\r\n"));
+    Serial.print(F("\r\nControl pins (Input):\r\n"));
+    Serial.print(F("  Auto Feed (pin 22): "));
+    Serial.print(digitalRead(Common::Pins::LPT_AUTO_FEED));
+    Serial.print(F("\r\n"));
+    Serial.print(F("  Initialize (pin 26): "));
+    Serial.print(digitalRead(Common::Pins::LPT_INITIALIZE));
+    Serial.print(F("\r\n"));
+    Serial.print(F("  Select In (pin 28): "));
+    Serial.print(digitalRead(Common::Pins::LPT_SELECT_IN));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("\r\nStatus pins (Output):\r\n"));
     Serial.print(F("  Ack (pin 41): "));
     Serial.print(digitalRead(Common::Pins::LPT_ACK));
     Serial.print(F("\r\n"));
     Serial.print(F("  Busy (pin 43): "));
     Serial.print(digitalRead(Common::Pins::LPT_BUSY));
+    Serial.print(F("\r\n"));
+    Serial.print(F("  Paper Out (pin 45): "));
+    Serial.print(digitalRead(Common::Pins::LPT_PAPER_OUT));
+    Serial.print(F("\r\n"));
+    Serial.print(F("  Select (pin 47): "));
+    Serial.print(digitalRead(Common::Pins::LPT_SELECT));
     Serial.print(F("\r\n"));
     Serial.print(F("  Error (pin 24): "));
     Serial.print(digitalRead(Common::Pins::LPT_ERROR));
@@ -400,6 +428,14 @@ void ConfigurationManager::printStorageStatus() {
         Serial.print(_fileSystemManager->isSDAvailable() ? F("Available") : F("Not Available"));
         Serial.print(F("\r\n"));
         
+        Serial.print(F("SD Card Present: "));
+        Serial.print(_fileSystemManager->isSDCardPresent() ? F("YES") : F("NO"));
+        Serial.print(F("\r\n"));
+        
+        Serial.print(F("SD Write Protected: "));
+        Serial.print(_fileSystemManager->isSDWriteProtected() ? F("YES") : F("NO"));
+        Serial.print(F("\r\n"));
+        
         Serial.print(F("EEPROM: "));
         Serial.print(_fileSystemManager->isEEPROMAvailable() ? F("Available") : F("Not Available"));
         Serial.print(F("\r\n"));
@@ -428,6 +464,15 @@ void ConfigurationManager::printStorageStatus() {
         Serial.print(_systemManager->getFreeMemory());
         Serial.print(F(" bytes\r\n"));
     }
+    
+    Serial.print(F("\r\n=== Hardware Status ===\r\n"));
+    Serial.print(F("L1 LED (Pin 30): "));
+    Serial.print(digitalRead(Common::Pins::LPT_READ_LED) ? F("ON") : F("OFF"));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("L2 LED (Pin 32): "));
+    Serial.print(digitalRead(Common::Pins::DATA_WRITE_LED) ? F("ON") : F("OFF"));
+    Serial.print(F("\r\n"));
     
     Serial.print(F("=============================\r\n\r\n"));
 }
