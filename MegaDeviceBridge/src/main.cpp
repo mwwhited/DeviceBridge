@@ -11,6 +11,7 @@
 #include "./Components/TimeManager.h"
 #include "./Components/SystemManager.h"
 #include "./Components/ConfigurationManager.h"
+#include "./Components/HeartbeatLEDManager.h"
 
 // Common definitions
 #include "./Common/Types.h"
@@ -56,6 +57,7 @@ DeviceBridge::Components::DisplayManager* displayManager = nullptr;
 DeviceBridge::Components::TimeManager* timeManager = nullptr;
 DeviceBridge::Components::SystemManager* systemManager = nullptr;
 DeviceBridge::Components::ConfigurationManager* configurationManager = nullptr;
+DeviceBridge::Components::HeartbeatLEDManager* heartbeatLEDManager = nullptr;
 DeviceBridge::Common::ConfigurationService* configurationService = nullptr;
 
 // Timing for cooperative multitasking
@@ -71,9 +73,6 @@ unsigned long lastConfigurationUpdate = 0;
 
 void setup()
 {
-  pinMode(DeviceBridge::Common::Pins::HEARTBEAT, OUTPUT);
-  digitalWrite(DeviceBridge::Common::Pins::HEARTBEAT, LOW); // Start with LED off
-
   Serial.begin(DeviceBridge::Common::Serial::BAUD_RATE);
   while (!Serial) { delay(10); }
   
@@ -94,11 +93,13 @@ void setup()
   timeManager = new DeviceBridge::Components::TimeManager();
   systemManager = new DeviceBridge::Components::SystemManager();
   configurationManager = new DeviceBridge::Components::ConfigurationManager();
+  heartbeatLEDManager = new DeviceBridge::Components::HeartbeatLEDManager();
   configurationService = new DeviceBridge::Common::ConfigurationService();
   
   // Verify component creation
   if (!parallelPortManager || !fileSystemManager || !displayManager || 
-      !timeManager || !systemManager || !configurationManager || !configurationService) {
+      !timeManager || !systemManager || !configurationManager || 
+      !heartbeatLEDManager || !configurationService) {
     Serial.print(F("FATAL: Failed to create component managers\r\n"));
     while(1) { delay(1000); }
   }
@@ -112,6 +113,7 @@ void setup()
   services.registerTimeManager(timeManager);
   services.registerSystemManager(systemManager);
   services.registerConfigurationManager(configurationManager);
+  services.registerHeartbeatLEDManager(heartbeatLEDManager);
   services.registerConfigurationService(configurationService);
   
   // Validate all dependencies are registered
@@ -145,6 +147,10 @@ void setup()
   
   if (!configurationManager->initialize()) {
     Serial.print(F("WARNING: Configuration manager initialization failed\r\n"));
+  }
+  
+  if (!heartbeatLEDManager->initialize()) {
+    Serial.print(F("WARNING: Heartbeat LED manager initialization failed\r\n"));
   }
   
   Serial.print(F("All systems initialized successfully!\r\n"));
@@ -204,9 +210,9 @@ void loop()
     lastSystemUpdate = currentTime;
   }
 
-  // Heartbeat manager
+  // Heartbeat LED manager
   if (currentTime - lastHeartbeatUpdate >= configurationService->getHeartbeatInterval()) {
-    digitalWrite(DeviceBridge::Common::Pins::HEARTBEAT, !digitalRead(DeviceBridge::Common::Pins::HEARTBEAT));
+    heartbeatLEDManager->update();
     lastHeartbeatUpdate = currentTime;
   }
   

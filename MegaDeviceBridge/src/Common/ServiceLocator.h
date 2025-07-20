@@ -13,6 +13,7 @@ namespace Components {
     class TimeManager;
     class SystemManager;
     class ConfigurationManager;
+    class HeartbeatLEDManager;
 }
 
 namespace Common {
@@ -36,6 +37,7 @@ private:
     Components::TimeManager* _timeManager;
     Components::SystemManager* _systemManager;
     Components::ConfigurationManager* _configurationManager;
+    Components::HeartbeatLEDManager* _heartbeatLEDManager;
     Common::ConfigurationService* _configurationService;
     User::Display* _display;
     
@@ -57,6 +59,7 @@ public:
     void registerTimeManager(Components::TimeManager* manager);
     void registerSystemManager(Components::SystemManager* manager);
     void registerConfigurationManager(Components::ConfigurationManager* manager);
+    void registerHeartbeatLEDManager(Components::HeartbeatLEDManager* manager);
     void registerConfigurationService(Common::ConfigurationService* service);
     void registerDisplay(User::Display* display);
     
@@ -67,6 +70,7 @@ public:
     Components::TimeManager* getTimeManager() const;
     Components::SystemManager* getSystemManager() const;
     Components::ConfigurationManager* getConfigurationManager() const;
+    Components::HeartbeatLEDManager* getHeartbeatLEDManager() const;
     Common::ConfigurationService* getConfigurationService() const;
     User::Display* getDisplay() const;
     

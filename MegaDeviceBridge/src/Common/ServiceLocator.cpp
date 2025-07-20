@@ -5,6 +5,7 @@
 #include "../Components/TimeManager.h"
 #include "../Components/SystemManager.h"
 #include "../Components/ConfigurationManager.h"
+#include "../Components/HeartbeatLEDManager.h"
 #include "ConfigurationService.h"
 #include "../User/Display.h"
 #include <Arduino.h>
@@ -21,6 +22,7 @@ ServiceLocator::ServiceLocator()
     , _timeManager(nullptr)
     , _systemManager(nullptr)
     , _configurationManager(nullptr)
+    , _heartbeatLEDManager(nullptr)
     , _configurationService(nullptr)
     , _display(nullptr)
 {
@@ -67,6 +69,10 @@ void ServiceLocator::registerConfigurationManager(Components::ConfigurationManag
     _configurationManager = manager;
 }
 
+void ServiceLocator::registerHeartbeatLEDManager(Components::HeartbeatLEDManager* manager) {
+    _heartbeatLEDManager = manager;
+}
+
 void ServiceLocator::registerConfigurationService(Common::ConfigurationService* service) {
     _configurationService = service;
 }
@@ -98,6 +104,10 @@ Components::SystemManager* ServiceLocator::getSystemManager() const {
 
 Components::ConfigurationManager* ServiceLocator::getConfigurationManager() const {
     return _configurationManager;
+}
+
+Components::HeartbeatLEDManager* ServiceLocator::getHeartbeatLEDManager() const {
+    return _heartbeatLEDManager;
 }
 
 Common::ConfigurationService* ServiceLocator::getConfigurationService() const {
@@ -134,6 +144,9 @@ bool ServiceLocator::validateAllDependencies() const {
     
     printComponentStatus(F("ConfigurationManager"), _configurationManager);
     if (!_configurationManager) allValid = false;
+    
+    printComponentStatus(F("HeartbeatLEDManager"), _heartbeatLEDManager);
+    if (!_heartbeatLEDManager) allValid = false;
     
     printComponentStatus(F("ConfigurationService"), _configurationService);
     if (!_configurationService) allValid = false;
