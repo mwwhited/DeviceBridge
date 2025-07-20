@@ -4,6 +4,7 @@
 #include "ParallelPortManager.h"
 #include "SystemManager.h"
 #include "TimeManager.h"
+#include "../Common/ConfigurationService.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -507,26 +508,46 @@ void ConfigurationManager::printStorageStatus() {
     Serial.print(F("\r\n"));
 
     // Add LPT buffer status for debugging data loss issues
+    auto config = getServices().getConfigurationService();
+    uint16_t bufferCapacity = config->getRingBufferSize();
+    uint16_t moderateThreshold = config->getModerateFlowThreshold(bufferCapacity);
+    uint16_t criticalThreshold = config->getCriticalFlowThreshold(bufferCapacity);
+    uint16_t recoveryThreshold = config->getRecoveryFlowThreshold(bufferCapacity);
+    
     Serial.print(F("\r\n=== LPT Buffer Status ===\r\n"));
     uint16_t bufferLevel = parallelPort->getBufferLevel();
     Serial.print(F("Buffer Level: "));
     Serial.print(bufferLevel);
-    Serial.print(F("/512 bytes ("));
-    Serial.print((bufferLevel * 100) / 512);
+    Serial.print(F("/"));
+    Serial.print(bufferCapacity);
+    Serial.print(F(" bytes ("));
+    Serial.print((bufferLevel * 100) / bufferCapacity);
     Serial.print(F("% full)\r\n"));
     
     Serial.print(F("Flow Control Thresholds:\r\n"));
-    Serial.print(F("  60% (307 bytes): Moderate busy delay (25μs)\r\n"));
-    Serial.print(F("  80% (409 bytes): Extended busy delay (50μs)\r\n"));
+    Serial.print(F("  60% ("));
+    Serial.print(moderateThreshold);
+    Serial.print(F(" bytes): Moderate busy delay ("));
+    Serial.print(config->getModerateFlowDelayUs());
+    Serial.print(F("μs)\r\n"));
+    Serial.print(F("  80% ("));
+    Serial.print(criticalThreshold);
+    Serial.print(F(" bytes): Extended busy delay ("));
+    Serial.print(config->getCriticalFlowDelayUs());
+    Serial.print(F("μs)\r\n"));
     
     Serial.print(F("Buffer Status: "));
-    if (bufferLevel >= 512) {
+    if (bufferLevel >= bufferCapacity) {
         Serial.print(F("❌ FULL - DATA LOSS RISK!"));
-    } else if (bufferLevel >= 409) {  // 80% threshold
-        Serial.print(F("🔴 CRITICAL - Extended flow control (50μs)"));
-    } else if (bufferLevel >= 307) {  // 60% threshold
-        Serial.print(F("⚠️  WARNING - Moderate flow control (25μs)"));
-    } else if (bufferLevel >= 256) {  // 50% threshold
+    } else if (bufferLevel >= criticalThreshold) {  // 80% threshold
+        Serial.print(F("🔴 CRITICAL - Extended flow control ("));
+        Serial.print(config->getCriticalFlowDelayUs());
+        Serial.print(F("μs)"));
+    } else if (bufferLevel >= moderateThreshold) {  // 60% threshold
+        Serial.print(F("⚠️  WARNING - Moderate flow control ("));
+        Serial.print(config->getModerateFlowDelayUs());
+        Serial.print(F("μs)"));
+    } else if (bufferLevel >= recoveryThreshold) {  // 50% threshold
         Serial.print(F("🟡 ELEVATED - Ready for flow control"));
     } else if (bufferLevel > 0) {
         Serial.print(F("✅ Normal - Data available"));

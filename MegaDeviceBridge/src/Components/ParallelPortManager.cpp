@@ -1,6 +1,7 @@
 #include "ParallelPortManager.h"
 #include "FileSystemManager.h"
 #include "DisplayManager.h"
+#include "../Common/ConfigurationService.h"
 #include <string.h>
 
 namespace DeviceBridge::Components {
@@ -132,11 +133,11 @@ bool ParallelPortManager::detectEndOfFile() {
     }
 
     // Use millis() based timing for loop-based architecture
-    const uint32_t FILE_TIMEOUT_MS = 2000; // 2 second timeout
+    uint32_t fileTimeoutMs = getServices().getConfigurationService()->getKeepBusyMs(); // Use configured timeout
     uint32_t currentTime = millis();
     uint32_t timeSinceLastData = currentTime - _lastDataTime;
 
-    return timeSinceLastData >= FILE_TIMEOUT_MS;
+    return timeSinceLastData >= fileTimeoutMs;
 }
 
 uint16_t ParallelPortManager::getBufferLevel() const {
