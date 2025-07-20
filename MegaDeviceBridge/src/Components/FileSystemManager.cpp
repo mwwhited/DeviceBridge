@@ -63,11 +63,15 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
             _detectedFileType = _fileType; // Use configured type
         }
     } else {
-        sendDisplayMessage(Common::DisplayMessage::STATUS, F(","));
+        // Don't spam LCD with status messages for every data chunk
+        // The continuous activity is already shown by L2 LED
     }
 
-    // Write data - only if file is properly open
+    // Write data - show activity even if file isn't open
     if (chunk.length > 0) {
+        // Flash L2 LED to show write activity attempt
+        digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
+        
         if (_isFileOpen) {
             if (!writeDataChunk(chunk)) {
                 _writeErrors++;
@@ -86,6 +90,10 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
                 errorSent = false; // Reset for next file
             }
         }
+        
+        // Brief delay to make LED flash visible, then turn off
+        delay(2);
+        digitalWrite(Common::Pins::DATA_WRITE_LED, LOW);
     }
 
     // Handle end of file
@@ -131,13 +139,20 @@ bool FileSystemManager::createNewFile() {
             if (lastSlash >= 0) {
                 String dirPath = currentPath.substring(0, lastSlash);
                 if (!SD.exists(dirPath.c_str())) {
-                    if (!SD.mkdir(dirPath.c_str())) {
-                        sendDisplayMessage(Common::DisplayMessage::ERROR, F("Failed to create directory"));
-                        return false;
+                    // Create directory without leading slash for Arduino SD library
+                    String createPath = dirPath.substring(1); // Remove leading '/'
+                    if (!SD.mkdir(createPath.c_str())) {
+                        // Try without subdirectory - fallback to root
+                        sendDisplayMessage(Common::DisplayMessage::ERROR, F("Dir Failed - Using Root"));
+                        // Use just the filename without directory structure
+                        auto fileName = currentPath.substring(lastSlash + 1);
+                        currentPath = "/" + fileName;
+                    } else {
+                        sendDisplayMessage(Common::DisplayMessage::INFO, F("Dir Created"));
                     }
+                } else {
+                    sendDisplayMessage(Common::DisplayMessage::INFO, F("Dir Exists"));
                 }
-
-                sendDisplayMessage(Common::DisplayMessage::INFO, ("Dir: " + dirPath).c_str());
             }
             auto fileName = currentPath.substring(lastSlash + 1);
             sendDisplayMessage(Common::DisplayMessage::INFO, ("File: " + fileName).c_str());
@@ -371,27 +386,34 @@ uint32_t FileSystemManager::getSDCardFileCount() const {
         return 0;
     }
 
-    uint32_t fileCount = 0;
-    File root = SD.open("/");
+    return countFilesRecursive("/");
+}
 
-    if (!root) {
+uint32_t FileSystemManager::countFilesRecursive(const char* dirPath) const {
+    uint32_t fileCount = 0;
+    File dir = SD.open(dirPath);
+
+    if (!dir) {
         return 0;
     }
 
-    // Count all files in root directory
+    // Count all files and recurse into subdirectories
     while (true) {
-        File entry = root.openNextFile();
+        File entry = dir.openNextFile();
         if (!entry) {
             break; // No more files
         }
 
-        if (!entry.isDirectory()) {
+        if (entry.isDirectory()) {
+            // Recurse into subdirectory
+            fileCount += countFilesRecursive(entry.name());
+        } else {
             fileCount++;
         }
         entry.close();
     }
 
-    root.close();
+    dir.close();
     return fileCount;
 }
 

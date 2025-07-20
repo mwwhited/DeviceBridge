@@ -1,5 +1,6 @@
 #include "ParallelPortManager.h"
 #include "FileSystemManager.h"
+#include "DisplayManager.h"
 #include <string.h>
 
 namespace DeviceBridge::Components {

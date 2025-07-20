@@ -104,6 +104,8 @@ public:
     bool isSDWriteProtected() const;  // Write protect detection
     
 private:
+    // Helper methods
+    uint32_t countFilesRecursive(const char* dirPath) const;
     // Statistics
     uint32_t _totalBytesWritten;
     uint16_t _writeErrors;
