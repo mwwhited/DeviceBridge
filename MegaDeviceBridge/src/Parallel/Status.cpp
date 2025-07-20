@@ -40,6 +40,10 @@ namespace DeviceBridge::Parallel
     // set busy
     digitalWrite(_busy, true);
   }
+  void Status::setBusy(bool busy) {
+    digitalWrite(_busy, busy);
+  }
+
   void Status::setAck(){
     // set acknowledgement
     digitalWrite(_acknowledge, false);
@@ -51,5 +55,24 @@ namespace DeviceBridge::Parallel
     // reset busy
     digitalWrite(_busy, false);
     
+  }
+
+  void Status::sendAcknowledgePulse() {
+    // Send a brief acknowledge pulse
+    digitalWrite(_acknowledge, false);
+    delayMicroseconds(5);  // Brief pulse
+    digitalWrite(_acknowledge, true);
+  }
+
+  void Status::setError(bool error) {
+    digitalWrite(_error, !error);  // Error is active LOW
+  }
+
+  void Status::setPaperOut(bool paperOut) {
+    digitalWrite(_paperOut, paperOut);
+  }
+
+  void Status::setSelect(bool select) {
+    digitalWrite(_selected, select);
   }
 }

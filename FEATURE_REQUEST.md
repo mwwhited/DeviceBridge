@@ -1,0 +1,20 @@
+- check the timing diagram of a LPT port
+- this device should be working as a printer.  the device should report as busy while it is doing anything other than reading from the lpt port.
+- update testint to include the hex value of the data lines as well as all of the data control lines for both in and out
+- Each component should have a self test that is used by the validate test function
+  - one of the steps in the self test should make sure the objects are properly initialized and have no null pointers from required components.
+- the serial menu needs the ability to write the current configuration to the eeprom on the arduino
+- when the ring buffer is nearly full the lpt port should hold the busy pin high giving time for other devices to write out the content
+- devices that require interrupts or dma such as serial and spi should have the ability to force lpt to be busy.  
+  - add a lock/unlock to lpt
+- create a service locator class that can hold instances of all component objects
+  - inject the service locator into each class at construction
+  - only allow communication between components though the references on the service locator
+- instead of using EEFS use LittleFS for the EEPROM
+- serial commands
+  - add list {device} commands for listing files devices
+  - add get {device} {filename} command for downloading a file from the device over serial
+  - add delete {device} {filename} command for removing a file from device
+- all pinouts should be defined on `src\Common\Config.h`.  
+- all configuration such as pinouts for devices should be injected though a configuration object
+  - currently 

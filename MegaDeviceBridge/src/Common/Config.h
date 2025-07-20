@@ -53,7 +53,9 @@ namespace Serial {
 }
 
 // Hardware Pin Assignments (from Pinouts.md)
-namespace Pins {
+namespace Pins {  
+  constexpr uint8_t HEARTBEAT = 13;
+
   // LCD Shield pins
   constexpr uint8_t LCD_RESET = 8;
   constexpr uint8_t LCD_ENABLE = 9;
@@ -61,10 +63,17 @@ namespace Pins {
   constexpr uint8_t LCD_D5 = 5;
   constexpr uint8_t LCD_D6 = 6;
   constexpr uint8_t LCD_D7 = 7;
+  constexpr uint8_t LCD_BUTTONS = A0;  // OSEPP analog button input
 
   // Storage pins
   constexpr uint8_t SD_CS = 10;
   constexpr uint8_t EEPROM_CS = 3;
+  constexpr uint8_t SD_CD = 36;         // Card Detect (active LOW)
+  constexpr uint8_t SD_WP = 34;         // Write Protect (active HIGH)
+  
+  // Status LEDs
+  constexpr uint8_t LPT_READ_LED = 30;  // L1 - Parallel port read activity
+  constexpr uint8_t DATA_WRITE_LED = 32; // L2 - File write activity
 
   // Parallel port control pins
   constexpr uint8_t LPT_STROBE = 18;

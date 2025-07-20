@@ -4,6 +4,7 @@
 #include "../User/Display.h"
 #include "../Common/Types.h"
 #include "../Common/Config.h"
+#include "../Common/ServiceLocator.h"
 
 namespace DeviceBridge::Components {
 
@@ -11,11 +12,10 @@ namespace DeviceBridge::Components {
 class TimeManager;
 class SystemManager;
 
-class DisplayManager {
+class DisplayManager : public DeviceBridge::IComponent {
 private:
     User::Display& _display;
-    TimeManager* _timeManager;
-    SystemManager* _systemManager;
+    // Note: No longer storing direct references - using ServiceLocator
     
     // Display state
     char _currentMessage[Common::Limits::MAX_MESSAGE_LENGTH];
@@ -52,15 +52,18 @@ private:
 public:
     DisplayManager(User::Display& display);
     ~DisplayManager();
+        
     
-    // Set component references
-    void setTimeManager(TimeManager* manager) { _timeManager = manager; }
-    void setSystemManager(SystemManager* manager) { _systemManager = manager; }
+    // Lifecycle management (IComponent interface)
+    bool initialize() override;
+    void update() override;  // Called from main loop
+    void stop() override;
     
-    // Lifecycle management
-    bool initialize();
-    void update();  // Called from main loop
-    void stop();
+    // IComponent interface implementation
+    bool selfTest() override;
+    const char* getComponentName() const override;
+    bool validateDependencies() const override;
+    void printDependencyStatus() const override;
     
     // Display control
     void showMessage(const char* message, const char* line2 = nullptr);

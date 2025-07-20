@@ -12,7 +12,8 @@
       "WebFetch(domain:wiki.dfrobot.com)",
       "WebFetch(domain:arduino.stackexchange.com)",
       "Bash(pio run:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(python3 -m pip install platformio)"
     ],
     "deny": []
   }

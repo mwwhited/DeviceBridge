@@ -4,16 +4,18 @@
 #include "../Parallel/Port.h"
 #include "../Common/Types.h"
 #include "../Common/Config.h"
+#include "../Common/ServiceLocator.h"
+
 
 namespace DeviceBridge::Components {
 
 // Forward declaration for callback
 class FileSystemManager;
 
-class ParallelPortManager {
+class ParallelPortManager : public DeviceBridge::IComponent {
 private:
     Parallel::Port& _port;
-    FileSystemManager* _fileSystemManager;
+    // Note: No longer storing direct references - using ServiceLocator
     
     // File detection state
     bool _fileInProgress;
@@ -36,13 +38,16 @@ public:
     ParallelPortManager(Parallel::Port& port);
     ~ParallelPortManager();
     
-    // Set callback for data delivery
-    void setFileSystemManager(FileSystemManager* manager) { _fileSystemManager = manager; }
+    // Lifecycle management (IComponent interface)
+    bool initialize() override;
+    void update() override;  // Called from main loop
+    void stop() override;
     
-    // Lifecycle management
-    bool initialize();
-    void update();  // Called from main loop
-    void stop();
+    // IComponent interface implementation
+    bool selfTest() override;
+    const char* getComponentName() const override;
+    bool validateDependencies() const override;
+    void printDependencyStatus() const override;
     
     // Status inquiry
     bool isReceiving() const { return _fileInProgress; }
@@ -51,6 +56,22 @@ public:
     // Statistics
     uint32_t getTotalBytesReceived() const;
     uint32_t getFilesReceived() const;
+    
+    // Debug methods
+    uint32_t getInterruptCount() const;
+    uint32_t getDataCount() const;
+    
+    // LPT locking for SPI/Serial operations
+    void lockPort();
+    void unlockPort();
+    bool isPortLocked() const;
+    
+    // Printer protocol test methods
+    void setPrinterBusy(bool busy);
+    void setPrinterError(bool error);
+    void setPrinterPaperOut(bool paperOut);
+    void setPrinterSelect(bool select);
+    void sendPrinterAcknowledge();
     
 private:
     // Statistics tracking

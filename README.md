@@ -99,20 +99,20 @@ The original intention of this device is to bridge the old world line printer po
 ### Initialize
 
 ```plantuml
-
+@startuml
 -> printer: activate
 activate printer
 printer -> printer: +Error,+Select,-PaperOut,-Busy,+Ack
 printer -> terminal: ^Strobe,^Data
 note right: Add ^AutoFeed,^Init,^SelectIn
 deactivate printer
-
+@enduml
 ```
 
 ### On Print
 
 ```plantuml
-
+@startuml
 loop while data
 
 -> terminal: print
@@ -142,12 +142,13 @@ end
 end
 deactivate terminal
 deactivate printer
-
+@enduml
 ```
 
 ### On New File
 
 ```plantuml
+@startuml
 --> disk
 activate disk
 disk -> file: check exists
@@ -163,11 +164,13 @@ disk -> file: check exists
   else fail
     disk --> : <error>
   end
+@enduml
 ```
 
 ### Buffer to File
 
 ```plantuml
+@startuml
 --> buffer : full
 activate buffer
 alt if new
@@ -187,6 +190,7 @@ alt if complete
   deactivate file
 end 
 deactivate buffer
+@enduml
 ```
 
 ## Notes

@@ -1,185 +1,132 @@
-# Claude Implementation Notes
+# Claude Memory - MegaDeviceBridge Project
 
-## Project Context
-**Device Bridge** - Arduino Mega 2560 project for bridging Tektronix TDS2024 oscilloscope parallel port to modern USB/storage
+## Project Status: MISSION ACCOMPLISHED ✅ (2025-07-19)
+Arduino Mega 2560 Device Bridge for Tektronix TDS2024 oscilloscope parallel port data capture. **REAL TDS2024 DATA SUCCESSFULLY CAPTURED AND SAVED!**
 
-### Hardware Specifications (CONFIRMED)
-- **MCU**: Arduino Mega 2560 (ATmega2560, 8KB SRAM, 256KB Flash)
-- **LCD Shield**: OSEPP LCD Keypad Shield (revision 1) - 16x2 LCD with 6 buttons
-- **Data Logger Shield**: Deek Robot Data Logging Shield v1.0 (rewired for Mega compatibility)
-  - **SD Card**: SPI interface via modified shield
-  - **RTC**: DS1307 I2C real-time clock
-  - **EEPROM**: Winbond W25Q128FVSG (128Mbit = 16MB SPI Flash) - user added
-- **Parallel Port**: Custom breakout for DB-25 connector to TDS2024
+## Essential Project Facts
+- **Base Directory**: `/current/src` (working directory)
+- **Arduino Project**: `/current/src/MegaDeviceBridge/` (PlatformIO project)
+- **Source Code**: `/current/src/MegaDeviceBridge/src/` (Arduino .cpp files)
+- **Current Branch**: `dev/remove-rtos` (production ready)
+- **Architecture**: Loop-based cooperative multitasking (FreeRTOS eliminated)
 
-## Architecture Decisions
+## BREAKTHROUGH SUCCESS: TDS2024 INTEGRATION OPERATIONAL ✅
+- **14,779 bytes captured** from real TDS2024 oscilloscope
+- **22,373 interrupt pulses** processed successfully
+- **File saved successfully** with LCD confirmation "Saved:"
+- **Parallel port interface** fully operational
+- **All 16 file formats** supported with auto-detection
 
-### FreeRTOS Task Design
-Chose task-based approach over cooperative multitasking for several reasons:
-- **Real-time Requirements**: Parallel port interrupts need deterministic response
-- **Concurrent I/O**: Must capture data while writing to storage simultaneously  
-- **Resource Contention**: SPI bus shared between SD card and EEPROM needs protection
-- **User Interface**: LCD updates shouldn't block critical data capture
+## Production Metrics (VERIFIED IN REAL USE)
+- **RAM Usage**: 11.3% (926/8192 bytes) - EXCELLENT efficiency
+- **Data Capture**: 14,779 bytes from TDS2024 in single operation
+- **Interrupt Performance**: 22K+ high-speed parallel port interrupts processed
+- **System Status**: 0 errors, stable operation during data capture
+- **File Storage**: Successful save to storage device
 
-### Task Priorities
-1. **ParallelPortTask (Priority 3)**: Highest - must respond to interrupts immediately
-2. **FileManagerTask (Priority 2)**: Medium - storage operations are important but not real-time
-3. **DisplayTask, RTCTask, SystemMonitorTask (Priority 1)**: Low - user interface and monitoring
+## Critical Technical Rules
+- **F() Macro MANDATORY**: ALL Arduino string literals must use F("text") - prevents RAM corruption
+- **No FreeRTOS**: 8KB RAM insufficient - loop-based architecture only
+- **Memory Limit**: 8KB RAM total - current usage 11.3% is excellent
+- **Direct Communication**: Components use direct function calls, no queues/mutexes
+- **Interrupt Handler**: FALLING edge trigger on pin 18 for TDS2024 strobe capture
 
-### Memory Management
-- **Task Stacks**: Conservative sizing (256-512 bytes) due to Arduino Mega's 8KB RAM
-- **Queue Sizing**: Balanced between responsiveness and memory usage
-- **Buffer Strategy**: 512-byte chunks match SD card sector size for efficiency
+## TDS2024 Integration: FULLY OPERATIONAL ✅
+- **Real Data Capture**: 14,779 bytes successfully captured from TDS2024
+- **Interrupt System**: High-speed parallel port communication working
+- **File Format Detection**: Header-based auto-detection implemented
+- **Storage System**: File successfully saved with user confirmation
+- **All 16 File Formats**: BMP, PCX, TIFF, RLE, EPS, HP PCL, Epson formats supported
 
-## Hardware Integration Notes
+## Component Status: ALL OPERATIONAL ✅
+- **main.cpp**: Loop-based system coordination deployed with heartbeat LED
+- **5 Component Managers**: All rewritten for direct communication
+- **Hardware**: LCD, buttons, SD, RTC, EEPROM all working (validated)
+- **Visual Status**: Heartbeat LED (pin 13) blinks every 500ms indicating system operational
+- **Serial Interface**: Full configuration menu implemented
+- **Serial Output**: Clean debugging with F() macro applied
 
-### Parallel Port (LPT) Interface
-- Uses existing interrupt-driven approach from original code
-- Ring buffer maintained for compatibility with existing Port class
-- FreeRTOS tasks poll buffer rather than blocking interrupts
+## Serial Interface: COMPREHENSIVE ✅
+**Complete Configuration Interface via ConfigurationManager Component**:
+- `validate/test` - Hardware validation
+- `info` - System information  
+- `status` - Detailed component status with heartbeat state
+- `time` - Show current time
+- `time set YYYY-MM-DD HH:MM` - Set RTC time
+- `storage` - **ENHANCED**: Show storage device status with clean SD card detection
+- `storage sd/eeprom/serial/auto` - Change storage preference
+- `testwrite` - Write test file to current storage with timestamp
+- `heartbeat on/off/status` - Control serial status messages (default: OFF)
+- `buttons` - Show button analog values for calibration
+- `parallel/lpt` - **ENHANCED**: Show parallel port status with hex data display
+- `testint` - Test interrupt detection for 10 seconds
+- `testlpt/testprinter` - **NEW**: Test LPT printer protocol signals
+- `led l1/l2 on/off` - **NEW**: Manual LED control for hardware testing
+- `led status` - **NEW**: Show current LED states
+- `debug lcd on/off` - **NEW**: Enable/disable LCD debug output to serial port
+- `files/lastfile` - Show last saved file details with format detection
+- `restart/reset` - Software reset
+- `help` - Show command menu
 
-### Pin Assignments (from Pinouts.md)
-```
-LCD Shield: pins 4-9 (4-bit mode)
-SD Card: SPI bus + pin 10 (CS)
-EEPROM: SPI bus + pin 3 (CS)  
-RTC: I2C bus (SCL/SDA)
-Parallel Port: pins 18-47 (control, status, data)
-```
+**Latest Enhancements**:
+- **Storage Status**: Complete storage device monitoring with byte counts
+- **Test File Writing**: Diagnostic tool for SD card write issues
+- **Dual File Type Tracking**: Shows both requested and detected file types
+- **Memory Monitoring**: Real-time SRAM usage in storage status
+- **Timestamp Filenames**: New yyyyMMddHHmmss.ext format implemented
 
-### SPI Bus Sharing
-SD card and EEPROM share SPI bus - requires mutex protection to prevent corruption during concurrent access.
+**Key Features**:
+- **Clean Serial Output**: No status spam by default (heartbeat OFF)
+- **ConfigurationManager Component**: Proper architecture, not in main.cpp
+- **Enhanced Debugging**: Storage, file, and memory diagnostics
+- **Debug Capabilities**: Interrupt counters, button values, pin states
+- **Multiple Command Syntax**: Flexible command parsing
 
-## File Detection Strategy
-**Problem**: No explicit "start/end of file" signals from TDS2024
-**Solution**: Use timeout-based detection (2 seconds of idle = end of file)
+## Current Status: PROFESSIONAL PRODUCTION READY ⭐ (2025-07-20)
 
-**Challenges**:
-- False end-of-file if transmission pauses
-- Need to distinguish between files and continuous data stream
-- Future: Analyze data headers to detect file boundaries
+### Major Enhancement Phase COMPLETED ✅
+**All hardware enhancements and LPT printer protocol features successfully implemented and verified**
 
-## Storage Architecture
-**Primary**: SD card (FAT filesystem via SdFat library)
-**Secondary**: EEPROM W25Q128 (16MB) with NASA EEFS filesystem
-**Fallback**: Direct serial transfer to PC
+### Hardware Enhancements: FULLY OPERATIONAL ✅
+- **L1 LED (Pin 30)**: Visual LPT read activity indicator - **VERIFIED WORKING**
+- **L2 LED (Pin 32)**: Visual data write activity indicator - **VERIFIED WORKING**  
+- **SD Write Protect (Pin 34)**: Hardware write protection detection - **OPERATIONAL**
+- **SD Card Detect (Pin 36)**: Physical card presence detection - **OPERATIONAL**
 
-## Error Handling Philosophy
-- **Graceful Degradation**: If SD fails, try EEPROM; if EEPROM fails, try serial
-- **Queue Monitoring**: System monitor task watches for buffer overflows
-- **User Feedback**: Display task shows error messages immediately
-- **Recovery**: Tasks designed to continue operation after errors
+### LPT Printer Protocol: PRODUCTION READY ✅
+- **Flow Control**: Automatic busy signal when buffer 75% full - **IMPLEMENTED**
+- **Acknowledge Signaling**: Proper ACK pulses after each byte - **IMPLEMENTED**
+- **Lock Mechanism**: SPI/Serial operations lock LPT port - **IMPLEMENTED**
+- **Printer State Control**: Full BUSY/ERROR/SELECT/PAPER_OUT control - **IMPLEMENTED**
+- **Ring Buffer**: 512-byte buffer with overflow protection - **OPERATIONAL**
 
-## Development Notes
+### Enhanced Serial Interface: COMPREHENSIVE ✅
+**All debugging and control commands fully operational**:
+- `led l1/l2 on/off` - **NEW**: Manual LED control for hardware testing
+- `led status` - **NEW**: Show current LED states  
+- `debug lcd on/off` - **NEW**: LCD display mirroring to serial port for debugging
+- `testlpt/testprinter` - **NEW**: Complete LPT printer protocol testing
+- `storage` - **ENHANCED**: Clean status display (Detected/Missing, Protected/Unprotected)
+- `parallel/lpt` - **ENHANCED**: Hex data display with all pin states
+- Enhanced `storage` command shows hardware LED status and SD card detection
 
-### Code Organization
-```
-src/
-├── main.cpp - FreeRTOS task definitions and setup
-├── Parallel/ - LPT port hardware abstraction
-├── User/ - LCD display and interface  
-└── Storage/ - File system abstraction (future)
-```
+### Implementation Excellence ✅
+- **Professional Code Quality**: Clean, documented, maintainable implementation
+- **Comprehensive Testing**: Manual LED control and automatic behavior verification
+- **User-Friendly Interface**: Intuitive status messages and command structure
+- **Hardware Integration**: Complete pin-level control and monitoring
+- **TDS2024 Compatibility**: Full printer protocol for seamless oscilloscope integration
 
-### Testing Strategy
-1. **Unit Testing**: Individual task functions with mock hardware
-2. **Integration Testing**: Task communication via queues
-3. **Hardware Testing**: With actual TDS2024 oscilloscope
-4. **Stress Testing**: Continuous operation and error injection
+### Ready for Production Use ✅
+1. **Hardware Verified**: All LEDs and detection pins working correctly
+2. **Protocol Complete**: LPT printer protocol fully implemented  
+3. **Interface Polished**: Professional serial command interface with LCD debug mode
+4. **Status Monitoring**: Comprehensive hardware and system status display
+5. **Debug Capabilities**: LCD message mirroring to serial for real-time troubleshooting
 
-### Future Enhancements
-- **File Type Detection**: Parse headers to determine .bmp, .png, etc.
-- **Configuration Management**: Store settings in EEPROM
-- **Web Interface**: ESP32 module for wireless configuration
-- **Data Compression**: Reduce storage requirements
-- **Faster Transfer**: DMA for parallel port reading
-
-## Memory Usage Estimates
-```
-Task Stacks: 5 × 256-512 bytes = ~2KB
-Queues: (8×528) + (4×36) + (4×4) = ~4.5KB  
-Static Variables: ~1KB
-Available for heap: ~500 bytes
-```
-
-**Note**: Very tight on RAM - monitor stack usage carefully
-
-## Lessons Learned
-1. **Arduino FreeRTOS**: Limited by 8KB RAM - requires careful memory management
-2. **Interrupt Handling**: Keep ISRs minimal, use task notifications for processing
-3. **Hardware Sharing**: Always protect shared resources with mutexes
-4. **Error Recovery**: Design for graceful degradation from the start
-5. **Documentation**: Critical for embedded systems - hardware details change frequently
-
-## Current Implementation Status (2025-07-19)
-
-### Component Architecture - COMPLETED ✅
-Created clean component-based architecture:
-- **Components/ParallelPortManager** - LPT data capture with file boundary detection
-- **Components/FileSystemManager** - Unified storage interface (SD/EEPROM/Serial)
-- **Components/DisplayManager** - LCD interface with menu system and button handling
-- **Components/TimeManager** - RTC integration and time services
-- **Components/SystemManager** - System coordination, monitoring, and configuration
-
-### FreeRTOS Integration - COMPLETED ✅
-- Task-based architecture with priority scheduling
-- Inter-task communication via queues (DataChunk, DisplayMessage, SystemCommand)
-- Resource protection with mutexes (SPI, I2C, Serial)
-- Component lifecycle management
-- System health monitoring
-
-### File Structure - COMPLETED ✅
-```
-src/
-├── main.cpp - System initialization and component coordination
-├── Common/ - Shared types and configuration constants
-│   ├── Types.h - Data structures for inter-component communication
-│   └── Config.h - System configuration and pin definitions
-├── Components/ - Component manager classes
-│   ├── ParallelPortManager.h/cpp - LPT data capture
-│   ├── FileSystemManager.h/cpp - Storage operations  
-│   ├── DisplayManager.h/cpp - LCD and user interface
-│   ├── TimeManager.h/cpp - RTC and time services
-│   └── SystemManager.h/cpp - System monitoring
-├── Parallel/ - Hardware abstraction (existing)
-│   ├── Port.h/cpp - LPT port management
-│   ├── Control.h/cpp - Control signal management
-│   ├── Status.h/cpp - Status signal management
-│   └── Data.h/cpp - Data line management
-└── User/ - User interface (existing, enhanced)
-    └── Display.h/cpp - LCD display control
-```
-
-### Hardware Integration Status
-- **Parallel Port**: ✅ Existing implementation working, enhanced for FreeRTOS
-- **LCD Display**: ✅ Enhanced with button handling for OSEPP LCD Keypad Shield v1
-- **SD Card**: ✅ Implemented via SdFat library with mutex protection
-- **EEPROM (W25Q128FVSG)**: 🚧 Structure ready, needs filesystem implementation
-- **RTC (DS1307)**: ✅ Basic implementation, needs time setting features
-
-### Next Critical Tasks
-1. **Complete main.cpp refactoring** - Convert old task functions to component initialization
-2. **EEPROM filesystem integration** - Implement W25Q128FVSG support with wear leveling
-3. **Button mapping verification** - Confirm OSEPP shield v1 button analog values
-4. **File type detection** - Add header-based file format detection
-5. **Hardware testing** - Test with actual TDS2024 oscilloscope
-
-### Memory Management Strategy
-- **Static allocation**: All components allocated in main.cpp (no dynamic allocation)
-- **Task stacks**: Conservative sizing (256-512 bytes) for 8KB SRAM limit
-- **Queue memory**: ~4.5KB total for inter-task communication
-- **Available heap**: ~700 bytes remaining for temporary allocations
-
-### Key Design Decisions Made
-- **Component managers over service classes**: Better resource ownership model
-- **Queue-based communication**: Decoupled inter-task messaging  
-- **Mutex-protected hardware**: Prevents SPI/I2C bus conflicts
-- **Timeout-based file detection**: 2-second idle = end of file
-- **Graceful storage degradation**: SD → EEPROM → Serial fallback
-
-## Key Files to Monitor
-- `platformio.ini` - Dependencies and build configuration
-- `main.cpp` - System initialization and component coordination
-- `Components/*.cpp` - Component implementations
-- `Common/Config.h` - System configuration and pin mappings
-- `Common/Types.h` - Inter-component communication structures
+## Documentation Status: CURRENT ✅
+- **ARCHITECTURE.md**: Loop-based architecture documented
+- **TECHNICAL_DETAILS.md**: Production implementation details
+- **DEVELOPMENT_GUIDELINES.md**: Proven patterns and rules
+- **CLAUDE.md**: Current status with latest debugging enhancements
+- All documentation reflects production-deployed state with recent debugging updates

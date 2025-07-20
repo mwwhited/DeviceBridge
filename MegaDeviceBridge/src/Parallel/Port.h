@@ -28,6 +28,13 @@ namespace DeviceBridge::Parallel
     static void isr2();
     static Port *_instance2;
     
+    // Debug counters
+    volatile uint32_t _interruptCount;
+    volatile uint32_t _dataCount;
+    
+    // Printer protocol state
+    volatile bool _locked;
+    
   public:
     Port(
         Control control,
@@ -39,6 +46,20 @@ namespace DeviceBridge::Parallel
     bool isAlmostFull();
     bool isFull();
     uint16_t readData(uint8_t buffer[], uint16_t index = 0, uint16_t length = 0);
+    
+    // Printer protocol methods
+    void setBusy(bool busy);
+    void setError(bool error);  
+    void setPaperOut(bool paperOut);
+    void setSelect(bool select);
+    void sendAcknowledge();
+    bool isLocked() const { return _locked; }
+    void lock() { _locked = true; setBusy(true); }
+    void unlock() { _locked = false; setBusy(false); }
+    
+    // Debug methods
+    uint32_t getInterruptCount() const { return _interruptCount; }
+    uint32_t getDataCount() const { return _dataCount; }
   };
 
   /*

@@ -19,6 +19,11 @@ namespace DeviceBridge::Parallel
 
     void initialize();
     void setBusy();
+    void setBusy(bool busy);
     void setAck();
+    void sendAcknowledgePulse();
+    void setError(bool error);
+    void setPaperOut(bool paperOut);
+    void setSelect(bool select);
   };
 }
