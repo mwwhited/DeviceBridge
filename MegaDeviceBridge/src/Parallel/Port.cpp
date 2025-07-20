@@ -34,30 +34,46 @@ namespace DeviceBridge::Parallel
       return; // Ignore data while locked
     }
     
+    // Check for buffer overflow BEFORE capturing data
+    if (_buffer.isFull()) {
+      // Critical: Buffer overflow! Drop this byte and signal error
+      setBusy(true);  // Hold busy to prevent more data
+      return;
+    }
+    
     // TDS2024 strobe pulses are very fast - on FALLING edge, capture data immediately
     // Don't check strobe state as it returns to HIGH before we can read it
+    
+    // Set busy to indicate we're processing (critical for TDS2024 timing)
+    _status.setBusy();
+    
+    // Brief delay to ensure TDS2024 sees the busy signal
+    delayMicroseconds(3);
+    
+    // Read the data byte from parallel port with timing critical section
+    uint8_t value = _data.readValue();
     
     // Count valid data captures
     _dataCount++;
     
-    // Set busy to indicate we're processing
-    _status.setBusy();
-    
-    // Read the data byte from parallel port
-    uint8_t value = _data.readValue();
-    
-    // Store data in ring buffer for processing
-    _buffer.push(value);
+    // Store data in ring buffer for processing - this MUST succeed
+    // since we checked for full buffer above
+    bool pushResult = _buffer.push(value);
     
     // Send acknowledge pulse to confirm data received
+    // This MUST happen before clearing busy for proper protocol
     sendAcknowledge();
     
-    // Check if buffer is getting full and set busy accordingly
+    // Check if buffer is getting full and adjust flow control
     if (isAlmostFull()) {
-      setBusy(true);  // Hold busy high to slow down sender
+      setBusy(true);  // Hold busy high to slow down sender  
     } else {
       setBusy(false); // Clear busy when buffer has space
+      delayMicroseconds(2); // Brief delay for TDS2024 timing stability
     }
+    
+    // Memory barrier to ensure all operations complete
+    __asm__ __volatile__("" ::: "memory");
   }
 
   byte Port::_isrSeed = 0;
@@ -122,6 +138,9 @@ namespace DeviceBridge::Parallel
     if (length == 0) // if length is 0, assume we want to fill the buffer
       length = 512; // Default chunk size
 
+    // Disable interrupts during buffer operations to prevent corruption
+    noInterrupts();
+    
     uint16_t cnt = 0;
     for (uint16_t i = 0; i < length; i++)
     {
@@ -136,6 +155,15 @@ namespace DeviceBridge::Parallel
         break; // read buffer is empty
       }
     }
+    
+    // Re-enable interrupts
+    interrupts();
+    
+    // Update flow control based on current buffer level
+    if (!isAlmostFull() && cnt > 0) {
+      setBusy(false); // Clear busy when we've freed up space
+    }
+    
     return cnt;
   }
 
@@ -157,6 +185,21 @@ namespace DeviceBridge::Parallel
 
   void Port::sendAcknowledge() {
     _status.sendAcknowledgePulse();
+  }
+
+  void Port::clearBuffer() {
+    // Clear the ring buffer and reset flow control
+    noInterrupts();
+    while (!_buffer.isEmpty()) {
+      uint8_t dummy;
+      _buffer.lockedPop(dummy);
+    }
+    setBusy(false); // Clear busy signal since buffer is empty
+    interrupts();
+  }
+
+  uint16_t Port::getBufferSize() const {
+    return _buffer.size();
   }
 
   /*

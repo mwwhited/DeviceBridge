@@ -98,6 +98,8 @@ void ConfigurationManager::processCommand(const String &command) {
         testInterruptPin();
     } else if (command.equalsIgnoreCase(F("testlpt")) || command.equalsIgnoreCase(F("testprinter"))) {
         testPrinterProtocol();
+    } else if (command.equalsIgnoreCase(F("clearbuffer")) || command.equalsIgnoreCase(F("clearport"))) {
+        clearLPTBuffer();
     } else if (command.startsWith(F("led "))) {
         handleLEDCommand(command);
     } else if (command.equalsIgnoreCase(F("files")) || command.equalsIgnoreCase(F("lastfile"))) {
@@ -131,6 +133,7 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  parallel/lpt      - Show parallel port status with hex data\r\n"));
     Serial.print(F("  testint           - Test interrupt pin response\r\n"));
     Serial.print(F("  testlpt           - Test LPT printer protocol signals\r\n"));
+    Serial.print(F("  clearbuffer       - Clear LPT data buffer and reset state\r\n"));
     Serial.print(F("  led l1/l2 on/off  - Control L1 (LPT) and L2 (Write) LEDs\r\n"));
     Serial.print(F("  debug lcd on/off  - Enable/disable LCD debug output to serial\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
@@ -470,6 +473,8 @@ void ConfigurationManager::testPrinterProtocol() {
 void ConfigurationManager::printStorageStatus() {
     auto fileSystem = getServices().getFileSystemManager();
     auto systemManager = getServices().getSystemManager();
+    auto parallelPort = getServices().getParallelPortManager();
+    
     Serial.print(F("\r\n=== Storage Device Status ===\r\n"));
 
     Serial.print(F("SD Card: "));
@@ -490,6 +495,27 @@ void ConfigurationManager::printStorageStatus() {
 
     Serial.print(F("EEPROM: "));
     Serial.print(fileSystem->isEEPROMAvailable() ? F("Available") : F("Not Available"));
+    Serial.print(F("\r\n"));
+
+    // Add LPT buffer status for debugging data loss issues
+    Serial.print(F("\r\n=== LPT Buffer Status ===\r\n"));
+    uint16_t bufferLevel = parallelPort->getBufferLevel();
+    Serial.print(F("Buffer Level: "));
+    Serial.print(bufferLevel);
+    Serial.print(F("/512 bytes ("));
+    Serial.print((bufferLevel * 100) / 512);
+    Serial.print(F("% full)\r\n"));
+    
+    Serial.print(F("Buffer Status: "));
+    if (bufferLevel >= 512) {
+        Serial.print(F("❌ FULL - DATA LOSS RISK!"));
+    } else if (bufferLevel >= 384) {
+        Serial.print(F("⚠️  ALMOST FULL - Flow control active"));
+    } else if (bufferLevel > 0) {
+        Serial.print(F("✅ Data available"));
+    } else {
+        Serial.print(F("✅ Empty"));
+    }
     Serial.print(F("\r\n"));
 
     Serial.print(F("Active Storage: "));
@@ -891,6 +917,33 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
         Serial.print(F("  debug lcd off    - Disable LCD message mirroring\r\n"));
         Serial.print(F("  debug lcd status - Show current LCD debug status\r\n"));
     }
+}
+
+void ConfigurationManager::clearLPTBuffer() {
+    auto parallelPort = getServices().getParallelPortManager();
+    auto displayManager = getServices().getDisplayManager();
+    
+    Serial.print(F("\r\n=== Clearing LPT Buffer ===\r\n"));
+    
+    // Show buffer status before clearing
+    uint16_t bufferLevel = parallelPort->getBufferLevel();
+    Serial.print(F("Buffer level before: "));
+    Serial.print(bufferLevel);
+    Serial.print(F("/512 bytes\r\n"));
+    
+    // Clear the buffer
+    parallelPort->clearBuffer();
+    
+    // Show buffer status after clearing
+    bufferLevel = parallelPort->getBufferLevel();
+    Serial.print(F("Buffer level after: "));
+    Serial.print(bufferLevel);
+    Serial.print(F("/512 bytes\r\n"));
+    
+    Serial.print(F("LPT buffer cleared successfully\r\n"));
+    Serial.print(F("===========================\r\n"));
+    
+    displayManager->displayMessage(Common::DisplayMessage::INFO, F("Buffer Cleared"));
 }
 
 // IComponent interface implementation

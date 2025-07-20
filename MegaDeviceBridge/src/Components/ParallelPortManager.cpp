@@ -92,6 +92,9 @@ void ParallelPortManager::processData() {
             _idleCounter = 0;
             _currentFileBytes = 0;
             _chunkIndex = 0;
+            
+            // Clear any remaining data in buffer to prevent corruption of next file
+            _port.clearBuffer();
         }
     }
 }
@@ -129,15 +132,8 @@ bool ParallelPortManager::detectEndOfFile() {
 }
 
 uint16_t ParallelPortManager::getBufferLevel() const {
-    // Return approximate buffer fill level
-    if (_port.isFull()) {
-        return 512;
-    } else if (_port.isAlmostFull()) {
-        return 384; // 75%
-    } else if (_port.hasData()) {
-        return 128; // Estimate for "some data"
-    }
-    return 0;
+    // Return exact buffer fill level using the new getBufferSize method
+    return _port.getBufferSize();
 }
 
 uint32_t ParallelPortManager::getTotalBytesReceived() const { return _totalBytesReceived; }
@@ -163,6 +159,18 @@ void ParallelPortManager::setPrinterPaperOut(bool paperOut) { _port.setPaperOut(
 void ParallelPortManager::setPrinterSelect(bool select) { _port.setSelect(select); }
 
 void ParallelPortManager::sendPrinterAcknowledge() { _port.sendAcknowledge(); }
+
+void ParallelPortManager::clearBuffer() { 
+    _port.clearBuffer(); 
+    // Also reset internal state
+    _chunkIndex = 0;
+    _fileInProgress = false;
+    _idleCounter = 0;
+}
+
+uint16_t ParallelPortManager::getBufferSize() const { 
+    return _port.getBufferSize(); 
+}
 
 // IComponent interface implementation
 bool ParallelPortManager::selfTest() {

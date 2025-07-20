@@ -38,6 +38,7 @@ private:
     void printStorageStatus();
     void handleTestWriteCommand(const String& command);
     void testPrinterProtocol();
+    void clearLPTBuffer();
     
     // Timing for updates
     unsigned long _lastCommandCheck;

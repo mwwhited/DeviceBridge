@@ -73,6 +73,10 @@ public:
     void setPrinterSelect(bool select);
     void sendPrinterAcknowledge();
     
+    // Buffer management methods
+    void clearBuffer();
+    uint16_t getBufferSize() const;
+    
 private:
     // Statistics tracking
     uint32_t _totalBytesReceived;

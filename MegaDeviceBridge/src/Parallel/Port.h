@@ -60,6 +60,10 @@ namespace DeviceBridge::Parallel
     // Debug methods
     uint32_t getInterruptCount() const { return _interruptCount; }
     uint32_t getDataCount() const { return _dataCount; }
+    
+    // Buffer management methods
+    void clearBuffer();
+    uint16_t getBufferSize() const;
   };
 
   /*
