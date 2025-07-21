@@ -22,6 +22,7 @@ namespace DeviceBridge::Parallel
     void setBusy(bool busy);
     void setAck();
     void sendAcknowledgePulse();
+    void sendAcknowledgePulseOptimized();  // IEEE-1284 compliant fast ACK
     void setError(bool error);
     void setPaperOut(bool paperOut);
     void setSelect(bool select);

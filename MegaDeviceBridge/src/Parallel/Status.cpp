@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <Arduino.h>
 #include "Status.h"
+#include "OptimizedTiming.h"
 #include "../Common/ServiceLocator.h"
 #include "../Common/ConfigurationService.h"
 
@@ -66,6 +67,19 @@ namespace DeviceBridge::Parallel
     delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getAckPulseUs());  // Extended pulse for reliable capture
     digitalWrite(_acknowledge, true);
     delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getRecoveryDelayUs());   // Brief recovery time
+  }
+  
+  void Status::sendAcknowledgePulseOptimized() {
+    // IEEE-1284 compliant fast acknowledge pulse using cached timing
+    // Direct pin access for minimum latency in ISR context
+    if (OptimizedTiming::isInitialized()) {
+      digitalWrite(_acknowledge, LOW);
+      delayMicroseconds(1); // Minimum pulse width for fast response
+      digitalWrite(_acknowledge, HIGH);
+    } else {
+      // Fallback to ServiceLocator method
+      sendAcknowledgePulse();
+    }
   }
 
   void Status::setError(bool error) {
