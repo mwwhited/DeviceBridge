@@ -58,7 +58,7 @@ namespace DeviceBridge::Parallel
     _status.setBusy();
     
     // Brief delay to ensure TDS2024 sees the busy signal
-    delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getHardwareDelayUs());
+    delayMicroseconds(Common::Timing::HARDWARE_DELAY_US);
     
     // Read the data byte from parallel port with timing critical section
     uint8_t value = _data.readValue();
@@ -82,27 +82,27 @@ namespace DeviceBridge::Parallel
         _criticalStartTime = millis();
       }
       setBusy(true);
-      delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getCriticalFlowDelayUs()); // Extended delay in critical state
+      delayMicroseconds(Common::Timing::CRITICAL_FLOW_DELAY_US); // Extended delay in critical state
     } else if (_criticalFlowControl) {
       // In critical recovery - stay busy until below warning level
       if (!isAlmostFull()) {
         // Buffer drained below warning level - exit critical state
         _criticalFlowControl = false;
         setBusy(false);
-        delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getTds2024TimingUs());
+        delayMicroseconds(Common::Timing::TDS2024_TIMING_US);
       } else {
         // Still above warning level - maintain critical flow control
         setBusy(true);
-        delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getCriticalFlowDelayUs());
+        delayMicroseconds(Common::Timing::CRITICAL_FLOW_DELAY_US);
       }
     } else if (isAlmostFull()) {
       // 60%+ full - WARNING: Hold busy with moderate delay
       setBusy(true);
-      delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getModerateFlowDelayUs()); // Moderate delay to slow down sender
+      delayMicroseconds(Common::Timing::MODERATE_FLOW_DELAY_US); // Moderate delay to slow down sender
     } else {
       // <60% full - Normal operation
       setBusy(false);
-      delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getTds2024TimingUs()); // Brief delay for TDS2024 timing stability
+      delayMicroseconds(Common::Timing::TDS2024_TIMING_US); // Brief delay for TDS2024 timing stability
     }
     
     // Memory barrier to ensure all operations complete
@@ -135,10 +135,10 @@ namespace DeviceBridge::Parallel
         _hardwareFlowControl.updateFlowControl(bufferSize, _buffer.maxSize());
       } else {
         // Basic flow control using status pins
-        if (bufferSize >= OptimizedTiming::criticalThreshold) {
+        if (bufferSize >= Common::FlowControl::CRITICAL_THRESHOLD) {
           _lastFlowControlLevel = 3; // Critical
           _status.setBusy(true);
-        } else if (bufferSize >= OptimizedTiming::moderateThreshold) {
+        } else if (bufferSize >= Common::FlowControl::MODERATE_THRESHOLD) {
           _lastFlowControlLevel = 2; // Moderate  
           _status.setBusy(true);
         } else {
@@ -256,14 +256,14 @@ namespace DeviceBridge::Parallel
 
   bool Port::isAlmostFull()
   {
-    // 60% threshold for moderate flow control
-    return _buffer.size() >= ServiceLocator::getInstance().getConfigurationService()->getModerateFlowThreshold(_buffer.maxSize());
+    // 50% threshold for moderate flow control (pre-computed constant)
+    return _buffer.size() >= Common::FlowControl::MODERATE_THRESHOLD;
   }
 
   bool Port::isCriticallyFull()
   {
-    // 80% threshold for extended flow control
-    return _buffer.size() >= ServiceLocator::getInstance().getConfigurationService()->getCriticalFlowThreshold(_buffer.maxSize());
+    // 70% threshold for extended flow control (pre-computed constant)
+    return _buffer.size() >= Common::FlowControl::CRITICAL_THRESHOLD;
   }
 
   bool Port::isFull()
@@ -276,7 +276,7 @@ namespace DeviceBridge::Parallel
     // Note: sizeof(buffer) gives size of pointer, not array
     // For Arduino, we'll use the length parameter properly
     if (length == 0) // if length is 0, assume we want to fill the buffer
-      length = ServiceLocator::getInstance().getConfigurationService()->getDataChunkSize(); // Default chunk size from configuration
+      length = Common::Buffer::DATA_CHUNK_SIZE; // Default chunk size from configuration
 
     // Disable interrupts during buffer operations to prevent corruption
     noInterrupts();
@@ -304,13 +304,13 @@ namespace DeviceBridge::Parallel
     uint16_t bufferCapacity = _buffer.maxSize();
     
     if (cnt > 0) { // Only update if we actually read data
-      if (bufferLevelAfterRead < ServiceLocator::getInstance().getConfigurationService()->getRecoveryFlowThreshold(bufferCapacity)) {
-        // Less than 50% full - clear busy immediately
+      if (bufferLevelAfterRead < Common::FlowControl::RECOVERY_THRESHOLD) {
+        // Less than 40% full - clear busy immediately
         setBusy(false);
-      } else if (bufferLevelAfterRead < ServiceLocator::getInstance().getConfigurationService()->getModerateFlowThreshold(bufferCapacity)) {
-        // 50-60% full - clear busy but with brief delay
+      } else if (bufferLevelAfterRead < Common::FlowControl::MODERATE_THRESHOLD) {
+        // 40-50% full - clear busy but with brief delay
         setBusy(false);
-        delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getFlowControlDelayUs());
+        delayMicroseconds(Common::Timing::FLOW_CONTROL_DELAY_US);
       }
       // If still >60% full, keep busy active until next interrupt
     }

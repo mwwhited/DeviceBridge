@@ -62,8 +62,8 @@ namespace DeviceBridge::Components
     // Button constants now accessed via ConfigurationService
 
     DisplayManager::DisplayManager(User::Display &display)
-        : _display(display), _lastMessageTime(0), _lastDisplayUpdate(0), _normalUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getNormalDisplayInterval()), _storageUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getStorageDisplayInterval()),
-          _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(ServiceLocator::getInstance().getConfigurationService()->getButtonNoneValue())
+        : _display(display), _lastMessageTime(0), _lastDisplayUpdate(0), _normalUpdateInterval(Common::DisplayRefresh::NORMAL_INTERVAL_MS), _storageUpdateInterval(Common::DisplayRefresh::STORAGE_INTERVAL_MS),
+          _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(Common::Buttons::BUTTON_NONE_VALUE)
     {
         // Initialize display flags (bit field)
         _displayFlags.showingTime = 0;
@@ -90,16 +90,15 @@ namespace DeviceBridge::Components
     {
         // Check for button presses (always responsive)
         uint16_t buttonValue = readButtons();
-        auto* config = ServiceLocator::getInstance().getConfigurationService();
-        if (buttonValue != config->getButtonNoneValue() && buttonValue != _lastButtonState)
+        if (buttonValue != Common::Buttons::BUTTON_NONE_VALUE && buttonValue != _lastButtonState)
         {
             handleButtonPress(buttonValue);
             _lastButtonState = buttonValue;
             _lastButtonTime = currentTime;
         }
-        else if (buttonValue == config->getButtonNoneValue())
+        else if (buttonValue == Common::Buttons::BUTTON_NONE_VALUE)
         {
-            _lastButtonState = config->getButtonNoneValue();
+            _lastButtonState = Common::Buttons::BUTTON_NONE_VALUE;
         }
 
         // Adaptive display update based on storage operation state
@@ -213,20 +212,19 @@ namespace DeviceBridge::Components
 
         uint16_t buttonValue = analogRead(A0);
 
-        // Tolerance for analog readings using ConfigurationService
-        auto* config = ServiceLocator::getInstance().getConfigurationService();
-        if (buttonValue < config->getRightThreshold())
-            return config->getButtonRightValue();
-        if (buttonValue < config->getUpThreshold())
-            return config->getButtonUpValue();
-        if (buttonValue < config->getDownThreshold())
-            return config->getButtonDownValue();
-        if (buttonValue < config->getLeftThreshold())
-            return config->getButtonLeftValue();
-        if (buttonValue < config->getSelectThreshold())
-            return config->getButtonSelectValue();
+        // Tolerance for analog readings using direct constants
+        if (buttonValue < Common::Buttons::RIGHT_THRESHOLD)
+            return Common::Buttons::BUTTON_RIGHT_VALUE;
+        if (buttonValue < Common::Buttons::UP_THRESHOLD)
+            return Common::Buttons::BUTTON_UP_VALUE;
+        if (buttonValue < Common::Buttons::DOWN_THRESHOLD)
+            return Common::Buttons::BUTTON_DOWN_VALUE;
+        if (buttonValue < Common::Buttons::LEFT_THRESHOLD)
+            return Common::Buttons::BUTTON_LEFT_VALUE;
+        if (buttonValue < Common::Buttons::SELECT_THRESHOLD)
+            return Common::Buttons::BUTTON_SELECT_VALUE;
 
-        return config->getButtonNoneValue();
+        return Common::Buttons::BUTTON_NONE_VALUE;
     }
 
     void DisplayManager::handleButtonPress(uint16_t button)
@@ -247,26 +245,24 @@ namespace DeviceBridge::Components
         // Reset idle timer on any menu interaction
         _lastMessageTime = millis();
         
-        auto* config = ServiceLocator::getInstance().getConfigurationService();
-        
-        if (button == config->getButtonUpValue()) {
+        if (button == Common::Buttons::BUTTON_UP_VALUE) {
             if (_menuSelection > 0)
             {
                 _menuSelection--;
             }
             showMenuScreen();
         }
-        else if (button == config->getButtonDownValue()) {
+        else if (button == Common::Buttons::BUTTON_DOWN_VALUE) {
             if (_menuSelection < getMenuOptionCount(_menuState) - 1)
             {
                 _menuSelection++;
             }
             showMenuScreen();
         }
-        else if (button == config->getButtonSelectValue()) {
+        else if (button == Common::Buttons::BUTTON_SELECT_VALUE) {
             executeMenuSelection();
         }
-        else if (button == config->getButtonLeftValue()) {
+        else if (button == Common::Buttons::BUTTON_LEFT_VALUE) {
             exitMenu();
         }
     }
@@ -565,8 +561,7 @@ namespace DeviceBridge::Components
         
         // Test button reading
         Serial.print(F("  Testing button interface... "));
-        uint16_t buttonValue = analogRead(A0);
-        auto* config = ServiceLocator::getInstance().getConfigurationService();
+        uint16_t buttonValue = analogRead(Common::Pins::LCD_BUTTONS);
         
         if (buttonValue >= 0 && buttonValue <= 1023) {
             Serial.print(F("✅ OK (value: "));

@@ -242,6 +242,13 @@ namespace FlowControl {
   constexpr uint8_t MODERATE_THRESHOLD_PERCENT = 50;     // Moderate flow control (was 60%)
   constexpr uint8_t CRITICAL_THRESHOLD_PERCENT = 70;     // Critical flow control (was 80%)
   constexpr uint8_t RECOVERY_THRESHOLD_PERCENT = 40;     // Recovery threshold (was 50%)
+  
+  // Pre-computed thresholds for 512-byte ring buffer (for compiler inlining)
+  constexpr uint16_t RING_BUFFER_SIZE = Buffer::RING_BUFFER_SIZE;
+  constexpr uint16_t PRE_WARNING_THRESHOLD = (RING_BUFFER_SIZE * PRE_WARNING_THRESHOLD_PERCENT) / 100;  // 205 bytes
+  constexpr uint16_t MODERATE_THRESHOLD = (RING_BUFFER_SIZE * MODERATE_THRESHOLD_PERCENT) / 100;        // 256 bytes  
+  constexpr uint16_t CRITICAL_THRESHOLD = (RING_BUFFER_SIZE * CRITICAL_THRESHOLD_PERCENT) / 100;        // 358 bytes
+  constexpr uint16_t RECOVERY_THRESHOLD = (RING_BUFFER_SIZE * RECOVERY_THRESHOLD_PERCENT) / 100;        // 205 bytes
 }
 
 } // namespace DeviceBridge::Common

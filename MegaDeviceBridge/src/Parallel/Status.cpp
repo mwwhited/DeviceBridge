@@ -64,9 +64,9 @@ namespace DeviceBridge::Parallel
     // Send proper acknowledge pulse for TDS2024 timing
     // TDS2024 requires minimum 10μs acknowledge pulse width
     digitalWrite(_acknowledge, false);
-    delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getAckPulseUs());  // Extended pulse for reliable capture
+    delayMicroseconds(Common::Timing::ACK_PULSE_US);  // Extended pulse for reliable capture
     digitalWrite(_acknowledge, true);
-    delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getRecoveryDelayUs());   // Brief recovery time
+    delayMicroseconds(Common::Timing::RECOVERY_DELAY_US);   // Brief recovery time
   }
   
   void Status::sendAcknowledgePulseOptimized() {

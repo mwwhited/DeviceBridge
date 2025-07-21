@@ -22,19 +22,11 @@ HardwareFlowControl::HardwareFlowControl()
     _config.paperOutPin = Common::Pins::LPT_PAPER_OUT;
     _config.selectPin = Common::Pins::LPT_SELECT;
     
-    // Use OptimizedTiming thresholds if available
-    if (OptimizedTiming::isInitialized()) {
-        _config.warningThreshold = OptimizedTiming::preWarningThreshold;
-        _config.criticalThreshold = OptimizedTiming::criticalThreshold;
-        _config.emergencyThreshold = OptimizedTiming::criticalThreshold + 10; // 10 bytes above critical
-        _config.recoveryThreshold = OptimizedTiming::recoveryThreshold;
-    } else {
-        // Fallback values if OptimizedTiming not initialized
-        _config.warningThreshold = 200;   // ~40% of 512-byte buffer
-        _config.criticalThreshold = 350;  // ~70% of 512-byte buffer
-        _config.emergencyThreshold = 400; // ~80% of 512-byte buffer
-        _config.recoveryThreshold = 200;  // ~40% for recovery
-    }
+    // Use pre-computed thresholds from Config.h constants
+    _config.warningThreshold = Common::FlowControl::PRE_WARNING_THRESHOLD;
+    _config.criticalThreshold = Common::FlowControl::CRITICAL_THRESHOLD;
+    _config.emergencyThreshold = Common::FlowControl::CRITICAL_THRESHOLD + 10; // 10 bytes above critical
+    _config.recoveryThreshold = Common::FlowControl::RECOVERY_THRESHOLD;
     
     // Hardware timing for reliable signal recognition
     _config.signalSetupTime = 2;  // 2μs setup time for host recognition

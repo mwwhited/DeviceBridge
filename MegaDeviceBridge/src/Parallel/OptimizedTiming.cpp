@@ -30,29 +30,23 @@ void OptimizedTiming::initialize() {
         return; // Already initialized
     }
     
-    // Get configuration service once
-    auto configService = ServiceLocator::getInstance().getConfigurationService();
+    // Cache all timing values from configuration constants
+    hardwareDelayUs = Common::Timing::HARDWARE_DELAY_US;
+    ackPulseUs = Common::Timing::ACK_PULSE_US;
+    recoveryDelayUs = Common::Timing::RECOVERY_DELAY_US;
+    criticalFlowDelayUs = Common::Timing::CRITICAL_FLOW_DELAY_US;
+    moderateFlowDelayUs = Common::Timing::MODERATE_FLOW_DELAY_US;
+    flowControlDelayUs = Common::Timing::FLOW_CONTROL_DELAY_US;
     
-    // Cache all timing values from configuration
-    hardwareDelayUs = configService->getHardwareDelayUs();
-    ackPulseUs = configService->getAckPulseUs();
-    recoveryDelayUs = configService->getRecoveryDelayUs();
-    criticalFlowDelayUs = configService->getCriticalFlowDelayUs();
-    moderateFlowDelayUs = configService->getModerateFlowDelayUs();
-    flowControlDelayUs = configService->getFlowControlDelayUs();
+    // Cache emergency timeout values from constants
+    criticalTimeoutMs = Common::Buffer::CRITICAL_TIMEOUT_MS;
+    chunkSendTimeoutMs = Common::Buffer::CHUNK_SEND_TIMEOUT_MS;
     
-    // Cache emergency timeout values
-    criticalTimeoutMs = configService->getCriticalTimeoutMs();
-    chunkSendTimeoutMs = configService->getChunkSendTimeoutMs();
-    
-    // Pre-compute buffer thresholds to eliminate runtime calculations
-    uint16_t bufferSize = configService->getRingBufferSize();
-    
-    // Use the optimized thresholds from Config.h
-    preWarningThreshold = (bufferSize * Common::FlowControl::PRE_WARNING_THRESHOLD_PERCENT) / 100;
-    moderateThreshold = (bufferSize * Common::FlowControl::MODERATE_THRESHOLD_PERCENT) / 100;
-    criticalThreshold = (bufferSize * Common::FlowControl::CRITICAL_THRESHOLD_PERCENT) / 100;
-    recoveryThreshold = (bufferSize * Common::FlowControl::RECOVERY_THRESHOLD_PERCENT) / 100;
+    // Use the pre-computed thresholds from Config.h
+    preWarningThreshold = Common::FlowControl::PRE_WARNING_THRESHOLD;
+    moderateThreshold = Common::FlowControl::MODERATE_THRESHOLD;
+    criticalThreshold = Common::FlowControl::CRITICAL_THRESHOLD;
+    recoveryThreshold = Common::FlowControl::RECOVERY_THRESHOLD;
     
     _initialized = true;
 }
