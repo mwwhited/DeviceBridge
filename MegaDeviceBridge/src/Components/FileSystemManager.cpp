@@ -14,11 +14,17 @@ static const char component_name[] PROGMEM = "FileSystemManager";
 namespace DeviceBridge::Components {
 
 FileSystemManager::FileSystemManager()
-    : _activeFileSystem(nullptr), _eeprom(Common::Pins::EEPROM_CS), _sdAvailable(false), _eepromAvailable(false), _eepromCurrentAddress(0),
+    : _activeFileSystem(nullptr), _eeprom(Common::Pins::EEPROM_CS), _eepromCurrentAddress(0),
       _eepromBufferIndex(0), _activeStorage(Common::StorageType::AUTO_SELECT),
       _preferredStorage(Common::StorageType::SD_CARD), _fileCounter(0), _fileType(Common::FileType::AUTO_DETECT),
       _detectedFileType(Common::FileType::AUTO_DETECT), _totalBytesWritten(0), _currentFileBytesWritten(0), 
-      _writeErrors(0), _isFileOpen(false), _lastSDCardDetectState(false), _lastSDCardCheckTime(0) {
+      _writeErrors(0), _lastSDCardCheckTime(0) {
+    // Initialize bit field flags
+    _flags.sdAvailable = 0;
+    _flags.eepromAvailable = 0;
+    _flags.lastSDCardDetectState = 0;
+    _flags.isFileOpen = 0;
+    _flags.reserved = 0;
     memset(_currentFilename, 0, sizeof(_currentFilename));
 }
 
@@ -32,21 +38,21 @@ bool FileSystemManager::initialize() {
     }
     
     // Legacy initialization for compatibility
-    _sdAvailable = initializeSD();
-    _eepromAvailable = initializeEEPROM();
+    _flags.sdAvailable = initializeSD() ? 1 : 0;
+    _flags.eepromAvailable = initializeEEPROM() ? 1 : 0;
     
     // Initialize hot-swap detection state
-    _lastSDCardDetectState = checkSDCardPresence();
+    _flags.lastSDCardDetectState = checkSDCardPresence() ? 1 : 0;
     _lastSDCardCheckTime = millis();
 
     // Select initial storage type and active file system
-    if (_preferredStorage.value == Common::StorageType::SD_CARD && _sdAvailable) {
+    if (_preferredStorage.value == Common::StorageType::SD_CARD && _flags.sdAvailable) {
         _activeStorage = Common::StorageType::SD_CARD;
-    } else if (_preferredStorage.value == Common::StorageType::EEPROM && _eepromAvailable) {
+    } else if (_preferredStorage.value == Common::StorageType::EEPROM && _flags.eepromAvailable) {
         _activeStorage = Common::StorageType::EEPROM;
-    } else if (_sdAvailable) {
+    } else if (_flags.sdAvailable) {
         _activeStorage = Common::StorageType::SD_CARD;
-    } else if (_eepromAvailable) {
+    } else if (_flags.eepromAvailable) {
         _activeStorage = Common::StorageType::EEPROM;
     } else {
         _activeStorage = Common::StorageType::SERIAL_TRANSFER;
@@ -56,7 +62,7 @@ bool FileSystemManager::initialize() {
     // Set active file system based on selected storage
     selectActiveFileSystem(_activeStorage);
 
-    return _sdAvailable || _eepromAvailable || _activeFileSystem != nullptr;
+    return _flags.sdAvailable || _flags.eepromAvailable || _activeFileSystem != nullptr;
 }
 
 void FileSystemManager::update(unsigned long currentTime) {
@@ -65,15 +71,15 @@ void FileSystemManager::update(unsigned long currentTime) {
         bool currentSDCardState = checkSDCardPresence();
         
         // SD card was inserted
-        if (currentSDCardState && !_lastSDCardDetectState) {
+        if (currentSDCardState && !_flags.lastSDCardDetectState) {
             handleSDCardInsertion();
         }
         // SD card was removed
-        else if (!currentSDCardState && _lastSDCardDetectState) {
+        else if (!currentSDCardState && _flags.lastSDCardDetectState) {
             handleSDCardRemoval();
         }
         
-        _lastSDCardDetectState = currentSDCardState;
+        _flags.lastSDCardDetectState = currentSDCardState ? 1 : 0;
         _lastSDCardCheckTime = currentTime;
     }
 }
@@ -157,11 +163,11 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
             Serial.print(F("[DEBUG-FS] WRITING DATA - "));
             Serial.print(chunk.length);
             Serial.print(F(" bytes, file open: "));
-            Serial.print(_isFileOpen ? F("YES") : F("NO"));
+            Serial.print(_flags.isFileOpen ? F("YES") : F("NO"));
             Serial.print(F("\r\n"));
         }
         
-        if (_isFileOpen) {
+        if (_flags.isFileOpen) {
             if (!writeDataChunk(chunk)) {
                 _writeErrors++;
                 if (systemManager && systemManager->isParallelDebugEnabled()) {
@@ -267,7 +273,7 @@ bool FileSystemManager::createNewFile() {
 
     switch (_activeStorage.value) {
     case Common::StorageType::SD_CARD:
-        if (_sdAvailable) {
+        if (_flags.sdAvailable) {
             sendDisplayMessage(Common::DisplayMessage::INFO, _currentFilename);
 
             String currentPath = "/" + String(_currentFilename);
@@ -301,12 +307,12 @@ bool FileSystemManager::createNewFile() {
             // Unlock LPT port immediately after SD operation
             getServices().getParallelPortManager()->unlockPort();
             
-            _isFileOpen = (_currentFile != 0);
-            if (_isFileOpen) {
+            _flags.isFileOpen = (_currentFile != 0);
+            if (_flags.isFileOpen) {
                 _currentFileBytesWritten = 0; // Reset counter for new file
             }
             
-            if (_isFileOpen) {
+            if (_flags.isFileOpen) {
                 sendDisplayMessage(Common::DisplayMessage::INFO, F("SD Opened"));
             } else {
                 sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Open Failed"));
@@ -320,33 +326,33 @@ bool FileSystemManager::createNewFile() {
                 }
             }
             
-            return _isFileOpen;
+            return _flags.isFileOpen;
         }
         break;
 
     case Common::StorageType::EEPROM:
         // TODO: Implement EEPROM file creation
-        _isFileOpen = false;
+        _flags.isFileOpen = false;
         return false;
 
     case Common::StorageType::SERIAL_TRANSFER:
         // For serial transfer, we'll send data directly
-        _isFileOpen = true;
+        _flags.isFileOpen = true;
         _currentFileBytesWritten = 0; // Reset counter for new file
         _fileCounter++; // Increment counter for serial transfer files too
         return true;
 
     default:
-        _isFileOpen = false;
+        _flags.isFileOpen = false;
         return false;
     }
 
-    _isFileOpen = false;
+    _flags.isFileOpen = false;
     return false;
 }
 
 bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
-    if (!_isFileOpen) {
+    if (!_flags.isFileOpen) {
         return false;
     }
 
@@ -403,7 +409,7 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
 }
 
 bool FileSystemManager::closeCurrentFile() {
-    if (!_isFileOpen) {
+    if (!_flags.isFileOpen) {
         return true; // Already closed
     }
 
@@ -426,7 +432,7 @@ bool FileSystemManager::closeCurrentFile() {
         break;
     }
 
-    _isFileOpen = false;
+    _flags.isFileOpen = false;
     
     // Clear any error signals to TDS2024 on successful file closure
     auto parallelPortManager = getServices().getParallelPortManager();
@@ -492,7 +498,7 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
             // Verify the new storage type is available
             switch (type.value) {
             case Common::StorageType::SD_CARD:
-                if (!_sdAvailable) {
+                if (!_flags.sdAvailable) {
                     sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Not Available"));
                     _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
                     selectActiveFileSystem(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
@@ -500,7 +506,7 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
                 break;
 
             case Common::StorageType::EEPROM:
-                if (!_eepromAvailable) {
+                if (!_flags.eepromAvailable) {
                     sendDisplayMessage(Common::DisplayMessage::ERROR, F("EEPROM Not Available"));
                     _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
                     selectActiveFileSystem(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
@@ -513,10 +519,10 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
                 break;
 
             case Common::StorageType::AUTO_SELECT:
-                if (_sdAvailable) {
+                if (_flags.sdAvailable) {
                     _activeStorage.value = Common::StorageType::SD_CARD;
                     selectActiveFileSystem(Common::StorageType(Common::StorageType::SD_CARD));
-                } else if (_eepromAvailable) {
+                } else if (_flags.eepromAvailable) {
                     _activeStorage.value = Common::StorageType::EEPROM;
                     selectActiveFileSystem(Common::StorageType(Common::StorageType::EEPROM));
                 } else {
@@ -551,7 +557,7 @@ uint32_t FileSystemManager::getFilesStored() const {
 }
 
 uint32_t FileSystemManager::getSDCardFileCount() const {
-    if (!_sdAvailable) {
+    if (!_flags.sdAvailable) {
         return 0;
     }
 
@@ -646,7 +652,7 @@ bool FileSystemManager::selfTest() {
     bool result = true;
 
     // Test SD card
-    if (_sdAvailable) {
+    if (_flags.sdAvailable) {
         Serial.print(F("  SD Card: ✅ Available\r\n"));
     } else {
         Serial.print(F("  SD Card: ❌ Not Available\r\n"));
@@ -654,7 +660,7 @@ bool FileSystemManager::selfTest() {
     }
 
     // Test EEPROM
-    if (_eepromAvailable) {
+    if (_flags.eepromAvailable) {
         Serial.print(F("  EEPROM: ✅ Available\r\n"));
     } else {
         Serial.print(F("  EEPROM: ⚠️  Not Available\r\n"));
@@ -723,7 +729,7 @@ void FileSystemManager::handleSDCardInsertion() {
     bool initSuccess = initializeSD();
     
     if (initSuccess) {
-        _sdAvailable = true;
+        _flags.sdAvailable = true;
         Serial.print(F("SD Card re-initialization successful!\r\n"));
         sendDisplayMessage(Common::DisplayMessage::INFO, F("SD Card Ready"));
         
@@ -735,7 +741,7 @@ void FileSystemManager::handleSDCardInsertion() {
             setStorageType(Common::StorageType(Common::StorageType::SD_CARD));
         }
     } else {
-        _sdAvailable = false;
+        _flags.sdAvailable = false;
         Serial.print(F("SD Card re-initialization failed\r\n"));
         sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Init Failed"));
     }
@@ -745,17 +751,17 @@ void FileSystemManager::handleSDCardRemoval() {
     Serial.print(F("SD Card removed\r\n"));
     
     // Close any open file on SD card
-    if (_isFileOpen && _activeStorage.value == Common::StorageType::SD_CARD) {
+    if (_flags.isFileOpen && _activeStorage.value == Common::StorageType::SD_CARD) {
         closeCurrentFile();
         Serial.print(F("Closed file due to SD card removal\r\n"));
     }
     
-    _sdAvailable = false;
+    _flags.sdAvailable = false;
     sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Card Removed"));
     
     // If we were using SD card and it's removed, switch to fallback storage
     if (_activeStorage.value == Common::StorageType::SD_CARD) {
-        if (_eepromAvailable) {
+        if (_flags.eepromAvailable) {
             Serial.print(F("Switching to EEPROM storage\r\n"));
             setStorageType(Common::StorageType(Common::StorageType::EEPROM));
         } else {

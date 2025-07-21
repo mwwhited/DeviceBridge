@@ -78,23 +78,28 @@ public:
     void validateHardware();  // Hardware validation test
     
     // Serial heartbeat control
-    void setSerialHeartbeatEnabled(bool enabled) { _serialHeartbeatEnabled = enabled; }
-    bool isSerialHeartbeatEnabled() const { return _serialHeartbeatEnabled; }
+    void setSerialHeartbeatEnabled(bool enabled) { _debugFlags.serialHeartbeatEnabled = enabled ? 1 : 0; }
+    bool isSerialHeartbeatEnabled() const { return _debugFlags.serialHeartbeatEnabled; }
     
     // Debug mode control
-    void setLCDDebugEnabled(bool enabled) { _lcdDebugEnabled = enabled; }
-    bool isLCDDebugEnabled() const { return _lcdDebugEnabled; }
-    void setParallelDebugEnabled(bool enabled) { _parallelDebugEnabled = enabled; }
-    bool isParallelDebugEnabled() const { return _parallelDebugEnabled; }
+    void setLCDDebugEnabled(bool enabled) { _debugFlags.lcdDebugEnabled = enabled ? 1 : 0; }
+    bool isLCDDebugEnabled() const { return _debugFlags.lcdDebugEnabled; }
+    void setParallelDebugEnabled(bool enabled) { _debugFlags.parallelDebugEnabled = enabled ? 1 : 0; }
+    bool isParallelDebugEnabled() const { return _debugFlags.parallelDebugEnabled; }
         
 private:
     // Statistics tracking
     uint32_t _uptimeSeconds;
     uint32_t _errorCount;
     uint32_t _commandsProcessed;
-    bool _serialHeartbeatEnabled;
-    bool _lcdDebugEnabled;
-    bool _parallelDebugEnabled;
+    
+    // Debug flags (bit field optimization)
+    struct {
+        uint8_t serialHeartbeatEnabled : 1;
+        uint8_t lcdDebugEnabled : 1;
+        uint8_t parallelDebugEnabled : 1;
+        uint8_t reserved : 5;  // For future flags
+    } _debugFlags;
 };
 
 } // namespace DeviceBridge::Components

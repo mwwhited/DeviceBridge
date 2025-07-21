@@ -62,10 +62,14 @@ namespace DeviceBridge::Components
     // Button constants now accessed via ConfigurationService
 
     DisplayManager::DisplayManager(User::Display &display)
-        : _display(display), _lastMessageTime(0), _showingTime(false), _inMenu(false), 
-          _storageOperationActive(false), _lastDisplayUpdate(0), _normalUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getNormalDisplayInterval()), _storageUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getStorageDisplayInterval()),
+        : _display(display), _lastMessageTime(0), _lastDisplayUpdate(0), _normalUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getNormalDisplayInterval()), _storageUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getStorageDisplayInterval()),
           _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(ServiceLocator::getInstance().getConfigurationService()->getButtonNoneValue())
     {
+        // Initialize display flags (bit field)
+        _displayFlags.showingTime = 0;
+        _displayFlags.inMenu = 0;
+        _displayFlags.storageOperationActive = 0;
+        _displayFlags.reserved = 0;
         memset(_currentMessage, 0, sizeof(_currentMessage));
         memset(_currentLine2, 0, sizeof(_currentLine2));
         strcpy(_currentMessage, "Ready");
@@ -99,7 +103,7 @@ namespace DeviceBridge::Components
         }
 
         // Adaptive display update based on storage operation state
-        uint32_t updateInterval = _storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
+        uint32_t updateInterval = _displayFlags.storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
         
         if (currentTime - _lastDisplayUpdate >= updateInterval) {
             updateDisplay(currentTime);
@@ -109,18 +113,18 @@ namespace DeviceBridge::Components
 
     void DisplayManager::stop()
     {
-        _inMenu = false;
-        _showingTime = false;
+        _displayFlags.inMenu = false;
+        _displayFlags.showingTime = false;
     }
 
     void DisplayManager::setStorageOperationActive(bool active)
     {
-        _storageOperationActive = active;
+        _displayFlags.storageOperationActive = active;
         
         // If storage operation is ending, allow immediate display update and clock refresh
         if (!active) {
             _lastDisplayUpdate = 0;
-            _showingTime = false; // Allow clock to refresh when idle
+            _displayFlags.showingTime = false; // Allow clock to refresh when idle
         }
     }
 
@@ -128,11 +132,11 @@ namespace DeviceBridge::Components
     {
         auto timeManager = getServices().getTimeManager();
         // Check if we should show time when truly idle (not in menu, not during storage operations)
-        if (!_inMenu && !_storageOperationActive && (currentTime - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
+        if (!_displayFlags.inMenu && !_displayFlags.storageOperationActive && (currentTime - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
         {
-            if (!_showingTime)
+            if (!_displayFlags.showingTime)
             {
-                _showingTime = true;
+                _displayFlags.showingTime = true;
                 char timeStr[32];
                 timeManager->getFormattedTime(timeStr, sizeof(timeStr));
                 showTimeDisplay(timeStr);
@@ -157,7 +161,7 @@ namespace DeviceBridge::Components
             break;
         case Common::DisplayMessage::TIME:
             showTimeDisplay(msg.message);
-            _showingTime = false;
+            _displayFlags.showingTime = false;
             break;
         case Common::DisplayMessage::MENU:
             showMenuScreen();
@@ -227,7 +231,7 @@ namespace DeviceBridge::Components
 
     void DisplayManager::handleButtonPress(uint16_t button)
     {
-        if (_inMenu)
+        if (_displayFlags.inMenu)
         {
             navigateMenu(button);
         }
@@ -342,9 +346,9 @@ namespace DeviceBridge::Components
         }
 
         _lastMessageTime = millis();
-        _showingTime = false;
+        _displayFlags.showingTime = false;
 
-        if (!_inMenu)
+        if (!_displayFlags.inMenu)
         {
             showMainScreen();
         }
@@ -359,7 +363,7 @@ namespace DeviceBridge::Components
         _display.print(error);
 
         _lastMessageTime = millis();
-        _showingTime = false;
+        _displayFlags.showingTime = false;
     }
 
     void DisplayManager::showStatus(const char *status)
@@ -369,18 +373,18 @@ namespace DeviceBridge::Components
 
     void DisplayManager::enterMenu()
     {
-        _inMenu = true;
+        _displayFlags.inMenu = true;
         _menuState = MAIN_MENU;
         _menuSelection = 0;
         _lastMessageTime = millis(); // Reset idle timer when entering menu
-        _showingTime = false; // Ensure we're not showing time
+        _displayFlags.showingTime = false; // Ensure we're not showing time
         showMenuScreen();
     }
 
     void DisplayManager::exitMenu()
     {
-        _inMenu = false;
-        _showingTime = false; // Allow clock to refresh when idle
+        _displayFlags.inMenu = false;
+        _displayFlags.showingTime = false; // Allow clock to refresh when idle
         showMainScreen();
     }
 

@@ -470,3 +470,39 @@ The MegaDeviceBridge system has excellent optimization potential through Flash m
 The system's current 11.3% RAM usage is already excellent, but these optimizations could reduce it to ~7.0%, providing even greater headroom for future enhancements while maintaining the bulletproof architecture and real-time performance characteristics.
 
 **Implementation Priority:** Focus on Phase 1 optimizations for maximum impact with minimal risk, then evaluate need for advanced techniques based on specific memory requirements.
+
+## Memory Reports
+
+## Compile Time
+
+```
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [====      ]  40.8% (used 3346 bytes from 8192 bytes)
+Flash: [===       ]  33.2% (used 84246 bytes from 253952 bytes)
+Building .pio\build\megaatmega2560\firmware.hex
+```
+
+### Runtime
+
+Output from `status` check at runtime
+
+```
+---- Sent utf8 encoded message: "status" ----
+
+=== Detailed System Status ===
+=== Device Bridge System Info ===
+Status: 0
+Uptime: 0 seconds
+Total Errors: 0
+Commands Processed: 0
+=== Memory Info ===
+Free SRAM: 2252 bytes
+
+=== Component Status ===
+SD Card: Available
+EEPROM: Available
+Active Storage: Storage: SD Card
+RTC: Available
+Serial Heartbeat: Disabled
+===========================
+```
