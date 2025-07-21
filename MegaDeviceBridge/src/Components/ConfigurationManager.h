@@ -64,6 +64,11 @@ public:
     
     // Configuration interface
     void checkSerialCommands();
+    
+private:
+    // Hardware flow control commands
+    void handleFlowControlCommand(const String& command);
+    void printFlowControlStatistics();
 };
 
 } // namespace DeviceBridge::Components

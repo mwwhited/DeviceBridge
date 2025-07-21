@@ -456,6 +456,18 @@ void ParallelPortManager::printDependencyStatus() const {
     Serial.print(F("\r\n"));
 }
 
+void ParallelPortManager::setHardwareFlowControlEnabled(bool enabled) {
+    _port.setHardwareFlowControlEnabled(enabled);
+}
+
+bool ParallelPortManager::isHardwareFlowControlEnabled() const {
+    return _port.isHardwareFlowControlEnabled();
+}
+
+DeviceBridge::Parallel::HardwareFlowControl::Statistics ParallelPortManager::getFlowControlStatistics() const {
+    return _port.getFlowControlStatistics();
+}
+
 unsigned long ParallelPortManager::getUpdateInterval() const {
     auto configService = getServices().getConfigurationService();
     return configService ? configService->getParallelInterval() : 1; // Default 1ms for real-time

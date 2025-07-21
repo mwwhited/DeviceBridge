@@ -107,6 +107,10 @@ void ConfigurationManager::processCommand(const String &command) {
         clearLPTBuffer();
     } else if (command.equalsIgnoreCase(F("resetcritical")) || command.equalsIgnoreCase(F("clearcritical"))) {
         resetCriticalState();
+    } else if (command.startsWith(F("flowcontrol "))) {
+        handleFlowControlCommand(command);
+    } else if (command.equalsIgnoreCase(F("flowstats")) || command.equalsIgnoreCase(F("flowstatus"))) {
+        printFlowControlStatistics();
     } else if (command.startsWith(F("lcdthrottle "))) {
         handleLCDThrottleCommand(command);
     } else if (command.startsWith(F("led "))) {
@@ -144,6 +148,8 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  testlpt           - Test LPT printer protocol signals\r\n"));
     Serial.print(F("  clearbuffer       - Clear LPT data buffer and reset state\r\n"));
     Serial.print(F("  resetcritical     - Reset critical flow control state\r\n"));
+    Serial.print(F("  flowcontrol on/off - Enable/disable hardware flow control\r\n"));
+    Serial.print(F("  flowstats         - Show hardware flow control statistics\r\n"));
     Serial.print(F("  lcdthrottle on/off - Control LCD refresh throttling for storage ops\r\n"));
     Serial.print(F("  led l1/l2 on/off  - Control L1 (LPT) and L2 (Write) LEDs\r\n"));
     Serial.print(F("  debug lcd on/off      - Enable/disable LCD debug output to serial\r\n"));
@@ -1384,6 +1390,84 @@ void ConfigurationManager::printDependencyStatus() const {
     auto parallelPortManager = getServices().getParallelPortManager();
     Serial.print(F("  ParallelPortManager: "));
     Serial.print(parallelPortManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(F("\r\n"));
+}
+
+void ConfigurationManager::handleFlowControlCommand(const String& command) {
+    auto parallelPortManager = getServices().getParallelPortManager();
+    if (!parallelPortManager) {
+        Serial.print(F("ERROR: ParallelPortManager not available\r\n"));
+        return;
+    }
+
+    String param = command.substring(12); // Skip "flowcontrol "
+    param.trim();
+
+    if (param.equalsIgnoreCase(F("on")) || param.equalsIgnoreCase(F("enable"))) {
+        parallelPortManager->setHardwareFlowControlEnabled(true);
+        Serial.print(F("Hardware flow control enabled\r\n"));
+    } else if (param.equalsIgnoreCase(F("off")) || param.equalsIgnoreCase(F("disable"))) {
+        parallelPortManager->setHardwareFlowControlEnabled(false);
+        Serial.print(F("Hardware flow control disabled\r\n"));
+    } else if (param.equalsIgnoreCase(F("status")) || param.length() == 0) {
+        Serial.print(F("Hardware flow control: "));
+        Serial.print(parallelPortManager->isHardwareFlowControlEnabled() ? F("ENABLED") : F("DISABLED"));
+        Serial.print(F("\r\n"));
+    } else {
+        Serial.print(F("Usage: flowcontrol on/off/status\r\n"));
+    }
+}
+
+void ConfigurationManager::printFlowControlStatistics() {
+    auto parallelPortManager = getServices().getParallelPortManager();
+    if (!parallelPortManager) {
+        Serial.print(F("ERROR: ParallelPortManager not available\r\n"));
+        return;
+    }
+
+    if (!parallelPortManager->isHardwareFlowControlEnabled()) {
+        Serial.print(F("Hardware flow control is disabled\r\n"));
+        return;
+    }
+
+    auto stats = parallelPortManager->getFlowControlStatistics();
+    
+    Serial.print(F("\r\n=== Hardware Flow Control Statistics ===\r\n"));
+    Serial.print(F("Current State: "));
+    Serial.print(DeviceBridge::Parallel::HardwareFlowControl::getStateName(stats.currentState));
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Time in Current State: "));
+    Serial.print(stats.timeInCurrentState);
+    Serial.print(F("ms\r\n"));
+    
+    Serial.print(F("Total State Transitions: "));
+    Serial.print(stats.stateTransitions);
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Emergency Activations: "));
+    Serial.print(stats.emergencyActivations);
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Recovery Operations: "));
+    Serial.print(stats.recoveryOperations);
+    Serial.print(F("\r\n"));
+    
+    Serial.print(F("Flow Control Status: "));
+    switch (stats.currentState) {
+        case DeviceBridge::Parallel::HardwareFlowControl::FlowState::NORMAL:
+            Serial.print(F("✅ Normal - Ready for data"));
+            break;
+        case DeviceBridge::Parallel::HardwareFlowControl::FlowState::WARNING:
+            Serial.print(F("⚠️ Warning - Buffer filling"));
+            break;
+        case DeviceBridge::Parallel::HardwareFlowControl::FlowState::CRITICAL:
+            Serial.print(F("🔶 Critical - Buffer nearly full"));
+            break;
+        case DeviceBridge::Parallel::HardwareFlowControl::FlowState::EMERGENCY:
+            Serial.print(F("🚨 Emergency - Stop transmission"));
+            break;
+    }
     Serial.print(F("\r\n"));
 }
 

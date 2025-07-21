@@ -5,6 +5,7 @@
 #include "Status.h"
 #include "Data.h"
 #include "OptimizedTiming.h"
+#include "HardwareFlowControl.h"
 #include "../Common/Config.h"
 #include <RingBuf.h>
 
@@ -16,9 +17,10 @@ namespace DeviceBridge::Parallel
     Control _control;
     Status _status;
     Data _data;
+    HardwareFlowControl _hardwareFlowControl;
 
     void handleInterrupt();               // Original ISR (deprecated)
-    void handleInterruptOptimized();      // IEEE-1284 compliant ISR
+    void handleInterruptOptimized();      // IEEE-1284 compliant ISR with hardware flow control
     
     RingBuf<uint8_t, DeviceBridge::Common::Buffer::RING_BUFFER_SIZE> _buffer;
 
@@ -47,6 +49,9 @@ namespace DeviceBridge::Parallel
     volatile bool _pendingAck;
     volatile bool _pendingFlowControl;
     volatile uint8_t _lastFlowControlLevel;
+    
+    // Hardware flow control state
+    bool _hardwareFlowEnabled;
     
   public:
     Port(
@@ -80,6 +85,11 @@ namespace DeviceBridge::Parallel
     
     // Deferred processing for optimized ISR
     void processPendingOperations();
+    
+    // Hardware flow control methods
+    void setHardwareFlowControlEnabled(bool enabled);
+    bool isHardwareFlowControlEnabled() const { return _hardwareFlowEnabled; }
+    HardwareFlowControl::Statistics getFlowControlStatistics() const;
     
     // Control signal debugging
     bool isStrobeLow() { return _control.isStrobeLow(); }

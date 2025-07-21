@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "../Parallel/Port.h"
+#include "../Parallel/HardwareFlowControl.h"
 #include "../Common/Types.h"
 #include "../Common/Config.h"
 #include "../Common/ServiceLocator.h"
@@ -95,6 +96,11 @@ public:
     bool isCriticalFlowControlActive() const;
     bool checkCriticalTimeout() const;
     void resetCriticalState();
+    
+    // Hardware flow control methods
+    void setHardwareFlowControlEnabled(bool enabled);
+    bool isHardwareFlowControlEnabled() const;
+    DeviceBridge::Parallel::HardwareFlowControl::Statistics getFlowControlStatistics() const;
     
 private:
     // Statistics tracking

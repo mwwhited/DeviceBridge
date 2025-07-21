@@ -5,6 +5,7 @@
 #include "Status.h"
 #include "Data.h"
 #include "OptimizedTiming.h"
+#include "HardwareFlowControl.h"
 #include "../Common/ServiceLocator.h"
 #include "../Common/ConfigurationService.h"
 #include <RingBuf.h>
@@ -28,7 +29,8 @@ namespace DeviceBridge::Parallel
                             _criticalStartTime(0),
                             _pendingAck(false),
                             _pendingFlowControl(false),
-                            _lastFlowControlLevel(0)
+                            _lastFlowControlLevel(0),
+                            _hardwareFlowEnabled(false)
   {
   }
 
@@ -127,42 +129,71 @@ namespace DeviceBridge::Parallel
       
       // Fast flow control decision using cached thresholds
       uint16_t bufferSize = _buffer.size();
-      if (bufferSize >= OptimizedTiming::criticalThreshold) {
-        _lastFlowControlLevel = 3; // Critical
-        _status.setBusy(true);
-      } else if (bufferSize >= OptimizedTiming::moderateThreshold) {
-        _lastFlowControlLevel = 2; // Moderate  
-        _status.setBusy(true);
+      
+      // Use hardware flow control if enabled, otherwise use basic flow control
+      if (_hardwareFlowEnabled) {
+        _hardwareFlowControl.updateFlowControl(bufferSize, _buffer.maxSize());
       } else {
-        _lastFlowControlLevel = 1; // Normal
-        _status.setBusy(false);
+        // Basic flow control using status pins
+        if (bufferSize >= OptimizedTiming::criticalThreshold) {
+          _lastFlowControlLevel = 3; // Critical
+          _status.setBusy(true);
+        } else if (bufferSize >= OptimizedTiming::moderateThreshold) {
+          _lastFlowControlLevel = 2; // Moderate  
+          _status.setBusy(true);
+        } else {
+          _lastFlowControlLevel = 1; // Normal
+          _status.setBusy(false);
+        }
       }
     } else {
       // Buffer overflow - signal error immediately
-      _status.setBusy(true);
-      _status.setError(true);
+      if (_hardwareFlowEnabled) {
+        _hardwareFlowControl.setFlowState(HardwareFlowControl::FlowState::EMERGENCY);
+      } else {
+        _status.setBusy(true);
+        _status.setError(true);
+      }
     }
     
     _interruptCount++;
     
     // TOTAL ISR TIME: ≤2μs (IEEE-1284 compliant!)
   }
+  
+  // Hardware flow control is now integrated into handleInterruptOptimized()
+  // This eliminates the need for a separate ISR and improves maintainability
 
   byte Port::_isrSeed = 0;
   Port *Port::_instance0;
   void Port::isr0()
   {
-    _instance0->handleInterrupt();
+    // Use optimized ISR by default (hardware flow control is integrated)
+    if (OptimizedTiming::isInitialized()) {
+      _instance0->handleInterruptOptimized();
+    } else {
+      _instance0->handleInterrupt();
+    }
   }
   Port *Port::_instance1;
   void Port::isr1()
   {
-    _instance1->handleInterrupt();
+    // Use optimized ISR by default (hardware flow control is integrated)
+    if (OptimizedTiming::isInitialized()) {
+      _instance1->handleInterruptOptimized();
+    } else {
+      _instance1->handleInterrupt();
+    }
   }
   Port *Port::_instance2;
   void Port::isr2()
   {
-    _instance2->handleInterrupt();
+    // Use optimized ISR by default (hardware flow control is integrated)  
+    if (OptimizedTiming::isInitialized()) {
+      _instance2->handleInterruptOptimized();
+    } else {
+      _instance2->handleInterrupt();
+    }
   }
 
   void Port::initialize()
@@ -215,6 +246,8 @@ namespace DeviceBridge::Parallel
       break;
     }
   }
+  
+  // Hardware flow control is now integrated - use initializeOptimized() and enable via setHardwareFlowControlEnabled()
 
   bool Port::hasData()
   {
@@ -378,6 +411,24 @@ namespace DeviceBridge::Parallel
       clearBuffer();
       resetCriticalState();
     }
+    
+    // Process hardware flow control deferred operations
+    if (_hardwareFlowEnabled) {
+      _hardwareFlowControl.processDeferred();
+    }
+  }
+  
+  void Port::setHardwareFlowControlEnabled(bool enabled)
+  {
+    _hardwareFlowEnabled = enabled;
+    if (enabled) {
+      _hardwareFlowControl.initialize();
+    }
+  }
+  
+  HardwareFlowControl::Statistics Port::getFlowControlStatistics() const
+  {
+    return _hardwareFlowControl.getStatistics();
   }
   
   /*
