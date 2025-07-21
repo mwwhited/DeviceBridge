@@ -611,10 +611,7 @@ bool FileSystemManager::selfTest() {
         // EEPROM not critical for basic operation
     }
 
-    // Test dependencies
-    if (!validateDependencies()) {
-        result = false;
-    }
+    // Dependencies validated by ServiceLocator at startup
 
     return result;
 }

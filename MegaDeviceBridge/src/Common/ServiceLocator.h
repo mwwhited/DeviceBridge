@@ -86,6 +86,7 @@ public:
 private:
     void printComponentStatus(const char* name, void* ptr) const;
     void printComponentStatus(const __FlashStringHelper* name, void* ptr) const;
+    void triggerSOSError(const __FlashStringHelper* errorCode) const;
 };
 
 /**

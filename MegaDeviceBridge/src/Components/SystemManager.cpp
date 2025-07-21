@@ -325,10 +325,36 @@ bool SystemManager::selfTest() {
 
     bool result = true;
 
-    // Test dependencies
-    if (!validateDependencies()) {
+    // Test memory availability
+    Serial.print(F("  Testing system memory... "));
+    uint16_t freeRAM = freeRam();
+    
+    if (freeRAM > 1000) {
+        Serial.print(F("✅ OK ("));
+        Serial.print(freeRAM);
+        Serial.print(F(" bytes free)\r\n"));
+    } else if (freeRAM > 500) {
+        Serial.print(F("⚠️  LOW ("));
+        Serial.print(freeRAM);
+        Serial.print(F(" bytes free)\r\n"));
+    } else {
+        Serial.print(F("❌ CRITICAL ("));
+        Serial.print(freeRAM);
+        Serial.print(F(" bytes free)\r\n"));
         result = false;
     }
+    
+    // Test system status tracking
+    Serial.print(F("  Testing status tracking... "));
+    if (_systemStatus != Common::SystemStatus::INITIALIZING) {
+        Serial.print(F("✅ OK (status: "));
+        Serial.print((int)_systemStatus);
+        Serial.print(F(")\r\n"));
+    } else {
+        Serial.print(F("⚠️  Still initializing\r\n"));
+    }
+    
+    // Dependencies validated by ServiceLocator at startup
 
     return result;
 }

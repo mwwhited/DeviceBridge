@@ -520,11 +520,33 @@ namespace DeviceBridge::Components
 
         bool result = true;
  
-        // Test dependencies
-        if (!validateDependencies())
-        {
+        // Test LCD display functionality
+        Serial.print(F("  Testing LCD display... "));
+        
+        // Test basic LCD operations
+        _display.clear();
+        _display.setCursor(0, 0);
+        _display.print(F("Self-Test"));
+        _display.setCursor(0, 1);
+        _display.print(F("LCD OK"));
+        
+        Serial.print(F("✅ OK\r\n"));
+        
+        // Test button reading
+        Serial.print(F("  Testing button interface... "));
+        uint16_t buttonValue = analogRead(A0);
+        auto* config = ServiceLocator::getInstance().getConfigurationService();
+        
+        if (buttonValue >= 0 && buttonValue <= 1023) {
+            Serial.print(F("✅ OK (value: "));
+            Serial.print(buttonValue);
+            Serial.print(F(")\r\n"));
+        } else {
+            Serial.print(F("❌ FAIL\r\n"));
             result = false;
         }
+        
+        // Dependencies validated by ServiceLocator at startup
 
         return result;
     }

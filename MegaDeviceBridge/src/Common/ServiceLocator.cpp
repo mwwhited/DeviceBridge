@@ -46,38 +46,91 @@ void ServiceLocator::destroy() {
 
 // Component registration methods
 void ServiceLocator::registerParallelPortManager(Components::ParallelPortManager* manager) {
+    if (!manager) {
+        Serial.print(F("FATAL: Null ParallelPortManager registration detected\r\n"));
+        triggerSOSError(F("NULL PPM"));
+        return;
+    }
     _parallelPortManager = manager;
 }
 
 void ServiceLocator::registerFileSystemManager(Components::FileSystemManager* manager) {
+    if (!manager) {
+        Serial.print(F("FATAL: Null FileSystemManager registration detected\r\n"));
+        triggerSOSError(F("NULL FSM"));
+        return;
+    }
     _fileSystemManager = manager;
 }
 
 void ServiceLocator::registerDisplayManager(Components::DisplayManager* manager) {
+    if (!manager) {
+        Serial.print(F("FATAL: Null DisplayManager registration detected\r\n"));
+        triggerSOSError(F("NULL DM"));
+        return;
+    }
     _displayManager = manager;
 }
 
 void ServiceLocator::registerTimeManager(Components::TimeManager* manager) {
+    if (!manager) {
+        Serial.print(F("FATAL: Null TimeManager registration detected\r\n"));
+        triggerSOSError(F("NULL TM"));
+        return;
+    }
     _timeManager = manager;
 }
 
 void ServiceLocator::registerSystemManager(Components::SystemManager* manager) {
+    if (!manager) {
+        Serial.print(F("FATAL: Null SystemManager registration detected\r\n"));
+        triggerSOSError(F("NULL SM"));
+        return;
+    }
     _systemManager = manager;
 }
 
 void ServiceLocator::registerConfigurationManager(Components::ConfigurationManager* manager) {
+    if (!manager) {
+        Serial.print(F("FATAL: Null ConfigurationManager registration detected\r\n"));
+        triggerSOSError(F("NULL CM"));
+        return;
+    }
     _configurationManager = manager;
 }
 
 void ServiceLocator::registerHeartbeatLEDManager(Components::HeartbeatLEDManager* manager) {
+    if (!manager) {
+        Serial.print(F("FATAL: Null HeartbeatLEDManager registration detected\r\n"));
+        // Cannot use triggerSOSError since HeartbeatLEDManager is null
+        // Fall back to direct LED control
+        pinMode(13, OUTPUT); // Default heartbeat pin
+        for (int i = 0; i < 10; i++) {
+            digitalWrite(13, HIGH);
+            delay(200);
+            digitalWrite(13, LOW);
+            delay(200);
+        }
+        return;
+    }
     _heartbeatLEDManager = manager;
 }
 
 void ServiceLocator::registerConfigurationService(Common::ConfigurationService* service) {
+    if (!service) {
+        Serial.print(F("FATAL: Null ConfigurationService registration detected\r\n"));
+        triggerSOSError(F("NULL CS"));
+        return;
+    }
     _configurationService = service;
 }
 
 void ServiceLocator::registerDisplay(User::Display* display) {
+    if (!display) {
+        Serial.print(F("FATAL: Null Display registration detected\r\n"));
+        triggerSOSError(F("NULL DISP"));
+        return;
+    }
     _display = display;
 }
 
@@ -248,6 +301,47 @@ void ServiceLocator::printComponentStatus(const __FlashStringHelper* name, void*
     } else {
         Serial.print(F("❌ Missing\r\n"));
     }
+}
+
+void ServiceLocator::triggerSOSError(const __FlashStringHelper* errorCode) const {
+    // Try to use HeartbeatLEDManager if available
+    if (_heartbeatLEDManager) {
+        // Convert flash string to regular string for storage
+        char errorBuffer[32];
+        strncpy_P(errorBuffer, (PGM_P)errorCode, sizeof(errorBuffer) - 1);
+        errorBuffer[sizeof(errorBuffer) - 1] = '\0';
+        _heartbeatLEDManager->setSOSMode(errorBuffer);
+        return;
+    }
+    
+    // Fallback to direct LED control if HeartbeatLEDManager not available
+    const uint8_t LED_PIN = 13; // Default Arduino LED pin
+    pinMode(LED_PIN, OUTPUT);
+    
+    // Blink SOS pattern: ... --- ...
+    const uint8_t SOS_PATTERN[] = {1, 1, 1, 0, 3, 3, 3, 0, 1, 1, 1, 0};
+    const uint8_t PATTERN_LENGTH = sizeof(SOS_PATTERN);
+    
+    for (uint8_t i = 0; i < PATTERN_LENGTH; i++) {
+        if (SOS_PATTERN[i] == 0) {
+            digitalWrite(LED_PIN, LOW);
+            delay(200); // Gap between signals
+        } else if (SOS_PATTERN[i] == 1) {
+            digitalWrite(LED_PIN, HIGH);
+            delay(200); // Dot
+            digitalWrite(LED_PIN, LOW);
+            delay(200);
+        } else if (SOS_PATTERN[i] == 3) {
+            digitalWrite(LED_PIN, HIGH);
+            delay(600); // Dash
+            digitalWrite(LED_PIN, LOW);
+            delay(200);
+        }
+    }
+    
+    Serial.print(F("SOS ERROR: "));
+    Serial.print(errorCode);
+    Serial.print(F("\r\n"));
 }
 
 } // namespace DeviceBridge

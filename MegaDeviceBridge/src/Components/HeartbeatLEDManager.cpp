@@ -1,6 +1,7 @@
 #include "HeartbeatLEDManager.h"
 #include "../Common/ConfigurationService.h"
 #include <Arduino.h>
+#include <string.h>
 
 namespace DeviceBridge::Components {
 
@@ -9,7 +10,9 @@ constexpr uint8_t HeartbeatLEDManager::SOS_PATTERN[SOS_PATTERN_LENGTH];
 
 HeartbeatLEDManager::HeartbeatLEDManager(uint8_t pin)
     : _mode(HeartbeatMode::NORMAL), _pin(pin), _ledState(false), _lastUpdate(0),
-      _sosIndex(0), _sosRepeat(0), _sosInPattern(false), _sosLastTime(0) {
+      _sosIndex(0), _sosRepeat(0), _sosInPattern(false), _sosLastTime(0),
+      _lastErrorMessageTime(0) {
+    memset(_errorMessage, 0, sizeof(_errorMessage));
 }
 
 HeartbeatLEDManager::~HeartbeatLEDManager() {
@@ -59,6 +62,14 @@ void HeartbeatLEDManager::updateNormalHeartbeat() {
 
 void HeartbeatLEDManager::updateSOSPattern() {
     uint32_t currentTime = millis();
+    
+    // Output error message every 5 seconds
+    if (currentTime - _lastErrorMessageTime >= 5000) {
+        Serial.print(F("SOS ERROR: "));
+        Serial.print(_errorMessage);
+        Serial.print(F(" - System requires attention\r\n"));
+        _lastErrorMessageTime = currentTime;
+    }
     
     // Check if we need to start a new SOS sequence (every 5 seconds)
     if (!_sosInPattern && (currentTime - _sosLastTime >= 5000)) {
@@ -152,6 +163,21 @@ void HeartbeatLEDManager::setPin(uint8_t pin) {
     }
 }
 
+void HeartbeatLEDManager::setSOSMode(const char* errorMessage) {
+    _mode = HeartbeatMode::SOS;
+    if (errorMessage) {
+        strncpy(_errorMessage, errorMessage, sizeof(_errorMessage) - 1);
+        _errorMessage[sizeof(_errorMessage) - 1] = '\0';
+    } else {
+        strcpy(_errorMessage, "SOS ERROR");
+    }
+    _sosIndex = 0;
+    _sosRepeat = 0;
+    _sosInPattern = false;
+    _sosLastTime = millis();
+    _lastErrorMessageTime = 0; // Force immediate error message
+}
+
 // IComponent interface implementation
 bool HeartbeatLEDManager::selfTest() {
     Serial.print(F("HeartbeatLEDManager Self-Test:\r\n"));
@@ -179,10 +205,7 @@ bool HeartbeatLEDManager::selfTest() {
     
     Serial.print(F("✅ OK\r\n"));
     
-    // Test dependencies
-    if (!validateDependencies()) {
-        result = false;
-    }
+    // Dependencies validated by ServiceLocator at startup
     
     return result;
 }

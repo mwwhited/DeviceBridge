@@ -25,6 +25,8 @@ private:
     uint8_t _sosRepeat;
     bool _sosInPattern;
     uint32_t _sosLastTime;
+    uint32_t _lastErrorMessageTime;
+    char _errorMessage[32];
     
     // SOS pattern: dot=150ms, dash=450ms, pause=150ms, letter_pause=450ms, word_pause=1050ms
     // Pattern: ... --- ... (pause) repeat every 5 seconds
@@ -60,6 +62,7 @@ public:
     
     // Mode control
     void setMode(HeartbeatMode mode);
+    void setSOSMode(const char* errorMessage);
     HeartbeatMode getMode() const { return _mode; }
     
     // Manual LED control

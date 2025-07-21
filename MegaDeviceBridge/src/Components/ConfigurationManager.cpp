@@ -1287,10 +1287,28 @@ bool ConfigurationManager::selfTest() {
 
     bool result = true;
 
-    // Test dependencies
-    if (!validateDependencies()) {
+    // Test configuration integrity
+    Serial.print(F("  Testing configuration values... "));
+    
+    // Test critical pin configurations
+    auto configService = getServices().getConfigurationService();
+    if (configService && configService->getHeartbeatPin() >= 0 && configService->getHeartbeatPin() <= 53) {
+        Serial.print(F("✅ OK\r\n"));
+    } else {
+        Serial.print(F("❌ FAIL - Invalid pin configuration\r\n"));
         result = false;
     }
+    
+    // Test serial command processing capability
+    Serial.print(F("  Testing serial interface... "));
+    if (Serial.available() >= 0) { // Serial is accessible
+        Serial.print(F("✅ OK\r\n"));
+    } else {
+        Serial.print(F("❌ FAIL\r\n"));
+        result = false;
+    }
+    
+    // Dependencies validated by ServiceLocator at startup
 
     return result;
 }

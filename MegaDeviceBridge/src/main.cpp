@@ -150,8 +150,6 @@ void setup()
   Serial.print(F("Connect TDS2024 to parallel port and use LCD buttons for control.\r\n"));
 }
 
-const int_8_t COMPONENT_UPDATE_INTERVAL = components[CONFIGURATION_INDEX].getUpdateInterval();
-
 void loop()
 {
   unsigned long currentTime = millis();

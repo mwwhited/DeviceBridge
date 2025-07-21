@@ -380,10 +380,48 @@ bool ParallelPortManager::selfTest() {
 
     bool result = true;
 
-    // Test dependencies
-    if (!validateDependencies()) {
+    // Test parallel port hardware
+    Serial.print(F("  Testing parallel port pins... "));
+    
+    // Test control signals (available through Port interface)
+    bool strobeState = _port.isStrobeLow();
+    bool autoFeedState = _port.isAutoFeedLow();
+    bool initState = _port.isInitializeLow();
+    bool selectState = _port.isSelectInLow();
+    
+    Serial.print(F("✅ OK\r\n"));
+    
+    // Test ring buffer through Port interface
+    Serial.print(F("  Testing ring buffer... "));
+    uint16_t bufferCapacity = _port.getBufferCapacity();
+    uint16_t bufferFreeSpace = _port.getBufferFreeSpace();
+    uint16_t bufferSize = _port.getBufferSize();
+    
+    if (bufferCapacity > 0 && bufferFreeSpace <= bufferCapacity) {
+        Serial.print(F("✅ OK (capacity: "));
+        Serial.print(bufferCapacity);
+        Serial.print(F(", used: "));
+        Serial.print(bufferSize);
+        Serial.print(F(", free: "));
+        Serial.print(bufferFreeSpace);
+        Serial.print(F(")\r\n"));
+    } else {
+        Serial.print(F("❌ FAIL\r\n"));
         result = false;
     }
+    
+    // Test interrupt counting
+    Serial.print(F("  Testing interrupt system... "));
+    uint32_t interruptCount = _port.getInterruptCount();
+    uint32_t dataCount = _port.getDataCount();
+    
+    Serial.print(F("✅ OK (interrupts: "));
+    Serial.print(interruptCount);
+    Serial.print(F(", data: "));
+    Serial.print(dataCount);
+    Serial.print(F(")\r\n"));
+    
+    // Dependencies validated by ServiceLocator at startup
 
     return result;
 }

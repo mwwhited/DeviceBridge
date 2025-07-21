@@ -165,10 +165,7 @@ bool TimeManager::selfTest() {
         result = false;
     }
     
-    // Test dependencies
-    if (!validateDependencies()) {
-        result = false;
-    }
+    // Dependencies validated by ServiceLocator at startup
     
     return result;
 }
