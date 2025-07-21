@@ -91,7 +91,7 @@ void FileSystemManager::stop() { closeCurrentFile(); }
 
 void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
     // Debug logging for data chunk processing
-    if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+    if (_cachedSystemManager->isParallelDebugEnabled()) {
         Serial.print(F("[DEBUG-FS] PROCESSING CHUNK - Length: "));
         Serial.print(chunk.length);
         Serial.print(F(", new file: "));
@@ -105,32 +105,30 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
     if (chunk.isNewFile) {
         closeCurrentFile();
         
-        if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+        if (_cachedSystemManager->isParallelDebugEnabled()) {
             Serial.print(F("[DEBUG-FS] CREATING NEW FILE...\r\n"));
         }
         
         if (!createNewFile()) {
-            if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-FS] FILE CREATION FAILED! Signaling error to TDS2024\r\n"));
             }
             
             // Signal error to TDS2024 to stop sending data
             // Use cached parallel port manager pointer
-            if (_cachedParallelPortManager) {
-                _cachedParallelPortManager->setPrinterError(true);    // Set ERROR signal active
-                _cachedParallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
-                _cachedParallelPortManager->clearBuffer();           // Clear any buffered data
-                
-                if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
-                    Serial.print(F("[DEBUG-FS] ERROR signals sent to TDS2024, buffer cleared\r\n"));
-                }
+            _cachedParallelPortManager->setPrinterError(true);    // Set ERROR signal active
+            _cachedParallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
+            _cachedParallelPortManager->clearBuffer();           // Clear any buffered data
+            
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
+                Serial.print(F("[DEBUG-FS] ERROR signals sent to TDS2024, buffer cleared\r\n"));
             }
             
             sendDisplayMessage(Common::DisplayMessage::ERROR, F("File Create Failed"));
             return;
         }
         
-        if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+        if (_cachedSystemManager->isParallelDebugEnabled()) {
             Serial.print(F("[DEBUG-FS] FILE CREATED SUCCESSFULLY: "));
             Serial.print(_currentFilename);
             Serial.print(F("\r\n"));
@@ -138,10 +136,8 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         
         // Clear any error signals to TDS2024 on successful file creation
         // Use cached parallel port manager pointer
-        if (_cachedParallelPortManager) {
-            _cachedParallelPortManager->setPrinterError(false);   // Clear ERROR signal
-            _cachedParallelPortManager->setPrinterPaperOut(false); // Clear PAPER_OUT signal
-        }
+        _cachedParallelPortManager->setPrinterError(false);   // Clear ERROR signal
+        _cachedParallelPortManager->setPrinterPaperOut(false); // Clear PAPER_OUT signal
         
         sendDisplayMessage(Common::DisplayMessage::STATUS, F("Storing..."));
 
@@ -161,7 +157,7 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         // Flash L2 LED to show write activity attempt
         digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
         
-        if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+        if (_cachedSystemManager->isParallelDebugEnabled()) {
             Serial.print(F("[DEBUG-FS] WRITING DATA - "));
             Serial.print(chunk.length);
             Serial.print(F(" bytes, file open: "));
@@ -172,14 +168,14 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         if (_flags.isFileOpen) {
             if (!writeDataChunk(chunk)) {
                 _writeErrors++;
-                if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+                if (_cachedSystemManager->isParallelDebugEnabled()) {
                     Serial.print(F("[DEBUG-FS] WRITE FAILED - Error count now: "));
                     Serial.print(_writeErrors);
                     Serial.print(F("\r\n"));
                 }
                 sendDisplayMessage(Common::DisplayMessage::ERROR, F("Write Failed"));
             } else {
-                if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+                if (_cachedSystemManager->isParallelDebugEnabled()) {
                     Serial.print(F("[DEBUG-FS] WRITE SUCCESS - "));
                     Serial.print(chunk.length);
                     Serial.print(F(" bytes written\r\n"));
@@ -188,7 +184,7 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         } else {
             // File not open - don't spam errors, just count them
             _writeErrors++;
-            if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-FS] WRITE ERROR - No file open! Error count: "));
                 Serial.print(_writeErrors);
                 Serial.print(F("\r\n"));
@@ -197,13 +193,11 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
             // Signal error to TDS2024 after multiple consecutive write errors
             if (_writeErrors >= 5) {  // After 5 errors, signal TDS2024 to stop
                 // Use cached parallel port manager pointer
-                if (_cachedParallelPortManager) {
-                    _cachedParallelPortManager->setPrinterError(true);    // Set ERROR signal active
-                    _cachedParallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
-                    
-                    if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
-                        Serial.print(F("[DEBUG-FS] Multiple write errors - signaling TDS2024 to stop\r\n"));
-                    }
+                _cachedParallelPortManager->setPrinterError(true);    // Set ERROR signal active
+                _cachedParallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
+                
+                if (_cachedSystemManager->isParallelDebugEnabled()) {
+                    Serial.print(F("[DEBUG-FS] Multiple write errors - signaling TDS2024 to stop\r\n"));
                 }
             }
             
@@ -225,7 +219,7 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
 
     // Handle end of file
     if (chunk.isEndOfFile) {
-        if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+        if (_cachedSystemManager->isParallelDebugEnabled()) {
             Serial.print(F("[DEBUG-FS] END OF FILE - Closing file: "));
             Serial.print(_currentFilename);
             Serial.print(F("\r\n"));
@@ -236,13 +230,13 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
             snprintf(message, sizeof(message), "Saved: %s", _currentFilename);
             sendDisplayMessage(Common::DisplayMessage::INFO, message);
             
-            if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-FS] FILE CLOSED SUCCESSFULLY - "));
                 Serial.print(_currentFilename);
                 Serial.print(F("\r\n"));
             }
         } else {
-            if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-FS] FILE CLOSE FAILED - "));
                 Serial.print(_currentFilename);
                 Serial.print(F("\r\n"));

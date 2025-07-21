@@ -63,7 +63,7 @@ void ParallelPortManager::processData() {
             _chunkStartTime = millis(); // Start timing for first chunk
             
             // Debug logging for new file detection
-            if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-LPT] NEW FILE DETECTED - File #"));
                 Serial.print(_filesReceived);
                 Serial.print(F(" started at "));
@@ -92,7 +92,7 @@ void ParallelPortManager::processData() {
                 _currentFileBytes += bytesRead;
                 
                 // Debug logging for data reading
-                if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+                if (_cachedSystemManager->isParallelDebugEnabled()) {
                     Serial.print(F("[DEBUG-LPT] Read "));
                     Serial.print(bytesRead);
                     Serial.print(F(" bytes, chunk: "));
@@ -165,7 +165,7 @@ void ParallelPortManager::processData() {
             _cachedFileSystemManager->processDataChunk(_currentChunk);
 
             // Debug logging for end of file detection AFTER final chunk is written
-            if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-LPT] END OF FILE DETECTED - File #"));
                 Serial.print(_filesReceived);
                 Serial.print(F(", bytes read: "));
@@ -200,7 +200,7 @@ void ParallelPortManager::sendChunk() {
     _currentChunk.isEndOfFile = 0;
     
     // Debug logging for chunk sending
-    if (_cachedSystemManager && _cachedSystemManager->isParallelDebugEnabled()) {
+    if (_cachedSystemManager->isParallelDebugEnabled()) {
         Serial.print(F("[DEBUG-LPT] SENDING CHUNK - Length: "));
         Serial.print(_chunkIndex);
         Serial.print(F(" bytes, new file: "));
