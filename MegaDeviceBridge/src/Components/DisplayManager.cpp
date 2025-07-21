@@ -10,6 +10,52 @@
 // PROGMEM component name for memory optimization
 static const char component_name[] PROGMEM = "DisplayManager";
 
+// PROGMEM menu strings for memory optimization
+static const char menu_main[] PROGMEM = "Main Menu";
+static const char menu_storage[] PROGMEM = "Storage";
+static const char menu_filetype[] PROGMEM = "File Type";
+static const char menu_config[] PROGMEM = "Config";
+static const char menu_default[] PROGMEM = "Menu";
+
+static const char option_storage[] PROGMEM = "Storage";
+static const char option_filetype[] PROGMEM = "File Type";
+static const char option_config[] PROGMEM = "Config";
+static const char option_save[] PROGMEM = "Save";
+static const char option_reset[] PROGMEM = "Reset";
+static const char option_default[] PROGMEM = "Option";
+
+// PROGMEM string pointer tables
+static const char* const menu_titles[] PROGMEM = {
+    menu_main,      // MAIN_MENU
+    menu_storage,   // STORAGE_MENU  
+    menu_filetype,  // FILETYPE_MENU
+    menu_config     // CONFIG_MENU
+};
+
+static const char* const main_menu_options[] PROGMEM = {
+    option_storage,   // 0
+    option_filetype,  // 1
+    option_config     // 2
+};
+
+static const char* const config_menu_options[] PROGMEM = {
+    option_save,     // 0
+    option_reset     // 1
+};
+
+// Shared buffer for menu string operations
+static char menu_string_buffer[16];
+
+// Helper function to safely read menu strings from PROGMEM
+inline const char* getMenuProgmemString(const char* const* table, uint8_t index, uint8_t max_index) {
+    if (index > max_index) {
+        strcpy_P(menu_string_buffer, option_default);
+        return menu_string_buffer;
+    }
+    strcpy_P(menu_string_buffer, (char*)pgm_read_word(&table[index]));
+    return menu_string_buffer;
+}
+
 namespace DeviceBridge::Components
 {
 
@@ -439,18 +485,11 @@ namespace DeviceBridge::Components
 
     const char *DisplayManager::getMenuTitle(MenuState state)
     {
-        switch (state)
-        {
-        case MAIN_MENU:
-            return "Main Menu";
-        case STORAGE_MENU:
-            return "Storage";
-        case FILETYPE_MENU:
-            return "File Type";
-        case CONFIG_MENU:
-            return "Config";
-        default:
-            return "Menu";
+        if (state < 4) {
+            return getMenuProgmemString(menu_titles, (uint8_t)state, 3);
+        } else {
+            strcpy_P(menu_string_buffer, menu_default);
+            return menu_string_buffer;
         }
     }
 
@@ -459,43 +498,28 @@ namespace DeviceBridge::Components
         switch (state)
         {
         case MAIN_MENU:
-            switch (option)
-            {
-            case 0:
-                return "Storage";
-            case 1:
-                return "File Type";
-            case 2:
-                return "Config";
-            default:
-                return "Option";
-            }
-            break;
+            return getMenuProgmemString(main_menu_options, option, 2);
 
         case STORAGE_MENU:
-            if (option >= Common::StorageType::Count)
-                return "Option";
+            if (option >= Common::StorageType::Count) {
+                strcpy_P(menu_string_buffer, option_default);
+                return menu_string_buffer;
+            }
             return (Common::StorageType(static_cast<Common::StorageType::Value>(option))).toSimple();
 
         case FILETYPE_MENU:
-            if (option >= Common::FileType::Count)
-                return "Option";
+            if (option >= Common::FileType::Count) {
+                strcpy_P(menu_string_buffer, option_default);
+                return menu_string_buffer;
+            }
             return (Common::FileType(static_cast<Common::FileType::Value>(option))).toSimple();
 
         case CONFIG_MENU:
-            switch (option)
-            {
-            case 0:
-                return "Save";
-            case 1:
-                return "Reset";
-            default:
-                return "Option";
-            }
-            break;
+            return getMenuProgmemString(config_menu_options, option, 1);
 
         default:
-            return "Option";
+            strcpy_P(menu_string_buffer, option_default);
+            return menu_string_buffer;
         }
     }
 
