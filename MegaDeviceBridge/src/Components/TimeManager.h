@@ -37,7 +37,7 @@ public:
         
     // Lifecycle management (IComponent interface)
     bool initialize() override;
-    void update() override;  // Called from main loop
+    void update(unsigned long currentTime) override;  // Called from main loop
     void stop() override;
     
     // IComponent interface implementation
@@ -45,6 +45,7 @@ public:
     const char* getComponentName() const override;
     bool validateDependencies() const override;
     void printDependencyStatus() const override;
+    unsigned long getUpdateInterval() const override;
     
     // Time operations
     bool setTime(uint8_t hour, uint8_t minute, uint8_t second);

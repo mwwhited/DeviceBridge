@@ -33,7 +33,7 @@ namespace DeviceBridge::Components
         return true;
     }
 
-    void DisplayManager::update()
+    void DisplayManager::update(unsigned long currentTime)
     {
         // Check for button presses (always responsive)
         uint16_t buttonValue = readButtons();
@@ -50,7 +50,6 @@ namespace DeviceBridge::Components
         }
 
         // Adaptive display update based on storage operation state
-        uint32_t currentTime = millis();
         uint32_t updateInterval = _storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
         
         if (currentTime - _lastDisplayUpdate >= updateInterval) {
@@ -569,6 +568,11 @@ namespace DeviceBridge::Components
         Serial.print(F("  SystemManager: "));
         Serial.print(systemManager ? F("✅ Available") : F("❌ Missing"));
         Serial.print(F("\r\n"));
+    }
+
+    unsigned long DisplayManager::getUpdateInterval() const {
+        auto configService = getServices().getConfigurationService();
+        return configService ? configService->getDisplayInterval() : 100; // Default 100ms
     }
 
 } // namespace DeviceBridge::Components

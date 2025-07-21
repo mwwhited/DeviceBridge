@@ -16,9 +16,8 @@ ConfigurationManager::~ConfigurationManager() { stop(); }
 
 bool ConfigurationManager::initialize() { return true; }
 
-void ConfigurationManager::update() {
+void ConfigurationManager::update(unsigned long currentTime) {
     // Check for serial commands periodically
-    uint32_t currentTime = millis();
     if (currentTime - _lastCommandCheck >= 50) { // Check every 50ms
         checkSerialCommands();
         _lastCommandCheck = currentTime;
@@ -1361,6 +1360,11 @@ void ConfigurationManager::printDependencyStatus() const {
     Serial.print(F("  ParallelPortManager: "));
     Serial.print(parallelPortManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
+}
+
+unsigned long ConfigurationManager::getUpdateInterval() const {
+    auto configService = getServices().getConfigurationService();
+    return configService ? configService->getConfigurationInterval() : 50; // Default 50ms
 }
 
 } // namespace DeviceBridge::Components

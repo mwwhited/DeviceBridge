@@ -42,7 +42,7 @@ bool FileSystemManager::initialize() {
     return _sdAvailable || _eepromAvailable;
 }
 
-void FileSystemManager::update() {
+void FileSystemManager::update(unsigned long currentTime) {
     // Periodic storage health check (called from main loop)
     // Can be used for background maintenance tasks if needed
 }
@@ -651,6 +651,11 @@ void FileSystemManager::printDependencyStatus() const {
     Serial.print(F("  TimeManager: "));
     Serial.print(timeManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
+}
+
+unsigned long FileSystemManager::getUpdateInterval() const {
+    auto configService = getServices().getConfigurationService();
+    return configService ? configService->getFileSystemInterval() : 10; // Default 10ms
 }
 
 } // namespace DeviceBridge::Components

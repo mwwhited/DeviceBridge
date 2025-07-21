@@ -3,6 +3,7 @@
 #include "FileSystemManager.h"
 #include "ParallelPortManager.h"
 #include "TimeManager.h"
+#include "../Common/ConfigurationService.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -26,9 +27,8 @@ bool SystemManager::initialize() {
     return true;
 }
 
-void SystemManager::update() {
+void SystemManager::update(unsigned long currentTime) {
     // Periodic system monitoring (called from main loop)
-    uint32_t currentTime = millis();
     if (currentTime - _lastSystemCheck >= Common::RTOS::SYSTEM_MONITOR_MS) {
         monitorSystemHealth();
         _lastSystemCheck = currentTime;
@@ -387,6 +387,11 @@ void SystemManager::printDependencyStatus() const {
     Serial.print(F("  ParallelPortManager: "));
     Serial.print(parallelPortManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
+}
+
+unsigned long SystemManager::getUpdateInterval() const {
+    auto configService = getServices().getConfigurationService();
+    return configService ? configService->getSystemInterval() : 5000; // Default 5 seconds
 }
 
 } // namespace DeviceBridge::Components
