@@ -47,23 +47,23 @@ public:
     virtual ~EEPROMFileSystem();
     
     // Lifecycle management
-    bool initialize() override;
-    bool isAvailable() const override;
-    void shutdown() override;
+    bool initialize() override final;
+    bool isAvailable() const override final;
+    void shutdown() override final;
     
     // File operations
-    bool createFile(const char* filename) override;
-    bool openFile(const char* filename, bool append = false) override;
-    bool writeData(const uint8_t* data, uint16_t length) override;
-    bool closeFile() override;
-    bool deleteFile(const char* filename) override;
-    bool fileExists(const char* filename) override;
+    bool createFile(const char* filename) override final;
+    bool openFile(const char* filename, bool append = false) override final;
+    bool writeData(const uint8_t* data, uint16_t length) override final;
+    bool closeFile() override final;
+    bool deleteFile(const char* filename) override final;
+    bool fileExists(const char* filename) override final;
     
     // Directory operations
-    bool listFiles(char* buffer, uint16_t bufferSize) override;
-    uint32_t getFileCount() override;
-    uint32_t getTotalSpace() override;
-    uint32_t getFreeSpace() override;
+    bool listFiles(char* buffer, uint16_t bufferSize) override final;
+    uint32_t getFileCount() override final;
+    uint32_t getTotalSpace() override final;
+    uint32_t getFreeSpace() override final;
     
     // Status inquiry
     Common::StorageType getStorageType() const override { 
@@ -80,7 +80,7 @@ public:
     const char* getLastErrorMessage() const override { return _lastErrorMessage; }
     
     // EEPROM specific features
-    bool format() override;
+    bool format() override final;
     bool flush() override { return true; }  // EEPROM writes are immediate
     bool sync() override { return true; }   // EEPROM writes are immediate
     

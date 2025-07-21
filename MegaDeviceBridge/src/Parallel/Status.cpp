@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <Arduino.h>
 #include "Status.h"
+#include "OptimizedTiming.h"
 #include "../Common/ServiceLocator.h"
 #include "../Common/ConfigurationService.h"
 
@@ -63,9 +64,22 @@ namespace DeviceBridge::Parallel
     // Send proper acknowledge pulse for TDS2024 timing
     // TDS2024 requires minimum 10μs acknowledge pulse width
     digitalWrite(_acknowledge, false);
-    delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getAckPulseUs());  // Extended pulse for reliable capture
+    delayMicroseconds(Common::Timing::ACK_PULSE_US);  // Extended pulse for reliable capture
     digitalWrite(_acknowledge, true);
-    delayMicroseconds(ServiceLocator::getInstance().getConfigurationService()->getRecoveryDelayUs());   // Brief recovery time
+    delayMicroseconds(Common::Timing::RECOVERY_DELAY_US);   // Brief recovery time
+  }
+  
+  void Status::sendAcknowledgePulseOptimized() {
+    // IEEE-1284 compliant fast acknowledge pulse using cached timing
+    // Direct pin access for minimum latency in ISR context
+    if (OptimizedTiming::isInitialized()) {
+      digitalWrite(_acknowledge, LOW);
+      delayMicroseconds(1); // Minimum pulse width for fast response
+      digitalWrite(_acknowledge, HIGH);
+    } else {
+      // Fallback to ServiceLocator method
+      sendAcknowledgePulse();
+    }
   }
 
   void Status::setError(bool error) {

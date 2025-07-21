@@ -21,11 +21,14 @@ private:
     char _currentMessage[Common::Limits::MAX_MESSAGE_LENGTH];
     char _currentLine2[Common::Limits::MAX_MESSAGE_LENGTH];
     uint32_t _lastMessageTime;
-    bool _showingTime;
-    bool _inMenu;
     
-    // Storage operation awareness for LCD refresh throttling
-    bool _storageOperationActive;
+    // Display state flags (bit field optimization)
+    struct {
+        uint8_t showingTime : 1;
+        uint8_t inMenu : 1;
+        uint8_t storageOperationActive : 1;
+        uint8_t reserved : 5;  // For future flags
+    } _displayFlags;
     uint32_t _lastDisplayUpdate;
     uint32_t _normalUpdateInterval;
     uint32_t _storageUpdateInterval;
@@ -40,7 +43,7 @@ private:
     uint8_t _menuSelection;
     
     // Display management
-    void updateDisplay();
+    void updateDisplay(unsigned long currentTime);
     void processMessage(const Common::DisplayMessage& msg);
     void showMainScreen();
     void showTimeDisplay(const char* timeStr);
@@ -61,16 +64,16 @@ public:
         
     
     // Lifecycle management (IComponent interface)
-    bool initialize() override;
-    void update(unsigned long currentTime) override;  // Called from main loop
-    void stop() override;
+    bool initialize() override final;
+    void update(unsigned long currentTime) override final;  // Called from main loop
+    void stop() override final;
     
     // IComponent interface implementation
-    bool selfTest() override;
-    const char* getComponentName() const override;
-    bool validateDependencies() const override;
-    void printDependencyStatus() const override;
-    unsigned long getUpdateInterval() const override;
+    bool selfTest() override final;
+    const char* getComponentName() const override final;
+    bool validateDependencies() const override final;
+    void printDependencyStatus() const override final;
+    unsigned long getUpdateInterval() const override final;
     
     // Display control
     void showMessage(const char* message, const char* line2 = nullptr);
@@ -84,11 +87,11 @@ public:
     void displayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper* message, const __FlashStringHelper* line2 = nullptr);
     
     // Status inquiry
-    bool isShowingMenu() const { return _inMenu; }
+    bool isShowingMenu() const { return _displayFlags.inMenu; }
     
     // Storage operation control for LCD refresh throttling
     void setStorageOperationActive(bool active);
-    bool isStorageOperationActive() const { return _storageOperationActive; }
+    bool isStorageOperationActive() const { return _displayFlags.storageOperationActive; }
     
 private:
     // Button debouncing

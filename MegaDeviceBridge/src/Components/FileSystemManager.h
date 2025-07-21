@@ -32,17 +32,20 @@ private:
     File _currentFile;
     W25Q128Manager _eeprom;
     
-    // Storage status
-    bool _sdAvailable;
-    bool _eepromAvailable;
+    // Storage status (bit field optimization)
+    struct {
+        uint8_t sdAvailable : 1;
+        uint8_t eepromAvailable : 1;
+        uint8_t lastSDCardDetectState : 1;
+        uint8_t isFileOpen : 1;
+        uint8_t reserved : 4;  // For future flags
+    } _flags;
     
-    // Hot-swap detection
-    bool _lastSDCardDetectState;
     uint32_t _lastSDCardCheckTime;
     
     // EEPROM file management
     uint32_t _eepromCurrentAddress;
-    uint32_t _eepromWriteBuffer[Common::Buffer::EEPROM_BUFFER_SIZE]; // 256-byte buffer (64 * 4 bytes)
+    uint32_t _eepromWriteBuffer[Common::Buffer::EEPROM_BUFFER_SIZE]; // 128-byte buffer (32 * 4 bytes) - OPTIMIZED
     uint16_t _eepromBufferIndex;
     Common::StorageType _activeStorage;
     Common::StorageType _preferredStorage;
@@ -52,7 +55,6 @@ private:
     char _currentFilename[Common::Limits::MAX_FILENAME_LENGTH];
     Common::FileType _fileType;          // Requested/configured file type
     Common::FileType _detectedFileType;  // Auto-detected file type (if auto-detection enabled)
-    bool _isFileOpen;
     
     // Storage operations (legacy)
     bool initializeSD();
@@ -90,16 +92,16 @@ public:
     bool createNewFile();
     
     // Lifecycle management (IComponent interface)
-    bool initialize() override;
-    void update(unsigned long currentTime) override;  // Called from main loop
-    void stop() override;
+    bool initialize() override final;
+    void update(unsigned long currentTime) override final;  // Called from main loop
+    void stop() override final;
     
     // IComponent interface implementation
-    bool selfTest() override;
-    const char* getComponentName() const override;
-    bool validateDependencies() const override;
-    void printDependencyStatus() const override;
-    unsigned long getUpdateInterval() const override;
+    bool selfTest() override final;
+    const char* getComponentName() const override final;
+    bool validateDependencies() const override final;
+    void printDependencyStatus() const override final;
+    unsigned long getUpdateInterval() const override final;
     
     // Data processing (called by ParallelPortManager)
     void processDataChunk(const Common::DataChunk& chunk);
@@ -114,8 +116,8 @@ public:
     Common::StorageType getCurrentStorageType() const { return _activeStorage; }  // Alias for serial interface
     Common::FileType getFileType() const { return _fileType; }
     Common::FileType getDetectedFileType() const { return _detectedFileType; }
-    bool isSDAvailable() const { return _sdAvailable; }
-    bool isEEPROMAvailable() const { return _eepromAvailable; }
+    bool isSDAvailable() const { return _flags.sdAvailable; }
+    bool isEEPROMAvailable() const { return _flags.eepromAvailable; }
     
     // Statistics
     uint32_t getFilesStored() const;  // Count files on SD card

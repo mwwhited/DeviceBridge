@@ -7,16 +7,69 @@
 #include <string.h>
 #include <Arduino.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "DisplayManager";
+
+// PROGMEM menu strings for memory optimization
+static const char menu_main[] PROGMEM = "Main Menu";
+static const char menu_storage[] PROGMEM = "Storage";
+static const char menu_filetype[] PROGMEM = "File Type";
+static const char menu_config[] PROGMEM = "Config";
+static const char menu_default[] PROGMEM = "Menu";
+
+static const char option_storage[] PROGMEM = "Storage";
+static const char option_filetype[] PROGMEM = "File Type";
+static const char option_config[] PROGMEM = "Config";
+static const char option_save[] PROGMEM = "Save";
+static const char option_reset[] PROGMEM = "Reset";
+static const char option_default[] PROGMEM = "Option";
+
+// PROGMEM string pointer tables
+static const char* const menu_titles[] PROGMEM = {
+    menu_main,      // MAIN_MENU
+    menu_storage,   // STORAGE_MENU  
+    menu_filetype,  // FILETYPE_MENU
+    menu_config     // CONFIG_MENU
+};
+
+static const char* const main_menu_options[] PROGMEM = {
+    option_storage,   // 0
+    option_filetype,  // 1
+    option_config     // 2
+};
+
+static const char* const config_menu_options[] PROGMEM = {
+    option_save,     // 0
+    option_reset     // 1
+};
+
+// Shared buffer for menu string operations
+static char menu_string_buffer[16];
+
+// Helper function to safely read menu strings from PROGMEM
+inline const char* getMenuProgmemString(const char* const* table, uint8_t index, uint8_t max_index) {
+    if (index > max_index) {
+        strcpy_P(menu_string_buffer, option_default);
+        return menu_string_buffer;
+    }
+    strcpy_P(menu_string_buffer, (char*)pgm_read_word(&table[index]));
+    return menu_string_buffer;
+}
+
 namespace DeviceBridge::Components
 {
 
     // Button constants now accessed via ConfigurationService
 
     DisplayManager::DisplayManager(User::Display &display)
-        : _display(display), _lastMessageTime(0), _showingTime(false), _inMenu(false), 
-          _storageOperationActive(false), _lastDisplayUpdate(0), _normalUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getNormalDisplayInterval()), _storageUpdateInterval(ServiceLocator::getInstance().getConfigurationService()->getStorageDisplayInterval()),
-          _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(ServiceLocator::getInstance().getConfigurationService()->getButtonNoneValue())
+        : _display(display), _lastMessageTime(0), _lastDisplayUpdate(0), _normalUpdateInterval(Common::DisplayRefresh::NORMAL_INTERVAL_MS), _storageUpdateInterval(Common::DisplayRefresh::STORAGE_INTERVAL_MS),
+          _menuState(MAIN_MENU), _menuSelection(0), _lastButtonTime(0), _lastButtonState(Common::Buttons::BUTTON_NONE_VALUE)
     {
+        // Initialize display flags (bit field)
+        _displayFlags.showingTime = 0;
+        _displayFlags.inMenu = 0;
+        _displayFlags.storageOperationActive = 0;
+        _displayFlags.reserved = 0;
         memset(_currentMessage, 0, sizeof(_currentMessage));
         memset(_currentLine2, 0, sizeof(_currentLine2));
         strcpy(_currentMessage, "Ready");
@@ -29,6 +82,9 @@ namespace DeviceBridge::Components
 
     bool DisplayManager::initialize()
     {
+        // Cache service dependencies first (performance optimization)
+        cacheServiceDependencies();
+        
         // Display should already be initialized by main
         return true;
     }
@@ -37,55 +93,53 @@ namespace DeviceBridge::Components
     {
         // Check for button presses (always responsive)
         uint16_t buttonValue = readButtons();
-        auto* config = ServiceLocator::getInstance().getConfigurationService();
-        if (buttonValue != config->getButtonNoneValue() && buttonValue != _lastButtonState)
+        if (buttonValue != Common::Buttons::BUTTON_NONE_VALUE && buttonValue != _lastButtonState)
         {
             handleButtonPress(buttonValue);
             _lastButtonState = buttonValue;
-            _lastButtonTime = millis();
+            _lastButtonTime = currentTime;
         }
-        else if (buttonValue == config->getButtonNoneValue())
+        else if (buttonValue == Common::Buttons::BUTTON_NONE_VALUE)
         {
-            _lastButtonState = config->getButtonNoneValue();
+            _lastButtonState = Common::Buttons::BUTTON_NONE_VALUE;
         }
 
         // Adaptive display update based on storage operation state
-        uint32_t updateInterval = _storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
+        uint32_t updateInterval = _displayFlags.storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
         
         if (currentTime - _lastDisplayUpdate >= updateInterval) {
-            updateDisplay();
+            updateDisplay(currentTime);
             _lastDisplayUpdate = currentTime;
         }
     }
 
     void DisplayManager::stop()
     {
-        _inMenu = false;
-        _showingTime = false;
+        _displayFlags.inMenu = false;
+        _displayFlags.showingTime = false;
     }
 
     void DisplayManager::setStorageOperationActive(bool active)
     {
-        _storageOperationActive = active;
+        _displayFlags.storageOperationActive = active;
         
         // If storage operation is ending, allow immediate display update and clock refresh
         if (!active) {
             _lastDisplayUpdate = 0;
-            _showingTime = false; // Allow clock to refresh when idle
+            _displayFlags.showingTime = false; // Allow clock to refresh when idle
         }
     }
 
-    void DisplayManager::updateDisplay()
+    void DisplayManager::updateDisplay(unsigned long currentTime)
     {
-        auto timeManager = getServices().getTimeManager();
         // Check if we should show time when truly idle (not in menu, not during storage operations)
-        if (!_inMenu && !_storageOperationActive && (millis() - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
+        if (!_displayFlags.inMenu && !_displayFlags.storageOperationActive && (currentTime - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
         {
-            if (!_showingTime)
+            if (!_displayFlags.showingTime)
             {
-                _showingTime = true;
+                _displayFlags.showingTime = true;
                 char timeStr[32];
-                timeManager->getFormattedTime(timeStr, sizeof(timeStr));
+                _cachedTimeManager->getFormattedTime(timeStr, sizeof(timeStr));
                 showTimeDisplay(timeStr);
             }
         }
@@ -108,7 +162,7 @@ namespace DeviceBridge::Components
             break;
         case Common::DisplayMessage::TIME:
             showTimeDisplay(msg.message);
-            _showingTime = false;
+            _displayFlags.showingTime = false;
             break;
         case Common::DisplayMessage::MENU:
             showMenuScreen();
@@ -158,27 +212,26 @@ namespace DeviceBridge::Components
             return _lastButtonState;
         }
 
-        uint16_t buttonValue = analogRead(A0);
+        uint16_t buttonValue = analogRead(54); // A0 pin number
 
-        // Tolerance for analog readings using ConfigurationService
-        auto* config = ServiceLocator::getInstance().getConfigurationService();
-        if (buttonValue < config->getRightThreshold())
-            return config->getButtonRightValue();
-        if (buttonValue < config->getUpThreshold())
-            return config->getButtonUpValue();
-        if (buttonValue < config->getDownThreshold())
-            return config->getButtonDownValue();
-        if (buttonValue < config->getLeftThreshold())
-            return config->getButtonLeftValue();
-        if (buttonValue < config->getSelectThreshold())
-            return config->getButtonSelectValue();
+        // Tolerance for analog readings using direct constants
+        if (buttonValue < Common::Buttons::RIGHT_THRESHOLD)
+            return Common::Buttons::BUTTON_RIGHT_VALUE;
+        if (buttonValue < Common::Buttons::UP_THRESHOLD)
+            return Common::Buttons::BUTTON_UP_VALUE;
+        if (buttonValue < Common::Buttons::DOWN_THRESHOLD)
+            return Common::Buttons::BUTTON_DOWN_VALUE;
+        if (buttonValue < Common::Buttons::LEFT_THRESHOLD)
+            return Common::Buttons::BUTTON_LEFT_VALUE;
+        if (buttonValue < Common::Buttons::SELECT_THRESHOLD)
+            return Common::Buttons::BUTTON_SELECT_VALUE;
 
-        return config->getButtonNoneValue();
+        return Common::Buttons::BUTTON_NONE_VALUE;
     }
 
     void DisplayManager::handleButtonPress(uint16_t button)
     {
-        if (_inMenu)
+        if (_displayFlags.inMenu)
         {
             navigateMenu(button);
         }
@@ -194,26 +247,24 @@ namespace DeviceBridge::Components
         // Reset idle timer on any menu interaction
         _lastMessageTime = millis();
         
-        auto* config = ServiceLocator::getInstance().getConfigurationService();
-        
-        if (button == config->getButtonUpValue()) {
+        if (button == Common::Buttons::BUTTON_UP_VALUE) {
             if (_menuSelection > 0)
             {
                 _menuSelection--;
             }
             showMenuScreen();
         }
-        else if (button == config->getButtonDownValue()) {
+        else if (button == Common::Buttons::BUTTON_DOWN_VALUE) {
             if (_menuSelection < getMenuOptionCount(_menuState) - 1)
             {
                 _menuSelection++;
             }
             showMenuScreen();
         }
-        else if (button == config->getButtonSelectValue()) {
+        else if (button == Common::Buttons::BUTTON_SELECT_VALUE) {
             executeMenuSelection();
         }
-        else if (button == config->getButtonLeftValue()) {
+        else if (button == Common::Buttons::BUTTON_LEFT_VALUE) {
             exitMenu();
         }
     }
@@ -260,7 +311,6 @@ namespace DeviceBridge::Components
 
     void DisplayManager::sendCommand(Common::SystemCommand::Type type, uint8_t value, const char *data)
     {
-        auto systemManager = getServices().getSystemManager();
         Common::SystemCommand cmd;
         cmd.type = type;
         cmd.value = value;
@@ -274,7 +324,7 @@ namespace DeviceBridge::Components
             cmd.data[0] = '\0';
         }
 
-        systemManager->processSystemCommand(cmd);
+        _cachedSystemManager->processSystemCommand(cmd);
     }
 
     void DisplayManager::showMessage(const char *message, const char *line2)
@@ -293,9 +343,9 @@ namespace DeviceBridge::Components
         }
 
         _lastMessageTime = millis();
-        _showingTime = false;
+        _displayFlags.showingTime = false;
 
-        if (!_inMenu)
+        if (!_displayFlags.inMenu)
         {
             showMainScreen();
         }
@@ -310,7 +360,7 @@ namespace DeviceBridge::Components
         _display.print(error);
 
         _lastMessageTime = millis();
-        _showingTime = false;
+        _displayFlags.showingTime = false;
     }
 
     void DisplayManager::showStatus(const char *status)
@@ -320,26 +370,25 @@ namespace DeviceBridge::Components
 
     void DisplayManager::enterMenu()
     {
-        _inMenu = true;
+        _displayFlags.inMenu = true;
         _menuState = MAIN_MENU;
         _menuSelection = 0;
         _lastMessageTime = millis(); // Reset idle timer when entering menu
-        _showingTime = false; // Ensure we're not showing time
+        _displayFlags.showingTime = false; // Ensure we're not showing time
         showMenuScreen();
     }
 
     void DisplayManager::exitMenu()
     {
-        _inMenu = false;
-        _showingTime = false; // Allow clock to refresh when idle
+        _displayFlags.inMenu = false;
+        _displayFlags.showingTime = false; // Allow clock to refresh when idle
         showMainScreen();
     }
 
     void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const char *message, const char *line2)
     {
-        auto systemManager = getServices().getSystemManager();
         // Debug mode: output LCD messages to serial
-        if (systemManager->isLCDDebugEnabled())
+        if (_cachedSystemManager->isLCDDebugEnabled())
         {
             Serial.print(F("[LCD] "));
             switch (type)
@@ -385,9 +434,8 @@ namespace DeviceBridge::Components
     }
     void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper *message, const __FlashStringHelper *line2)
     {
-        auto systemManager = getServices().getSystemManager();
         // Debug mode: output LCD messages to serial
-        if (systemManager->isLCDDebugEnabled())
+        if (_cachedSystemManager->isLCDDebugEnabled())
         {
             Serial.print(F("[LCD] "));
             switch (type)
@@ -436,18 +484,11 @@ namespace DeviceBridge::Components
 
     const char *DisplayManager::getMenuTitle(MenuState state)
     {
-        switch (state)
-        {
-        case MAIN_MENU:
-            return "Main Menu";
-        case STORAGE_MENU:
-            return "Storage";
-        case FILETYPE_MENU:
-            return "File Type";
-        case CONFIG_MENU:
-            return "Config";
-        default:
-            return "Menu";
+        if (state < 4) {
+            return getMenuProgmemString(menu_titles, (uint8_t)state, 3);
+        } else {
+            strcpy_P(menu_string_buffer, menu_default);
+            return menu_string_buffer;
         }
     }
 
@@ -456,43 +497,28 @@ namespace DeviceBridge::Components
         switch (state)
         {
         case MAIN_MENU:
-            switch (option)
-            {
-            case 0:
-                return "Storage";
-            case 1:
-                return "File Type";
-            case 2:
-                return "Config";
-            default:
-                return "Option";
-            }
-            break;
+            return getMenuProgmemString(main_menu_options, option, 2);
 
         case STORAGE_MENU:
-            if (option >= Common::StorageType::Count)
-                return "Option";
+            if (option >= Common::StorageType::Count) {
+                strcpy_P(menu_string_buffer, option_default);
+                return menu_string_buffer;
+            }
             return (Common::StorageType(static_cast<Common::StorageType::Value>(option))).toSimple();
 
         case FILETYPE_MENU:
-            if (option >= Common::FileType::Count)
-                return "Option";
+            if (option >= Common::FileType::Count) {
+                strcpy_P(menu_string_buffer, option_default);
+                return menu_string_buffer;
+            }
             return (Common::FileType(static_cast<Common::FileType::Value>(option))).toSimple();
 
         case CONFIG_MENU:
-            switch (option)
-            {
-            case 0:
-                return "Save";
-            case 1:
-                return "Reset";
-            default:
-                return "Option";
-            }
-            break;
+            return getMenuProgmemString(config_menu_options, option, 1);
 
         default:
-            return "Option";
+            strcpy_P(menu_string_buffer, option_default);
+            return menu_string_buffer;
         }
     }
 
@@ -534,8 +560,7 @@ namespace DeviceBridge::Components
         
         // Test button reading
         Serial.print(F("  Testing button interface... "));
-        uint16_t buttonValue = analogRead(A0);
-        auto* config = ServiceLocator::getInstance().getConfigurationService();
+        uint16_t buttonValue = analogRead(Common::Pins::LCD_BUTTONS);
         
         if (buttonValue >= 0 && buttonValue <= 1023) {
             Serial.print(F("✅ OK (value: "));
@@ -553,22 +578,22 @@ namespace DeviceBridge::Components
 
     const char *DisplayManager::getComponentName() const
     {
-        return "DisplayManager";
+        static char name_buffer[24];
+        strcpy_P(name_buffer, component_name);
+        return name_buffer;
     }
 
     bool DisplayManager::validateDependencies() const
     {
         bool valid = true;
 
-        auto timeManager = getServices().getTimeManager();
-        if (!timeManager)
+        if (!_cachedTimeManager)
         {
             Serial.print(F("  Missing TimeManager dependency\r\n"));
             valid = false;
         }
 
-        auto systemManager = getServices().getSystemManager();
-        if (!systemManager)
+        if (!_cachedSystemManager)
         {
             Serial.print(F("  Missing SystemManager dependency\r\n"));
             valid = false;
@@ -581,20 +606,17 @@ namespace DeviceBridge::Components
     {
         Serial.print(F("DisplayManager Dependencies:\r\n"));
 
-        auto timeManager = getServices().getTimeManager();
         Serial.print(F("  TimeManager: "));
-        Serial.print(timeManager ? F("✅ Available") : F("❌ Missing"));
+        Serial.print(_cachedTimeManager ? F("✅ Available") : F("❌ Missing"));
         Serial.print(F("\r\n"));
 
-        auto systemManager = getServices().getSystemManager();
         Serial.print(F("  SystemManager: "));
-        Serial.print(systemManager ? F("✅ Available") : F("❌ Missing"));
+        Serial.print(_cachedSystemManager ? F("✅ Available") : F("❌ Missing"));
         Serial.print(F("\r\n"));
     }
 
     unsigned long DisplayManager::getUpdateInterval() const {
-        auto configService = getServices().getConfigurationService();
-        return configService ? configService->getDisplayInterval() : 100; // Default 100ms
+        return _cachedConfigurationService->getDisplayInterval(); // Default 100ms
     }
 
 } // namespace DeviceBridge::Components

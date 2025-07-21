@@ -26,7 +26,7 @@ bool W25Q128Manager::initialize() {
     uint32_t jedecId = readJedecId();
     
     // W25Q128 JEDEC ID should be 0xEF4018 (Winbond, 128Mbit)
-    if ((jedecId & 0xFFFFFF) == ServiceLocator::getInstance().getConfigurationService()->getW25Q128JedecId()) {
+    if ((jedecId & 0xFFFFFF) == Common::Flash::W25Q128_JEDEC_ID) {
         _initialized = true;
         return true;
     }

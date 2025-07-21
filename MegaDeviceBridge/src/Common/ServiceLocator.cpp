@@ -234,7 +234,7 @@ bool ServiceLocator::runSystemSelfTest() const {
     Serial.print(F("Running component self-tests...\r\n"));
     
     // For now, just validate hardware availability through managers
-    if (_timeManager && !_timeManager->isRTCAvailable()) {
+    if (!_timeManager->isRTCAvailable()) {
         Serial.print(F("⚠️  TimeManager: RTC not available\r\n"));
     }
     

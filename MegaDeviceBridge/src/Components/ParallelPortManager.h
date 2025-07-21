@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "../Parallel/Port.h"
+#include "../Parallel/HardwareFlowControl.h"
 #include "../Common/Types.h"
 #include "../Common/Config.h"
 #include "../Common/ServiceLocator.h"
@@ -44,16 +45,16 @@ public:
     ~ParallelPortManager();
     
     // Lifecycle management (IComponent interface)
-    bool initialize() override;
-    void update(unsigned long currentTime) override;  // Called from main loop with timing
-    void stop() override;
+    bool initialize() override final;
+    void update(unsigned long currentTime) override final;  // Called from main loop with timing
+    void stop() override final;
     
     // IComponent interface implementation
-    bool selfTest() override;
-    const char* getComponentName() const override;
-    bool validateDependencies() const override;
-    void printDependencyStatus() const override;
-    unsigned long getUpdateInterval() const override;
+    bool selfTest() override final;
+    const char* getComponentName() const override final;
+    bool validateDependencies() const override final;
+    void printDependencyStatus() const override final;
+    unsigned long getUpdateInterval() const override final;
     
     // Status inquiry
     bool isReceiving() const { return _fileInProgress; }
@@ -95,6 +96,11 @@ public:
     bool isCriticalFlowControlActive() const;
     bool checkCriticalTimeout() const;
     void resetCriticalState();
+    
+    // Hardware flow control methods
+    void setHardwareFlowControlEnabled(bool enabled);
+    bool isHardwareFlowControlEnabled() const;
+    DeviceBridge::Parallel::HardwareFlowControl::Statistics getFlowControlStatistics() const;
     
 private:
     // Statistics tracking

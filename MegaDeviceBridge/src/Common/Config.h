@@ -68,7 +68,7 @@ namespace Pins {
   constexpr uint8_t LCD_D5 = 5;
   constexpr uint8_t LCD_D6 = 6;
   constexpr uint8_t LCD_D7 = 7;
-  constexpr uint8_t LCD_BUTTONS = A0;  // OSEPP analog button input
+  constexpr uint8_t LCD_BUTTONS = 54;  // A0 pin number for OSEPP analog button input
 
   // Storage pins
   constexpr uint8_t SD_CS = 10;
@@ -135,7 +135,7 @@ namespace Timing {
 namespace Buffer {
   constexpr uint16_t RING_BUFFER_SIZE = 512;          // Main parallel port ring buffer
   constexpr uint16_t DATA_CHUNK_SIZE = 512;           // Data chunk size (matches ring buffer for optimal transfer)
-  constexpr uint16_t EEPROM_BUFFER_SIZE = 64;         // EEPROM write buffer (64 * 4 bytes = 256 bytes)
+  constexpr uint16_t EEPROM_BUFFER_SIZE = 32;         // EEPROM write buffer (32 * 4 bytes = 128 bytes) - OPTIMIZED
   constexpr uint32_t CRITICAL_TIMEOUT_MS = 20000;     // 20 seconds emergency timeout
   constexpr uint32_t CHUNK_SEND_TIMEOUT_MS = 50;      // Send partial chunks after 50ms of data collection
   constexpr uint16_t MIN_CHUNK_SIZE = 64;             // Minimum chunk size to send (unless timeout or EOF)
@@ -242,6 +242,13 @@ namespace FlowControl {
   constexpr uint8_t MODERATE_THRESHOLD_PERCENT = 50;     // Moderate flow control (was 60%)
   constexpr uint8_t CRITICAL_THRESHOLD_PERCENT = 70;     // Critical flow control (was 80%)
   constexpr uint8_t RECOVERY_THRESHOLD_PERCENT = 40;     // Recovery threshold (was 50%)
+  
+  // Pre-computed thresholds for 512-byte ring buffer (for compiler inlining)
+  constexpr uint16_t RING_BUFFER_SIZE = Buffer::RING_BUFFER_SIZE;
+  constexpr uint16_t PRE_WARNING_THRESHOLD = (RING_BUFFER_SIZE * PRE_WARNING_THRESHOLD_PERCENT) / 100;  // 205 bytes
+  constexpr uint16_t MODERATE_THRESHOLD = (RING_BUFFER_SIZE * MODERATE_THRESHOLD_PERCENT) / 100;        // 256 bytes  
+  constexpr uint16_t CRITICAL_THRESHOLD = (RING_BUFFER_SIZE * CRITICAL_THRESHOLD_PERCENT) / 100;        // 358 bytes
+  constexpr uint16_t RECOVERY_THRESHOLD = (RING_BUFFER_SIZE * RECOVERY_THRESHOLD_PERCENT) / 100;        // 205 bytes
 }
 
 } // namespace DeviceBridge::Common

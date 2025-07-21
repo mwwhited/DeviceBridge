@@ -8,20 +8,32 @@
 #include <stdio.h>
 #include <string.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "FileSystemManager";
+
 namespace DeviceBridge::Components {
 
 FileSystemManager::FileSystemManager()
-    : _activeFileSystem(nullptr), _eeprom(Common::Pins::EEPROM_CS), _sdAvailable(false), _eepromAvailable(false), _eepromCurrentAddress(0),
+    : _activeFileSystem(nullptr), _eeprom(Common::Pins::EEPROM_CS), _eepromCurrentAddress(0),
       _eepromBufferIndex(0), _activeStorage(Common::StorageType::AUTO_SELECT),
       _preferredStorage(Common::StorageType::SD_CARD), _fileCounter(0), _fileType(Common::FileType::AUTO_DETECT),
       _detectedFileType(Common::FileType::AUTO_DETECT), _totalBytesWritten(0), _currentFileBytesWritten(0), 
-      _writeErrors(0), _isFileOpen(false), _lastSDCardDetectState(false), _lastSDCardCheckTime(0) {
+      _writeErrors(0), _lastSDCardCheckTime(0) {
+    // Initialize bit field flags
+    _flags.sdAvailable = 0;
+    _flags.eepromAvailable = 0;
+    _flags.lastSDCardDetectState = 0;
+    _flags.isFileOpen = 0;
+    _flags.reserved = 0;
     memset(_currentFilename, 0, sizeof(_currentFilename));
 }
 
 FileSystemManager::~FileSystemManager() { stop(); }
 
 bool FileSystemManager::initialize() {
+    // Cache service dependencies first (performance optimization)
+    cacheServiceDependencies();
+    
     // Initialize modular file system
     if (!initializeFileSystem()) {
         sendDisplayMessage(Common::DisplayMessage::ERROR, F("FileSystem Init Failed"));
@@ -29,21 +41,21 @@ bool FileSystemManager::initialize() {
     }
     
     // Legacy initialization for compatibility
-    _sdAvailable = initializeSD();
-    _eepromAvailable = initializeEEPROM();
+    _flags.sdAvailable = initializeSD() ? 1 : 0;
+    _flags.eepromAvailable = initializeEEPROM() ? 1 : 0;
     
     // Initialize hot-swap detection state
-    _lastSDCardDetectState = checkSDCardPresence();
+    _flags.lastSDCardDetectState = checkSDCardPresence() ? 1 : 0;
     _lastSDCardCheckTime = millis();
 
     // Select initial storage type and active file system
-    if (_preferredStorage.value == Common::StorageType::SD_CARD && _sdAvailable) {
+    if (_preferredStorage.value == Common::StorageType::SD_CARD && _flags.sdAvailable) {
         _activeStorage = Common::StorageType::SD_CARD;
-    } else if (_preferredStorage.value == Common::StorageType::EEPROM && _eepromAvailable) {
+    } else if (_preferredStorage.value == Common::StorageType::EEPROM && _flags.eepromAvailable) {
         _activeStorage = Common::StorageType::EEPROM;
-    } else if (_sdAvailable) {
+    } else if (_flags.sdAvailable) {
         _activeStorage = Common::StorageType::SD_CARD;
-    } else if (_eepromAvailable) {
+    } else if (_flags.eepromAvailable) {
         _activeStorage = Common::StorageType::EEPROM;
     } else {
         _activeStorage = Common::StorageType::SERIAL_TRANSFER;
@@ -53,7 +65,7 @@ bool FileSystemManager::initialize() {
     // Set active file system based on selected storage
     selectActiveFileSystem(_activeStorage);
 
-    return _sdAvailable || _eepromAvailable || _activeFileSystem != nullptr;
+    return _flags.sdAvailable || _flags.eepromAvailable || _activeFileSystem != nullptr;
 }
 
 void FileSystemManager::update(unsigned long currentTime) {
@@ -62,15 +74,15 @@ void FileSystemManager::update(unsigned long currentTime) {
         bool currentSDCardState = checkSDCardPresence();
         
         // SD card was inserted
-        if (currentSDCardState && !_lastSDCardDetectState) {
+        if (currentSDCardState && !_flags.lastSDCardDetectState) {
             handleSDCardInsertion();
         }
         // SD card was removed
-        else if (!currentSDCardState && _lastSDCardDetectState) {
+        else if (!currentSDCardState && _flags.lastSDCardDetectState) {
             handleSDCardRemoval();
         }
         
-        _lastSDCardDetectState = currentSDCardState;
+        _flags.lastSDCardDetectState = currentSDCardState ? 1 : 0;
         _lastSDCardCheckTime = currentTime;
     }
 }
@@ -79,8 +91,7 @@ void FileSystemManager::stop() { closeCurrentFile(); }
 
 void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
     // Debug logging for data chunk processing
-    auto systemManager = getServices().getSystemManager();
-    if (systemManager && systemManager->isParallelDebugEnabled()) {
+    if (_cachedSystemManager->isParallelDebugEnabled()) {
         Serial.print(F("[DEBUG-FS] PROCESSING CHUNK - Length: "));
         Serial.print(chunk.length);
         Serial.print(F(", new file: "));
@@ -94,43 +105,39 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
     if (chunk.isNewFile) {
         closeCurrentFile();
         
-        if (systemManager && systemManager->isParallelDebugEnabled()) {
+        if (_cachedSystemManager->isParallelDebugEnabled()) {
             Serial.print(F("[DEBUG-FS] CREATING NEW FILE...\r\n"));
         }
         
         if (!createNewFile()) {
-            if (systemManager && systemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-FS] FILE CREATION FAILED! Signaling error to TDS2024\r\n"));
             }
             
             // Signal error to TDS2024 to stop sending data
-            auto parallelPortManager = getServices().getParallelPortManager();
-            if (parallelPortManager) {
-                parallelPortManager->setPrinterError(true);    // Set ERROR signal active
-                parallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
-                parallelPortManager->clearBuffer();           // Clear any buffered data
-                
-                if (systemManager && systemManager->isParallelDebugEnabled()) {
-                    Serial.print(F("[DEBUG-FS] ERROR signals sent to TDS2024, buffer cleared\r\n"));
-                }
+            // Use cached parallel port manager pointer
+            _cachedParallelPortManager->setPrinterError(true);    // Set ERROR signal active
+            _cachedParallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
+            _cachedParallelPortManager->clearBuffer();           // Clear any buffered data
+            
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
+                Serial.print(F("[DEBUG-FS] ERROR signals sent to TDS2024, buffer cleared\r\n"));
             }
             
             sendDisplayMessage(Common::DisplayMessage::ERROR, F("File Create Failed"));
             return;
         }
         
-        if (systemManager && systemManager->isParallelDebugEnabled()) {
+        if (_cachedSystemManager->isParallelDebugEnabled()) {
             Serial.print(F("[DEBUG-FS] FILE CREATED SUCCESSFULLY: "));
             Serial.print(_currentFilename);
             Serial.print(F("\r\n"));
         }
         
         // Clear any error signals to TDS2024 on successful file creation
-        auto parallelPortManager = getServices().getParallelPortManager();
-        if (parallelPortManager) {
-            parallelPortManager->setPrinterError(false);   // Clear ERROR signal
-            parallelPortManager->setPrinterPaperOut(false); // Clear PAPER_OUT signal
-        }
+        // Use cached parallel port manager pointer
+        _cachedParallelPortManager->setPrinterError(false);   // Clear ERROR signal
+        _cachedParallelPortManager->setPrinterPaperOut(false); // Clear PAPER_OUT signal
         
         sendDisplayMessage(Common::DisplayMessage::STATUS, F("Storing..."));
 
@@ -150,25 +157,25 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         // Flash L2 LED to show write activity attempt
         digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
         
-        if (systemManager && systemManager->isParallelDebugEnabled()) {
+        if (_cachedSystemManager->isParallelDebugEnabled()) {
             Serial.print(F("[DEBUG-FS] WRITING DATA - "));
             Serial.print(chunk.length);
             Serial.print(F(" bytes, file open: "));
-            Serial.print(_isFileOpen ? F("YES") : F("NO"));
+            Serial.print(_flags.isFileOpen ? F("YES") : F("NO"));
             Serial.print(F("\r\n"));
         }
         
-        if (_isFileOpen) {
+        if (_flags.isFileOpen) {
             if (!writeDataChunk(chunk)) {
                 _writeErrors++;
-                if (systemManager && systemManager->isParallelDebugEnabled()) {
+                if (_cachedSystemManager->isParallelDebugEnabled()) {
                     Serial.print(F("[DEBUG-FS] WRITE FAILED - Error count now: "));
                     Serial.print(_writeErrors);
                     Serial.print(F("\r\n"));
                 }
                 sendDisplayMessage(Common::DisplayMessage::ERROR, F("Write Failed"));
             } else {
-                if (systemManager && systemManager->isParallelDebugEnabled()) {
+                if (_cachedSystemManager->isParallelDebugEnabled()) {
                     Serial.print(F("[DEBUG-FS] WRITE SUCCESS - "));
                     Serial.print(chunk.length);
                     Serial.print(F(" bytes written\r\n"));
@@ -177,7 +184,7 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
         } else {
             // File not open - don't spam errors, just count them
             _writeErrors++;
-            if (systemManager && systemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-FS] WRITE ERROR - No file open! Error count: "));
                 Serial.print(_writeErrors);
                 Serial.print(F("\r\n"));
@@ -185,14 +192,12 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
             
             // Signal error to TDS2024 after multiple consecutive write errors
             if (_writeErrors >= 5) {  // After 5 errors, signal TDS2024 to stop
-                auto parallelPortManager = getServices().getParallelPortManager();
-                if (parallelPortManager) {
-                    parallelPortManager->setPrinterError(true);    // Set ERROR signal active
-                    parallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
-                    
-                    if (systemManager && systemManager->isParallelDebugEnabled()) {
-                        Serial.print(F("[DEBUG-FS] Multiple write errors - signaling TDS2024 to stop\r\n"));
-                    }
+                // Use cached parallel port manager pointer
+                _cachedParallelPortManager->setPrinterError(true);    // Set ERROR signal active
+                _cachedParallelPortManager->setPrinterPaperOut(true); // Set PAPER_OUT to indicate problem
+                
+                if (_cachedSystemManager->isParallelDebugEnabled()) {
+                    Serial.print(F("[DEBUG-FS] Multiple write errors - signaling TDS2024 to stop\r\n"));
                 }
             }
             
@@ -214,7 +219,7 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
 
     // Handle end of file
     if (chunk.isEndOfFile) {
-        if (systemManager && systemManager->isParallelDebugEnabled()) {
+        if (_cachedSystemManager->isParallelDebugEnabled()) {
             Serial.print(F("[DEBUG-FS] END OF FILE - Closing file: "));
             Serial.print(_currentFilename);
             Serial.print(F("\r\n"));
@@ -225,13 +230,13 @@ void FileSystemManager::processDataChunk(const Common::DataChunk &chunk) {
             snprintf(message, sizeof(message), "Saved: %s", _currentFilename);
             sendDisplayMessage(Common::DisplayMessage::INFO, message);
             
-            if (systemManager && systemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-FS] FILE CLOSED SUCCESSFULLY - "));
                 Serial.print(_currentFilename);
                 Serial.print(F("\r\n"));
             }
         } else {
-            if (systemManager && systemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-FS] FILE CLOSE FAILED - "));
                 Serial.print(_currentFilename);
                 Serial.print(F("\r\n"));
@@ -257,14 +262,14 @@ bool FileSystemManager::initializeEEPROM() { return _eeprom.initialize(); }
 
 bool FileSystemManager::createNewFile() {
     // Notify display manager that storage operation is starting
-    auto displayManager = getServices().getDisplayManager();
-    displayManager->setStorageOperationActive(true);
+    // Use cached display manager pointer
+    _cachedDisplayManager->setStorageOperationActive(true);
     
     generateFilename(_currentFilename, sizeof(_currentFilename));
 
     switch (_activeStorage.value) {
     case Common::StorageType::SD_CARD:
-        if (_sdAvailable) {
+        if (_flags.sdAvailable) {
             sendDisplayMessage(Common::DisplayMessage::INFO, _currentFilename);
 
             String currentPath = "/" + String(_currentFilename);
@@ -291,19 +296,19 @@ bool FileSystemManager::createNewFile() {
             sendDisplayMessage(Common::DisplayMessage::INFO, ("File: " + fileName).c_str());
 
             // Lock LPT port during SD operations to prevent interference
-            getServices().getParallelPortManager()->lockPort();
+            _cachedParallelPortManager->lockPort();
             
             _currentFile = SD.open(currentPath, FILE_WRITE);
             
             // Unlock LPT port immediately after SD operation
-            getServices().getParallelPortManager()->unlockPort();
+            _cachedParallelPortManager->unlockPort();
             
-            _isFileOpen = (_currentFile != 0);
-            if (_isFileOpen) {
+            _flags.isFileOpen = (_currentFile != 0);
+            if (_flags.isFileOpen) {
                 _currentFileBytesWritten = 0; // Reset counter for new file
             }
             
-            if (_isFileOpen) {
+            if (_flags.isFileOpen) {
                 sendDisplayMessage(Common::DisplayMessage::INFO, F("SD Opened"));
             } else {
                 sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Open Failed"));
@@ -317,39 +322,39 @@ bool FileSystemManager::createNewFile() {
                 }
             }
             
-            return _isFileOpen;
+            return _flags.isFileOpen;
         }
         break;
 
     case Common::StorageType::EEPROM:
         // TODO: Implement EEPROM file creation
-        _isFileOpen = false;
+        _flags.isFileOpen = false;
         return false;
 
     case Common::StorageType::SERIAL_TRANSFER:
         // For serial transfer, we'll send data directly
-        _isFileOpen = true;
+        _flags.isFileOpen = true;
         _currentFileBytesWritten = 0; // Reset counter for new file
         _fileCounter++; // Increment counter for serial transfer files too
         return true;
 
     default:
-        _isFileOpen = false;
+        _flags.isFileOpen = false;
         return false;
     }
 
-    _isFileOpen = false;
+    _flags.isFileOpen = false;
     return false;
 }
 
 bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
-    if (!_isFileOpen) {
+    if (!_flags.isFileOpen) {
         return false;
     }
 
     // Ensure storage operation mode is active during writes
-    auto displayManager = getServices().getDisplayManager();
-    displayManager->setStorageOperationActive(true);
+    // Use cached display manager pointer
+    _cachedDisplayManager->setStorageOperationActive(true);
 
     // Turn on write activity LED
     digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
@@ -361,13 +366,13 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
         if (_currentFile) {
 
             // Lock LPT port during SPI operations to prevent interference
-            getServices().getParallelPortManager()->lockPort();
+            _cachedParallelPortManager->lockPort();
 
             size_t written = _currentFile.write(chunk.data, chunk.length);
             _currentFile.flush(); // Ensure data is written
 
             // Unlock LPT port
-            getServices().getParallelPortManager()->unlockPort();
+            _cachedParallelPortManager->unlockPort();
 
             if (written == chunk.length) {
                 _totalBytesWritten += chunk.length;
@@ -400,7 +405,7 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
 }
 
 bool FileSystemManager::closeCurrentFile() {
-    if (!_isFileOpen) {
+    if (!_flags.isFileOpen) {
         return true; // Already closed
     }
 
@@ -423,18 +428,16 @@ bool FileSystemManager::closeCurrentFile() {
         break;
     }
 
-    _isFileOpen = false;
+    _flags.isFileOpen = false;
     
     // Clear any error signals to TDS2024 on successful file closure
-    auto parallelPortManager = getServices().getParallelPortManager();
-    if (parallelPortManager) {
-        parallelPortManager->setPrinterError(false);   // Clear ERROR signal
-        parallelPortManager->setPrinterPaperOut(false); // Clear PAPER_OUT signal
-    }
+    // Use cached parallel port manager pointer
+        _cachedParallelPortManager->setPrinterError(false);   // Clear ERROR signal
+        _cachedParallelPortManager->setPrinterPaperOut(false); // Clear PAPER_OUT signal
     
     // Notify display manager that storage operation is ending
-    auto displayManager = getServices().getDisplayManager();
-    displayManager->setStorageOperationActive(false);
+    // Use cached display manager pointer
+    _cachedDisplayManager->setStorageOperationActive(false);
     
     return result;
 }
@@ -448,11 +451,11 @@ void FileSystemManager::generateTimestampFilename(char *buffer, size_t bufferSiz
     const char *extension = getFileExtension();
 
     // Use ServiceLocator to get TimeManager safely
-    TimeManager *timeManager = getServices().getTimeManager();
+    // Use cached time manager pointer
 
-    if (timeManager && timeManager->isRTCAvailable()) {
+    if (_cachedTimeManager->isRTCAvailable()) {
         // Get formatted datetime and parse it for compact format
-        auto rtc = timeManager->getRTC();
+        auto rtc = _cachedTimeManager->getRTC();
         auto now = rtc.now();
         snprintf(buffer, bufferSize, "%04d%02d%02d/%02d%02d%02d%s", now.year(), now.month(), now.day(), now.hour(),
                  now.minute(), now.second(), extension);
@@ -465,13 +468,13 @@ void FileSystemManager::generateTimestampFilename(char *buffer, size_t bufferSiz
 const char *FileSystemManager::getFileExtension() const { return _fileType.getFileExtension(); }
 
 void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const char *message) {
-    auto displayManager = getServices().getDisplayManager();
-    displayManager->displayMessage(type, message);
+    // Use cached display manager pointer
+    _cachedDisplayManager->displayMessage(type, message);
 }
 
 void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper *message) {
-    auto displayManager = getServices().getDisplayManager();
-    displayManager->displayMessage(type, message);
+    // Use cached display manager pointer
+    _cachedDisplayManager->displayMessage(type, message);
 }
 
 void FileSystemManager::setStorageType(Common::StorageType type) {
@@ -489,7 +492,7 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
             // Verify the new storage type is available
             switch (type.value) {
             case Common::StorageType::SD_CARD:
-                if (!_sdAvailable) {
+                if (!_flags.sdAvailable) {
                     sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Not Available"));
                     _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
                     selectActiveFileSystem(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
@@ -497,7 +500,7 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
                 break;
 
             case Common::StorageType::EEPROM:
-                if (!_eepromAvailable) {
+                if (!_flags.eepromAvailable) {
                     sendDisplayMessage(Common::DisplayMessage::ERROR, F("EEPROM Not Available"));
                     _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
                     selectActiveFileSystem(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
@@ -510,10 +513,10 @@ void FileSystemManager::setStorageType(Common::StorageType type) {
                 break;
 
             case Common::StorageType::AUTO_SELECT:
-                if (_sdAvailable) {
+                if (_flags.sdAvailable) {
                     _activeStorage.value = Common::StorageType::SD_CARD;
                     selectActiveFileSystem(Common::StorageType(Common::StorageType::SD_CARD));
-                } else if (_eepromAvailable) {
+                } else if (_flags.eepromAvailable) {
                     _activeStorage.value = Common::StorageType::EEPROM;
                     selectActiveFileSystem(Common::StorageType(Common::StorageType::EEPROM));
                 } else {
@@ -548,7 +551,7 @@ uint32_t FileSystemManager::getFilesStored() const {
 }
 
 uint32_t FileSystemManager::getSDCardFileCount() const {
-    if (!_sdAvailable) {
+    if (!_flags.sdAvailable) {
         return 0;
     }
 
@@ -598,31 +601,31 @@ Common::FileType FileSystemManager::detectFileType(const uint8_t *data, uint16_t
     }
 
     // Check for common file format headers using ConfigurationService
-    auto* config = getServices().getConfigurationService();
+    // Use cached configuration service pointer
     
     // BMP files start with "BM"
-    if (data[0] == config->getBmpSignature1() && data[1] == config->getBmpSignature2()) {
+    if (data[0] == _cachedConfigurationService->getBmpSignature1() && data[1] == _cachedConfigurationService->getBmpSignature2()) {
         return Common::FileType::BMP;
     }
 
     // PCX files start with 0x0A
-    if (data[0] == config->getPcxSignature()) {
+    if (data[0] == _cachedConfigurationService->getPcxSignature()) {
         return Common::FileType::PCX;
     }
 
     // TIFF files start with "II" (little-endian) or "MM" (big-endian)
-    if (config->isTiffLittleEndian(data[0], data[1], data[2], data[3]) ||
-        config->isTiffBigEndian(data[0], data[1], data[2], data[3])) {
+    if (_cachedConfigurationService->isTiffLittleEndian(data[0], data[1], data[2], data[3]) ||
+        _cachedConfigurationService->isTiffBigEndian(data[0], data[1], data[2], data[3])) {
         return Common::FileType::TIFF;
     }
 
     // PostScript/EPS files start with "%!"
-    if (data[0] == config->getPsSignature1() && data[1] == config->getPsSignature2()) {
+    if (data[0] == _cachedConfigurationService->getPsSignature1() && data[1] == _cachedConfigurationService->getPsSignature2()) {
         return Common::FileType::EPSIMAGE;
     }
 
     // Check for printer command sequences (HP PCL commands often start with ESC)
-    if (data[0] == config->getEscCharacter()) { // ESC character
+    if (data[0] == _cachedConfigurationService->getEscCharacter()) { // ESC character
         if (length >= 3) {
             // HP PCL commands: ESC E (reset), ESC & (parameterized command)
             if (data[1] == 0x45 || data[1] == 0x26) {
@@ -643,7 +646,7 @@ bool FileSystemManager::selfTest() {
     bool result = true;
 
     // Test SD card
-    if (_sdAvailable) {
+    if (_flags.sdAvailable) {
         Serial.print(F("  SD Card: ✅ Available\r\n"));
     } else {
         Serial.print(F("  SD Card: ❌ Not Available\r\n"));
@@ -651,7 +654,7 @@ bool FileSystemManager::selfTest() {
     }
 
     // Test EEPROM
-    if (_eepromAvailable) {
+    if (_flags.eepromAvailable) {
         Serial.print(F("  EEPROM: ✅ Available\r\n"));
     } else {
         Serial.print(F("  EEPROM: ⚠️  Not Available\r\n"));
@@ -663,19 +666,23 @@ bool FileSystemManager::selfTest() {
     return result;
 }
 
-const char *FileSystemManager::getComponentName() const { return "FileSystemManager"; }
+const char *FileSystemManager::getComponentName() const { 
+    static char name_buffer[24];
+    strcpy_P(name_buffer, component_name);
+    return name_buffer;
+}
 
 bool FileSystemManager::validateDependencies() const {
     bool valid = true;
 
-    auto displayManager = getServices().getDisplayManager();
-    if (!displayManager) {
+    // Use cached display manager pointer
+    if (!_cachedDisplayManager) {
         Serial.print(F("  Missing DisplayManager dependency\r\n"));
         valid = false;
     }
 
-    TimeManager *timeManager = getServices().getTimeManager();
-    if (!timeManager) {
+    // Use cached time manager pointer
+    if (!_cachedTimeManager) {
         Serial.print(F("  Missing TimeManager dependency\r\n"));
         valid = false;
     }
@@ -686,20 +693,20 @@ bool FileSystemManager::validateDependencies() const {
 void FileSystemManager::printDependencyStatus() const {
     Serial.print(F("FileSystemManager Dependencies:\r\n"));
 
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached display manager pointer
     Serial.print(F("  DisplayManager: "));
-    Serial.print(displayManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedDisplayManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 
-    TimeManager *timeManager = getServices().getTimeManager();
+    // Use cached time manager pointer
     Serial.print(F("  TimeManager: "));
-    Serial.print(timeManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedTimeManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 }
 
 unsigned long FileSystemManager::getUpdateInterval() const {
-    auto configService = getServices().getConfigurationService();
-    return configService ? configService->getFileSystemInterval() : 10; // Default 10ms
+    // Use cached configuration service pointer
+    return _cachedConfigurationService->getFileSystemInterval(); // Default 10ms
 }
 
 // Hot-swap detection methods
@@ -716,7 +723,7 @@ void FileSystemManager::handleSDCardInsertion() {
     bool initSuccess = initializeSD();
     
     if (initSuccess) {
-        _sdAvailable = true;
+        _flags.sdAvailable = true;
         Serial.print(F("SD Card re-initialization successful!\r\n"));
         sendDisplayMessage(Common::DisplayMessage::INFO, F("SD Card Ready"));
         
@@ -728,7 +735,7 @@ void FileSystemManager::handleSDCardInsertion() {
             setStorageType(Common::StorageType(Common::StorageType::SD_CARD));
         }
     } else {
-        _sdAvailable = false;
+        _flags.sdAvailable = false;
         Serial.print(F("SD Card re-initialization failed\r\n"));
         sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Init Failed"));
     }
@@ -738,17 +745,17 @@ void FileSystemManager::handleSDCardRemoval() {
     Serial.print(F("SD Card removed\r\n"));
     
     // Close any open file on SD card
-    if (_isFileOpen && _activeStorage.value == Common::StorageType::SD_CARD) {
+    if (_flags.isFileOpen && _activeStorage.value == Common::StorageType::SD_CARD) {
         closeCurrentFile();
         Serial.print(F("Closed file due to SD card removal\r\n"));
     }
     
-    _sdAvailable = false;
+    _flags.sdAvailable = false;
     sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Card Removed"));
     
     // If we were using SD card and it's removed, switch to fallback storage
     if (_activeStorage.value == Common::StorageType::SD_CARD) {
-        if (_eepromAvailable) {
+        if (_flags.eepromAvailable) {
             Serial.print(F("Switching to EEPROM storage\r\n"));
             setStorageType(Common::StorageType(Common::StorageType::EEPROM));
         } else {

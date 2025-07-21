@@ -5,6 +5,9 @@
 #include "../Common/ConfigurationService.h"
 #include <string.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "ParallelPortManager";
+
 namespace DeviceBridge::Components {
 
 ParallelPortManager::ParallelPortManager(Parallel::Port &port)
@@ -16,6 +19,9 @@ ParallelPortManager::ParallelPortManager(Parallel::Port &port)
 ParallelPortManager::~ParallelPortManager() { stop(); }
 
 bool ParallelPortManager::initialize() {
+    // Cache service dependencies first (performance optimization)
+    cacheServiceDependencies();
+    
     // Initialize LPT read activity LED
     pinMode(Common::Pins::LPT_READ_LED, OUTPUT);
     digitalWrite(Common::Pins::LPT_READ_LED, LOW);
@@ -57,8 +63,7 @@ void ParallelPortManager::processData() {
             _chunkStartTime = millis(); // Start timing for first chunk
             
             // Debug logging for new file detection
-            auto systemManager = getServices().getSystemManager();
-            if (systemManager && systemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-LPT] NEW FILE DETECTED - File #"));
                 Serial.print(_filesReceived);
                 Serial.print(F(" started at "));
@@ -87,8 +92,7 @@ void ParallelPortManager::processData() {
                 _currentFileBytes += bytesRead;
                 
                 // Debug logging for data reading
-                auto systemManager = getServices().getSystemManager();
-                if (systemManager && systemManager->isParallelDebugEnabled()) {
+                if (_cachedSystemManager->isParallelDebugEnabled()) {
                     Serial.print(F("[DEBUG-LPT] Read "));
                     Serial.print(bytesRead);
                     Serial.print(F(" bytes, chunk: "));
@@ -110,22 +114,20 @@ void ParallelPortManager::processData() {
                     Serial.print(_port.isSelectInLow() ? F("ACT") : F("INA"));
                     
                     // Byte tracking comparison (read vs written)
-                    auto fileSystemManager = getServices().getFileSystemManager();
                     Serial.print(F(" | Bytes: Read="));
                     Serial.print(_currentFileBytes);
                     Serial.print(F(" Written="));
-                    Serial.print(fileSystemManager->getCurrentFileBytesWritten());
-                    uint32_t difference = (_currentFileBytes > fileSystemManager->getCurrentFileBytesWritten()) ? 
-                        (_currentFileBytes - fileSystemManager->getCurrentFileBytesWritten()) : 
-                        (fileSystemManager->getCurrentFileBytesWritten() - _currentFileBytes);
+                    Serial.print(_cachedFileSystemManager->getCurrentFileBytesWritten());
+                    uint32_t difference = (_currentFileBytes > _cachedFileSystemManager->getCurrentFileBytesWritten()) ? 
+                        (_currentFileBytes - _cachedFileSystemManager->getCurrentFileBytesWritten()) : 
+                        (_cachedFileSystemManager->getCurrentFileBytesWritten() - _currentFileBytes);
                     if (difference > 0) {
                         Serial.print(F(" DIFF="));
                         Serial.print(difference);
                     }
                     
                     // Show hex dump of first N bytes for new files once we have enough data
-                    auto config = getServices().getConfigurationService();
-                    uint8_t headerBytes = config->getHeaderHexBytes();
+                    uint8_t headerBytes = _cachedConfigurationService->getHeaderHexBytes();
                     if (_currentFileBytes >= headerBytes && _currentChunk.isNewFile) {
                         Serial.print(F(" - HEADER HEX: "));
                         for (uint8_t i = 0; i < headerBytes; i++) {
@@ -160,23 +162,21 @@ void ParallelPortManager::processData() {
             _currentChunk.length = _chunkIndex;  // Use actual data length, not 0
             _currentChunk.timestamp = millis();
 
-            auto fileSystemManager = getServices().getFileSystemManager();
-            fileSystemManager->processDataChunk(_currentChunk);
+            _cachedFileSystemManager->processDataChunk(_currentChunk);
 
             // Debug logging for end of file detection AFTER final chunk is written
-            auto systemManager = getServices().getSystemManager();
-            if (systemManager && systemManager->isParallelDebugEnabled()) {
+            if (_cachedSystemManager->isParallelDebugEnabled()) {
                 Serial.print(F("[DEBUG-LPT] END OF FILE DETECTED - File #"));
                 Serial.print(_filesReceived);
                 Serial.print(F(", bytes read: "));
                 Serial.print(_currentFileBytes);
                 Serial.print(F(", bytes written: "));
-                Serial.print(fileSystemManager->getCurrentFileBytesWritten());
+                Serial.print(_cachedFileSystemManager->getCurrentFileBytesWritten());
                 Serial.print(F(", idle cycles: "));
                 Serial.print(_idleCounter);
                 
                 // Check for data loss AFTER final write
-                if (_currentFileBytes != fileSystemManager->getCurrentFileBytesWritten()) {
+                if (_currentFileBytes != _cachedFileSystemManager->getCurrentFileBytesWritten()) {
                     Serial.print(F(" **DATA MISMATCH**"));
                 }
                 Serial.print(F("\r\n"));
@@ -200,8 +200,7 @@ void ParallelPortManager::sendChunk() {
     _currentChunk.isEndOfFile = 0;
     
     // Debug logging for chunk sending
-    auto systemManager = getServices().getSystemManager();
-    if (systemManager && systemManager->isParallelDebugEnabled()) {
+    if (_cachedSystemManager->isParallelDebugEnabled()) {
         Serial.print(F("[DEBUG-LPT] SENDING CHUNK - Length: "));
         Serial.print(_chunkIndex);
         Serial.print(F(" bytes, new file: "));
@@ -211,8 +210,7 @@ void ParallelPortManager::sendChunk() {
         Serial.print(F("\r\n"));
     }
 
-    auto fileSystemManager = getServices().getFileSystemManager();
-    fileSystemManager->processDataChunk(_currentChunk);
+    _cachedFileSystemManager->processDataChunk(_currentChunk);
 
     // Reset chunk for next data - ONLY reset isNewFile after processing
     _chunkIndex = 0;
@@ -226,13 +224,12 @@ bool ParallelPortManager::shouldSendPartialChunk() const {
         return false;
     }
     
-    auto config = getServices().getConfigurationService();
     uint32_t currentTime = millis();
     uint32_t chunkAge = currentTime - _chunkStartTime;
     
     // Send if timeout reached and we have minimum data, or if we have significant data
-    return (chunkAge >= config->getChunkSendTimeoutMs() && _chunkIndex >= config->getMinChunkSize()) ||
-           (_chunkIndex >= config->getDataChunkSize() / 2); // Send when half full regardless of time
+    return (chunkAge >= _cachedConfigurationService->getChunkSendTimeoutMs() && _chunkIndex >= _cachedConfigurationService->getMinChunkSize()) ||
+           (_chunkIndex >= _cachedConfigurationService->getDataChunkSize() / 2); // Send when half full regardless of time
 }
 
 bool ParallelPortManager::detectNewFile() {
@@ -247,7 +244,7 @@ bool ParallelPortManager::detectEndOfFile() {
     }
 
     // Use millis() based timing for loop-based architecture
-    uint32_t fileTimeoutMs = getServices().getConfigurationService()->getKeepBusyMs(); // Use configured timeout
+    uint32_t fileTimeoutMs = _cachedConfigurationService->getKeepBusyMs(); // Use configured timeout
     uint32_t currentTime = millis();
     uint32_t timeSinceLastData = currentTime - _lastDataTime;
 
@@ -332,15 +329,13 @@ void ParallelPortManager::handleCriticalTimeout() {
     _port.setPaperOut(true); // Set PAPER_OUT signal to indicate problem
     
     // 2. Send error to LCD and Serial
-    auto fileSystemManager = getServices().getFileSystemManager();
-    auto displayManager = getServices().getDisplayManager();
     
     Serial.print(F("\r\n*** CRITICAL BUFFER TIMEOUT ***\r\n"));
     Serial.print(F("Buffer failed to clear in 20 seconds\r\n"));
     Serial.print(F("Emergency recovery: Closing file and clearing buffer\r\n"));
     
-    displayManager->displayMessage(Common::DisplayMessage::ERROR, F("Buffer Timeout!"));
-    displayManager->displayMessage(Common::DisplayMessage::ERROR, F("Emergency Clear"));
+    _cachedDisplayManager->displayMessage(Common::DisplayMessage::ERROR, F("Buffer Timeout!"));
+    _cachedDisplayManager->displayMessage(Common::DisplayMessage::ERROR, F("Emergency Clear"));
     
     // 3. Close current file if open
     if (_fileInProgress) {
@@ -350,7 +345,7 @@ void ParallelPortManager::handleCriticalTimeout() {
         endChunk.isEndOfFile = 1;
         endChunk.timestamp = millis();
         
-        fileSystemManager->processDataChunk(endChunk);
+        _cachedFileSystemManager->processDataChunk(endChunk);
         
         _fileInProgress = false;
         _currentFileBytes = 0;
@@ -371,7 +366,7 @@ void ParallelPortManager::handleCriticalTimeout() {
     Serial.print(F("Emergency recovery completed\r\n"));
     Serial.print(F("System ready for new data\r\n"));
     
-    displayManager->displayMessage(Common::DisplayMessage::INFO, F("Recovery Done"));
+    _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("Recovery Done"));
 }
 
 // IComponent interface implementation
@@ -426,13 +421,16 @@ bool ParallelPortManager::selfTest() {
     return result;
 }
 
-const char *ParallelPortManager::getComponentName() const { return "ParallelPortManager"; }
+const char *ParallelPortManager::getComponentName() const { 
+    static char name_buffer[24];
+    strcpy_P(name_buffer, component_name);
+    return name_buffer;
+}
 
 bool ParallelPortManager::validateDependencies() const {
     bool valid = true;
 
-    auto fileSystemManager = getServices().getFileSystemManager();
-    if (!fileSystemManager) {
+    if (!_cachedFileSystemManager) {
         Serial.print(F("  Missing FileSystemManager dependency\r\n"));
         valid = false;
     }
@@ -443,15 +441,25 @@ bool ParallelPortManager::validateDependencies() const {
 void ParallelPortManager::printDependencyStatus() const {
     Serial.print(F("ParallelPortManager Dependencies:\r\n"));
 
-    auto fileSystemManager = getServices().getFileSystemManager();
     Serial.print(F("  FileSystemManager: "));
-    Serial.print(fileSystemManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedFileSystemManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 }
 
+void ParallelPortManager::setHardwareFlowControlEnabled(bool enabled) {
+    _port.setHardwareFlowControlEnabled(enabled);
+}
+
+bool ParallelPortManager::isHardwareFlowControlEnabled() const {
+    return _port.isHardwareFlowControlEnabled();
+}
+
+DeviceBridge::Parallel::HardwareFlowControl::Statistics ParallelPortManager::getFlowControlStatistics() const {
+    return _port.getFlowControlStatistics();
+}
+
 unsigned long ParallelPortManager::getUpdateInterval() const {
-    auto configService = getServices().getConfigurationService();
-    return configService ? configService->getParallelInterval() : 1; // Default 1ms for real-time
+    return _cachedConfigurationService->getParallelInterval(); // Default 1ms for real-time
 }
 
 } // namespace DeviceBridge::Components
