@@ -1,2 +1,0 @@
-- update the servicelocator calls to be replaced with local pointers.  
-  - 
