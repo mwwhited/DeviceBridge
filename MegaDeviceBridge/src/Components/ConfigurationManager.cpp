@@ -17,7 +17,12 @@ ConfigurationManager::ConfigurationManager() : _lastCommandCheck(0) {}
 
 ConfigurationManager::~ConfigurationManager() { stop(); }
 
-bool ConfigurationManager::initialize() { return true; }
+bool ConfigurationManager::initialize() { 
+    // Cache service dependencies first (performance optimization)
+    cacheServiceDependencies();
+    
+    return true; 
+}
 
 void ConfigurationManager::update(unsigned long currentTime) {
     // Check for serial commands periodically
@@ -43,7 +48,7 @@ void ConfigurationManager::checkSerialCommands() {
 }
 
 void ConfigurationManager::processCommand(const String &command) {
-    auto systemManager = getServices().getSystemManager();
+    // Use cached system manager pointer
     if (command.equalsIgnoreCase(F("validate")) || command.equalsIgnoreCase(F("test"))) {
         // Run comprehensive system validation
         Serial.print(F("\r\n=== COMPREHENSIVE SYSTEM VALIDATION ===\r\n"));
@@ -57,7 +62,7 @@ void ConfigurationManager::processCommand(const String &command) {
 
         // 3. Hardware validation (existing)
         Serial.print(F("\r\n=== HARDWARE VALIDATION ===\r\n"));
-        systemManager->validateHardware();
+        _cachedSystemManager->validateHardware();
 
         // 4. Summary
         Serial.print(F("\r\n=== VALIDATION SUMMARY ===\r\n"));
@@ -75,8 +80,8 @@ void ConfigurationManager::processCommand(const String &command) {
         }
         Serial.print(F("=====================================\r\n"));
     } else if (command.equalsIgnoreCase(F("info"))) {
-        systemManager->printSystemInfo();
-        systemManager->printMemoryInfo();
+        _cachedSystemManager->printSystemInfo();
+        _cachedSystemManager->printMemoryInfo();
     } else if (command.equalsIgnoreCase(F("status"))) {
         printDetailedStatus();
     } else if (command.startsWith(F("time set "))) {
@@ -172,45 +177,45 @@ void ConfigurationManager::printHelpMenu() {
 }
 
 void ConfigurationManager::printDetailedStatus() {
-    auto fileSystem = getServices().getFileSystemManager();
-    auto timeManager = getServices().getTimeManager();
-    auto systemManager = getServices().getSystemManager();
+    // Use cached file system manager pointer
+    // Use cached time manager pointer
+    // Use cached system manager pointer
 
     Serial.print(F("\r\n=== Detailed System Status ===\r\n"));
-    systemManager->printSystemInfo();
-    systemManager->printMemoryInfo();
+    _cachedSystemManager->printSystemInfo();
+    _cachedSystemManager->printMemoryInfo();
 
     // Component status
     Serial.print(F("\r\n=== Component Status ===\r\n"));
 
     Serial.print(F("SD Card: "));
-    Serial.print(fileSystem->isSDAvailable() ? F("Available") : F("Not Available"));
+    Serial.print(_cachedFileSystemManager->isSDAvailable() ? F("Available") : F("Not Available"));
     Serial.print(F("\r\n"));
 
     Serial.print(F("EEPROM: "));
-    Serial.print(fileSystem->isEEPROMAvailable() ? F("Available") : F("Not Available"));
+    Serial.print(_cachedFileSystemManager->isEEPROMAvailable() ? F("Available") : F("Not Available"));
     Serial.print(F("\r\n"));
 
     Serial.print(F("Active Storage: "));
-    Serial.print(fileSystem->getCurrentStorageType().toString());
+    Serial.print(_cachedFileSystemManager->getCurrentStorageType().toString());
     Serial.print(F("\r\n"));
 
     Serial.print(F("RTC: "));
-    Serial.print(timeManager->isRTCAvailable() ? F("Available") : F("Not Available"));
+    Serial.print(_cachedTimeManager->isRTCAvailable() ? F("Available") : F("Not Available"));
     Serial.print(F("\r\n"));
 
     Serial.print(F("Serial Heartbeat: "));
-    Serial.print(systemManager->isSerialHeartbeatEnabled() ? F("Enabled") : F("Disabled"));
+    Serial.print(_cachedSystemManager->isSerialHeartbeatEnabled() ? F("Enabled") : F("Disabled"));
     Serial.print(F("\r\n"));
 
     Serial.print(F("===========================\r\n\r\n"));
 }
 
 void ConfigurationManager::printCurrentTime() {
-    auto timeManager = getServices().getTimeManager();
-    if (timeManager->isRTCAvailable()) {
+    // Use cached time manager pointer
+    if (_cachedTimeManager->isRTCAvailable()) {
         char timeBuffer[32];
-        timeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
+        _cachedTimeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
         Serial.print(F("Current Time: "));
         Serial.print(timeBuffer);
         Serial.print(F("\r\n"));
@@ -220,8 +225,8 @@ void ConfigurationManager::printCurrentTime() {
 }
 
 void ConfigurationManager::handleTimeSetCommand(const String &command) {
-    auto displayManager = getServices().getDisplayManager();
-    auto timeManager = getServices().getTimeManager();
+    // Use cached display manager pointer
+    // Use cached time manager pointer
     // Expected format: "time set 2025-07-19 19:30"
     String timeStr = command.substring(9); // Remove "time set "
     timeStr.trim();
@@ -246,19 +251,19 @@ void ConfigurationManager::handleTimeSetCommand(const String &command) {
     }
 
     // Set time via TimeManager
-    if (timeManager->setDateTime(year, month, day, hour, minute, 0)) {
+    if (_cachedTimeManager->setDateTime(year, month, day, hour, minute, 0)) {
         Serial.print(F("Time set successfully to: "));
         printCurrentTime();
-        displayManager->displayMessage(Common::DisplayMessage::INFO, F("Time Updated"));
+        _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("Time Updated"));
     } else {
         Serial.print(F("Failed to set time - RTC not available\r\n"));
-        displayManager->displayMessage(Common::DisplayMessage::ERROR, F("Time Set Failed"));
+        _cachedDisplayManager->displayMessage(Common::DisplayMessage::ERROR, F("Time Set Failed"));
     }
 }
 
 void ConfigurationManager::handleStorageCommand(const String &command) {
-    auto fileSystem = getServices().getFileSystemManager();
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached file system manager pointer
+    // Use cached display manager pointer
     String storageType = command.substring(8); // Remove "storage "
     storageType.trim();
     storageType.toLowerCase();
@@ -280,13 +285,13 @@ void ConfigurationManager::handleStorageCommand(const String &command) {
 
     // Set storage type via FileSystemManager
 
-    fileSystem->setStorageType(newStorage);
+    _cachedFileSystemManager->setStorageType(newStorage);
 
     Serial.print(F("Storage type set to: "));
     Serial.print(newStorage.toString());
     Serial.print(F("\r\n"));
 
-    displayManager->displayMessage(Common::DisplayMessage::INFO, newStorage.toString());
+    _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, newStorage.toString());
 }
 
 void ConfigurationManager::printButtonStatus() {
@@ -317,37 +322,37 @@ void ConfigurationManager::printButtonStatus() {
 }
 
 void ConfigurationManager::printParallelPortStatus() {
-    auto parallelPortManager = getServices().getParallelPortManager();
-    auto fileSystemManager = getServices().getFileSystemManager();
+    // Use cached parallel port manager pointer
+    // Use cached file system manager pointer
     Serial.print(F("\r\n=== Parallel Port Status ===\r\n"));
 
     Serial.print(F("Total Bytes Received: "));
-    Serial.print(parallelPortManager->getTotalBytesReceived());
+    Serial.print(_cachedParallelPortManager->getTotalBytesReceived());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Total Bytes Written: "));
-    Serial.print(fileSystemManager->getTotalBytesWritten());
+    Serial.print(_cachedFileSystemManager->getTotalBytesWritten());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Files Received: "));
-    Serial.print(parallelPortManager->getFilesReceived());
+    Serial.print(_cachedParallelPortManager->getFilesReceived());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Buffer Level: "));
-    Serial.print(parallelPortManager->getBufferLevel());
+    Serial.print(_cachedParallelPortManager->getBufferLevel());
     Serial.print(F(" bytes\r\n"));
 
     Serial.print(F("Interrupt Count: "));
-    Serial.print(parallelPortManager->getInterruptCount());
+    Serial.print(_cachedParallelPortManager->getInterruptCount());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Data Count: "));
-    Serial.print(parallelPortManager->getDataCount());
+    Serial.print(_cachedParallelPortManager->getDataCount());
     Serial.print(F("\r\n"));
     
     // Data integrity check
-    uint32_t totalRead = parallelPortManager->getTotalBytesReceived();
-    uint32_t totalWritten = fileSystemManager->getTotalBytesWritten();
+    uint32_t totalRead = _cachedParallelPortManager->getTotalBytesReceived();
+    uint32_t totalWritten = _cachedFileSystemManager->getTotalBytesWritten();
     Serial.print(F("Data Integrity: "));
     if (totalRead == totalWritten) {
         Serial.print(F("GOOD ("));
@@ -391,25 +396,25 @@ void ConfigurationManager::printParallelPortStatus() {
 
     Serial.print(F("\r\nControl pins (Input - Active Low):\r\n"));
     Serial.print(F("  /Strobe: "));
-    Serial.print(parallelPortManager->isStrobeLow() ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(_cachedParallelPortManager->isStrobeLow() ? F("ACTIVE") : F("INACTIVE"));
     Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_STROBE));
     Serial.print(F(")\r\n"));
     
     Serial.print(F("  /Auto Feed: "));
-    Serial.print(parallelPortManager->isAutoFeedLow() ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(_cachedParallelPortManager->isAutoFeedLow() ? F("ACTIVE") : F("INACTIVE"));
     Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_AUTO_FEED));
     Serial.print(F(")\r\n"));
     
     Serial.print(F("  /Initialize: "));
-    Serial.print(parallelPortManager->isInitializeLow() ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(_cachedParallelPortManager->isInitializeLow() ? F("ACTIVE") : F("INACTIVE"));
     Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_INITIALIZE));
     Serial.print(F(")\r\n"));
     
     Serial.print(F("  /Select In: "));
-    Serial.print(parallelPortManager->isSelectInLow() ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(_cachedParallelPortManager->isSelectInLow() ? F("ACTIVE") : F("INACTIVE"));
     Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_SELECT_IN));
     Serial.print(F(")\r\n"));
@@ -435,7 +440,7 @@ void ConfigurationManager::printParallelPortStatus() {
 }
 
 void ConfigurationManager::testInterruptPin() {
-    auto parallelPortManager = getServices().getParallelPortManager();
+    // Use cached parallel port manager pointer
     Serial.print(F("\r\n=== Testing Interrupt Pin ===\r\n"));
     Serial.print(F("Monitoring strobe pin (18) for 10 seconds...\r\n"));
     Serial.print(F("Press PRINT on TDS2024 to test interrupt response.\r\n"));
@@ -472,96 +477,96 @@ void ConfigurationManager::testInterruptPin() {
     Serial.print(F("\r\n"));
 
     Serial.print(F("Buffer level after test: "));
-    Serial.print(parallelPortManager->getBufferLevel());
+    Serial.print(_cachedParallelPortManager->getBufferLevel());
     Serial.print(F(" bytes\r\n"));
 
     Serial.print(F("==============================\r\n\r\n"));
 }
 
 void ConfigurationManager::testPrinterProtocol() {
-    auto parallelPortManager = getServices().getParallelPortManager();
+    // Use cached parallel port manager pointer
     Serial.print(F("\r\n=== Testing LPT Printer Protocol ===\r\n"));
     Serial.print(F("Testing busy/acknowledge signaling for 5 seconds...\r\n"));
 
     // Test sequence: Set various printer states
     Serial.print(F("Setting printer to READY state...\r\n"));
-    parallelPortManager->setPrinterBusy(false);
-    parallelPortManager->setPrinterError(false);
-    parallelPortManager->setPrinterPaperOut(false);
-    parallelPortManager->setPrinterSelect(true);
+    _cachedParallelPortManager->setPrinterBusy(false);
+    _cachedParallelPortManager->setPrinterError(false);
+    _cachedParallelPortManager->setPrinterPaperOut(false);
+    _cachedParallelPortManager->setPrinterSelect(true);
     delay(500);
 
     Serial.print(F("Testing BUSY signal (should block TDS2024)...\r\n"));
-    parallelPortManager->setPrinterBusy(true);
+    _cachedParallelPortManager->setPrinterBusy(true);
     delay(2000); // Keep busy for 2 seconds
-    parallelPortManager->setPrinterBusy(false);
+    _cachedParallelPortManager->setPrinterBusy(false);
     Serial.print(F("BUSY signal cleared\r\n"));
 
     Serial.print(F("Testing ERROR signal...\r\n"));
-    parallelPortManager->setPrinterError(true);
+    _cachedParallelPortManager->setPrinterError(true);
     delay(500);
-    parallelPortManager->setPrinterError(false);
+    _cachedParallelPortManager->setPrinterError(false);
     Serial.print(F("ERROR signal cleared\r\n"));
 
     Serial.print(F("Testing SELECT signal...\r\n"));
-    parallelPortManager->setPrinterSelect(false);
+    _cachedParallelPortManager->setPrinterSelect(false);
     delay(500);
-    parallelPortManager->setPrinterSelect(true);
+    _cachedParallelPortManager->setPrinterSelect(true);
     Serial.print(F("SELECT signal restored\r\n"));
 
     Serial.print(F("Testing ACKNOWLEDGE pulse...\r\n"));
     for (int i = 0; i < 3; i++) {
-        parallelPortManager->sendPrinterAcknowledge();
+        _cachedParallelPortManager->sendPrinterAcknowledge();
         delay(100);
     }
     Serial.print(F("ACK pulses sent\r\n"));
 
     Serial.print(F("Returning to READY state...\r\n"));
-    parallelPortManager->setPrinterBusy(false);
-    parallelPortManager->setPrinterError(false);
-    parallelPortManager->setPrinterPaperOut(false);
-    parallelPortManager->setPrinterSelect(true);
+    _cachedParallelPortManager->setPrinterBusy(false);
+    _cachedParallelPortManager->setPrinterError(false);
+    _cachedParallelPortManager->setPrinterPaperOut(false);
+    _cachedParallelPortManager->setPrinterSelect(true);
 
     Serial.print(F("LPT Printer Protocol test completed.\r\n"));
     Serial.print(F("=====================================\r\n\r\n"));
 }
 
 void ConfigurationManager::printStorageStatus() {
-    auto fileSystem = getServices().getFileSystemManager();
-    auto systemManager = getServices().getSystemManager();
-    auto parallelPort = getServices().getParallelPortManager();
+    // Use cached file system manager pointer
+    // Use cached system manager pointer
+    // Use cached parallel port manager pointer
     
     Serial.print(F("\r\n=== Storage Device Status ===\r\n"));
 
     Serial.print(F("SD Card: "));
-    Serial.print(fileSystem->isSDAvailable() ? F("Available") : F("Not Available"));
+    Serial.print(_cachedFileSystemManager->isSDAvailable() ? F("Available") : F("Not Available"));
     Serial.print(F("\r\n"));
 
     Serial.print(F("SD Card Present: "));
-    Serial.print(fileSystem->isSDCardPresent() ? F("YES") : F("NO"));
+    Serial.print(_cachedFileSystemManager->isSDCardPresent() ? F("YES") : F("NO"));
     Serial.print(F(" (CD Pin 36: "));
     Serial.print(digitalRead(Common::Pins::SD_CD) ? F("Missing") : F("Detected"));
     Serial.print(F(")\r\n"));
 
     Serial.print(F("SD Write Protected: "));
-    Serial.print(fileSystem->isSDWriteProtected() ? F("YES") : F("NO"));
+    Serial.print(_cachedFileSystemManager->isSDWriteProtected() ? F("YES") : F("NO"));
     Serial.print(F(" (WP Pin 34: "));
     Serial.print(digitalRead(Common::Pins::SD_WP) ? F("Protected") : F("Unprotected"));
     Serial.print(F(")\r\n"));
 
     Serial.print(F("EEPROM: "));
-    Serial.print(fileSystem->isEEPROMAvailable() ? F("Available") : F("Not Available"));
+    Serial.print(_cachedFileSystemManager->isEEPROMAvailable() ? F("Available") : F("Not Available"));
     Serial.print(F("\r\n"));
 
     // Add LPT buffer status for debugging data loss issues
-    auto config = getServices().getConfigurationService();
-    uint16_t bufferCapacity = config->getRingBufferSize();
-    uint16_t moderateThreshold = config->getModerateFlowThreshold(bufferCapacity);
-    uint16_t criticalThreshold = config->getCriticalFlowThreshold(bufferCapacity);
-    uint16_t recoveryThreshold = config->getRecoveryFlowThreshold(bufferCapacity);
+    // Use cached configuration service pointer
+    uint16_t bufferCapacity = _cachedConfigurationService->getRingBufferSize();
+    uint16_t moderateThreshold = _cachedConfigurationService->getModerateFlowThreshold(bufferCapacity);
+    uint16_t criticalThreshold = _cachedConfigurationService->getCriticalFlowThreshold(bufferCapacity);
+    uint16_t recoveryThreshold = _cachedConfigurationService->getRecoveryFlowThreshold(bufferCapacity);
     
     Serial.print(F("\r\n=== LPT Buffer Status ===\r\n"));
-    uint16_t bufferLevel = parallelPort->getBufferLevel();
+    uint16_t bufferLevel = _cachedParallelPortManager->getBufferLevel();
     Serial.print(F("Buffer Level: "));
     Serial.print(bufferLevel);
     Serial.print(F("/"));
@@ -574,12 +579,12 @@ void ConfigurationManager::printStorageStatus() {
     Serial.print(F("  60% ("));
     Serial.print(moderateThreshold);
     Serial.print(F(" bytes): Moderate busy delay ("));
-    Serial.print(config->getModerateFlowDelayUs());
+    Serial.print(_cachedConfigurationService->getModerateFlowDelayUs());
     Serial.print(F("μs)\r\n"));
     Serial.print(F("  80% ("));
     Serial.print(criticalThreshold);
     Serial.print(F(" bytes): Extended busy delay ("));
-    Serial.print(config->getCriticalFlowDelayUs());
+    Serial.print(_cachedConfigurationService->getCriticalFlowDelayUs());
     Serial.print(F("μs)\r\n"));
     
     Serial.print(F("Buffer Status: "));
@@ -587,11 +592,11 @@ void ConfigurationManager::printStorageStatus() {
         Serial.print(F("❌ FULL - DATA LOSS RISK!"));
     } else if (bufferLevel >= criticalThreshold) {  // 80% threshold
         Serial.print(F("🔴 CRITICAL - Extended flow control ("));
-        Serial.print(config->getCriticalFlowDelayUs());
+        Serial.print(_cachedConfigurationService->getCriticalFlowDelayUs());
         Serial.print(F("μs)"));
     } else if (bufferLevel >= moderateThreshold) {  // 60% threshold
         Serial.print(F("⚠️  WARNING - Moderate flow control ("));
-        Serial.print(config->getModerateFlowDelayUs());
+        Serial.print(_cachedConfigurationService->getModerateFlowDelayUs());
         Serial.print(F("μs)"));
     } else if (bufferLevel >= recoveryThreshold) {  // 50% threshold
         Serial.print(F("🟡 ELEVATED - Ready for flow control"));
@@ -603,7 +608,7 @@ void ConfigurationManager::printStorageStatus() {
     Serial.print(F("\r\n"));
     
     // Add critical state information
-    if (parallelPort->isCriticalFlowControlActive()) {
+    if (_cachedParallelPortManager->isCriticalFlowControlActive()) {
         Serial.print(F("⚠️  CRITICAL FLOW CONTROL ACTIVE\r\n"));
         Serial.print(F("Critical State Duration: "));
         // Calculate duration (approximation)
@@ -612,40 +617,40 @@ void ConfigurationManager::printStorageStatus() {
     
     // Add interrupt statistics
     Serial.print(F("Interrupt Count: "));
-    Serial.print(parallelPort->getInterruptCount());
+    Serial.print(_cachedParallelPortManager->getInterruptCount());
     Serial.print(F("\r\n"));
     Serial.print(F("Data Count: "));
-    Serial.print(parallelPort->getDataCount());
+    Serial.print(_cachedParallelPortManager->getDataCount());
     Serial.print(F("\r\n"));
     
     // Add LCD refresh status
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached display manager pointer
     Serial.print(F("\r\n=== LCD Refresh Status ===\r\n"));
     Serial.print(F("Storage Operation Active: "));
-    Serial.print(displayManager->isStorageOperationActive() ? F("YES") : F("NO"));
+    Serial.print(_cachedDisplayManager->isStorageOperationActive() ? F("YES") : F("NO"));
     Serial.print(F("\r\n"));
     Serial.print(F("Current Refresh Rate: "));
-    Serial.print(displayManager->isStorageOperationActive() ? F("500ms (Throttled)") : F("100ms (Normal)"));
+    Serial.print(_cachedDisplayManager->isStorageOperationActive() ? F("500ms (Throttled)") : F("100ms (Normal)"));
     Serial.print(F("\r\n"));
 
     Serial.print(F("Active Storage: "));
-    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(_cachedFileSystemManager->getActiveStorage().toSimple());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Files Stored: "));
-    Serial.print(fileSystem->getFilesStored());
+    Serial.print(_cachedFileSystemManager->getFilesStored());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Total Bytes Written: "));
-    Serial.print(fileSystem->getTotalBytesWritten());
+    Serial.print(_cachedFileSystemManager->getTotalBytesWritten());
     Serial.print(F(" bytes\r\n"));
 
     Serial.print(F("Write Errors: "));
-    Serial.print(fileSystem->getWriteErrors());
+    Serial.print(_cachedFileSystemManager->getWriteErrors());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Free Memory: "));
-    Serial.print(systemManager->getFreeMemory());
+    Serial.print(_cachedSystemManager->getFreeMemory());
     Serial.print(F(" bytes\r\n"));
 
     Serial.print(F("\r\n=== Hardware Status ===\r\n"));
@@ -669,21 +674,21 @@ void ConfigurationManager::printStorageStatus() {
 }
 
 void ConfigurationManager::handleTestWriteCommand(const String &command) {
-    auto fileSystem = getServices().getFileSystemManager();
-    auto timeManager = getServices().getTimeManager();
-    auto systemManager = getServices().getSystemManager();
+    // Use cached file system manager pointer
+    // Use cached time manager pointer
+    // Use cached system manager pointer
     Serial.print(F("\r\n=== Test File Write ===\r\n"));
 
     // Create test data with timestamp
     char testData[64];
-    if (timeManager->isRTCAvailable()) {
+    if (_cachedTimeManager->isRTCAvailable()) {
         char timeBuffer[32];
-        timeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
+        _cachedTimeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
         snprintf(testData, sizeof(testData), "TEST %s - Memory: %d bytes free", timeBuffer,
-                 systemManager ? systemManager->getFreeMemory() : 0);
+                 _cachedSystemManager->getFreeMemory());
     } else {
         snprintf(testData, sizeof(testData), "TEST %lu - Memory: %d bytes free", millis(),
-                 systemManager->getFreeMemory());
+                 _cachedSystemManager->getFreeMemory());
     }
 
     Serial.print(F("Test Data: "));
@@ -691,13 +696,13 @@ void ConfigurationManager::handleTestWriteCommand(const String &command) {
     Serial.print(F("\r\n"));
 
     Serial.print(F("Active Storage: "));
-    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(_cachedFileSystemManager->getActiveStorage().toSimple());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Storage Status: SD="));
-    Serial.print(fileSystem->isSDAvailable() ? F("OK") : F("FAIL"));
+    Serial.print(_cachedFileSystemManager->isSDAvailable() ? F("OK") : F("FAIL"));
     Serial.print(F(", EEPROM="));
-    Serial.print(fileSystem->isEEPROMAvailable() ? F("OK") : F("FAIL"));
+    Serial.print(_cachedFileSystemManager->isEEPROMAvailable() ? F("OK") : F("FAIL"));
     Serial.print(F("\r\n"));
 
     // Create a test data chunk to simulate file write
@@ -716,11 +721,11 @@ void ConfigurationManager::handleTestWriteCommand(const String &command) {
     Serial.print(F("Writing test file...\r\n"));
 
     // Process the chunk (creates new file)
-    fileSystem->processDataChunk(testChunk);
+    _cachedFileSystemManager->processDataChunk(testChunk);
 
     // Check write status after first chunk
     Serial.print(F("Write errors after data chunk: "));
-    Serial.print(fileSystem->getWriteErrors());
+    Serial.print(_cachedFileSystemManager->getWriteErrors());
     Serial.print(F("\r\n"));
 
     // Create end-of-file chunk
@@ -732,23 +737,23 @@ void ConfigurationManager::handleTestWriteCommand(const String &command) {
     endChunk.timestamp = millis();
 
     // Process end chunk (closes file)
-    fileSystem->processDataChunk(endChunk);
+    _cachedFileSystemManager->processDataChunk(endChunk);
 
     // Check final status
     Serial.print(F("Write errors after close: "));
-    Serial.print(fileSystem->getWriteErrors());
+    Serial.print(_cachedFileSystemManager->getWriteErrors());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Final Storage Used: "));
-    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(_cachedFileSystemManager->getActiveStorage().toSimple());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Files Now Stored: "));
-    Serial.print(fileSystem->getFilesStored());
+    Serial.print(_cachedFileSystemManager->getFilesStored());
     Serial.print(F("\r\n"));
 
     Serial.print(F("New file: "));
-    Serial.print(fileSystem->getCurrentFilename());
+    Serial.print(_cachedFileSystemManager->getCurrentFilename());
     Serial.print(F("\r\n"));
 
     Serial.print(F("Test write completed.\r\n"));
@@ -756,9 +761,9 @@ void ConfigurationManager::handleTestWriteCommand(const String &command) {
 }
 
 void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
-    auto fileSystem = getServices().getFileSystemManager();
-    auto timeManager = getServices().getTimeManager();
-    auto systemManager = getServices().getSystemManager();
+    // Use cached file system manager pointer
+    // Use cached time manager pointer
+    // Use cached system manager pointer
     
     Serial.print(F("\r\n=== Long Test File Write (Multiple Chunks) ===\r\n"));
     
@@ -781,9 +786,9 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
     
     // Create base test data with timestamp
     char baseData[48];
-    if (timeManager->isRTCAvailable()) {
+    if (_cachedTimeManager->isRTCAvailable()) {
         char timeBuffer[32];
-        timeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
+        _cachedTimeManager->getFormattedDateTime(timeBuffer, sizeof(timeBuffer));
         snprintf(baseData, sizeof(baseData), "LONG-TEST %s", timeBuffer);
     } else {
         snprintf(baseData, sizeof(baseData), "LONG-TEST %lu", millis());
@@ -793,7 +798,7 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
     Serial.print(baseData);
     Serial.print(F("\r\n"));
     Serial.print(F("Active Storage: "));
-    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(_cachedFileSystemManager->getActiveStorage().toSimple());
     Serial.print(F("\r\n"));
     
     Serial.print(F("Writing long test file...\r\n"));
@@ -810,12 +815,12 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
     // Create first chunk data
     char chunkData[80];
     snprintf(chunkData, sizeof(chunkData), "%s - Chunk 1/%d - Memory: %d\r\n", 
-             baseData, chunkCount, systemManager->getFreeMemory());
+            baseData, chunkCount, _cachedSystemManager->getFreeMemory());
     chunk.length = strlen(chunkData);
     strncpy((char *)chunk.data, chunkData, sizeof(chunk.data) - 1);
     
     // Process first chunk (creates file)
-    fileSystem->processDataChunk(chunk);
+    _cachedFileSystemManager->processDataChunk(chunk);
     Serial.print(F("Chunk 1 written\r\n"));
     
     // Write remaining chunks with delays to show L2 LED activity
@@ -829,12 +834,12 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
         chunk.timestamp = millis();
         
         snprintf(chunkData, sizeof(chunkData), "%s - Chunk %d/%d - Free: %d\r\n", 
-                 baseData, i, chunkCount, systemManager->getFreeMemory());
+                 baseData, i, chunkCount, _cachedSystemManager->getFreeMemory());
         chunk.length = strlen(chunkData);
         strncpy((char *)chunk.data, chunkData, sizeof(chunk.data) - 1);
         
         // Process chunk
-        fileSystem->processDataChunk(chunk);
+        _cachedFileSystemManager->processDataChunk(chunk);
         
         Serial.print(F("Chunk "));
         Serial.print(i);
@@ -850,23 +855,23 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
     chunk.timestamp = millis();
     
     // Process end chunk (closes file)
-    fileSystem->processDataChunk(chunk);
+    _cachedFileSystemManager->processDataChunk(chunk);
     
     // Check final status
     Serial.print(F("Write errors after completion: "));
-    Serial.print(fileSystem->getWriteErrors());
+    Serial.print(_cachedFileSystemManager->getWriteErrors());
     Serial.print(F("\r\n"));
     
     Serial.print(F("Final Storage Used: "));
-    Serial.print(fileSystem->getActiveStorage().toSimple());
+    Serial.print(_cachedFileSystemManager->getActiveStorage().toSimple());
     Serial.print(F("\r\n"));
     
     Serial.print(F("Files Now Stored: "));
-    Serial.print(fileSystem->getFilesStored());
+    Serial.print(_cachedFileSystemManager->getFilesStored());
     Serial.print(F("\r\n"));
     
     Serial.print(F("New file: "));
-    Serial.print(fileSystem->getCurrentFilename());
+    Serial.print(_cachedFileSystemManager->getCurrentFilename());
     Serial.print(F("\r\n"));
     
     Serial.print(F("Long test write completed - "));
@@ -876,14 +881,14 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
 }
 
 void ConfigurationManager::printLastFileInfo() {
-    auto fileSystem = getServices().getFileSystemManager();
+    // Use cached file system manager pointer
     Serial.print(F("\r\n=== Last Saved File Information ===\r\n"));
 
     // Check SD card insertion first
     Serial.print(F("SD Card Status: "));
-    if (fileSystem->isSDCardPresent()) {
+    if (_cachedFileSystemManager->isSDCardPresent()) {
         Serial.print(F("Detected"));
-        if (fileSystem->isSDAvailable()) {
+        if (_cachedFileSystemManager->isSDAvailable()) {
             Serial.print(F(" and Available"));
         } else {
             Serial.print(F(" but Not Available"));
@@ -894,38 +899,38 @@ void ConfigurationManager::printLastFileInfo() {
     Serial.print(F("\r\n"));
 
     Serial.print(F("Files Stored: "));
-    Serial.print(fileSystem->getFilesStored());
+    Serial.print(_cachedFileSystemManager->getFilesStored());
     Serial.print(F("\r\n"));
 
-    if (fileSystem->getFilesStored() > 0) {
+    if (_cachedFileSystemManager->getFilesStored() > 0) {
         Serial.print(F("Last Filename: "));
-        Serial.print(fileSystem->getCurrentFilename());
+        Serial.print(_cachedFileSystemManager->getCurrentFilename());
         Serial.print(F("\r\n"));
 
         Serial.print(F("Storage Device: "));
-        Serial.print(fileSystem->getActiveStorage().toString());
+        Serial.print(_cachedFileSystemManager->getActiveStorage().toString());
         Serial.print(F("\r\n"));
 
         Serial.print(F("File Type (Requested): "));
-        Serial.print(fileSystem->getFileType().toSimple());
+        Serial.print(_cachedFileSystemManager->getFileType().toSimple());
         Serial.print(F("\r\n"));
 
         Serial.print(F("File Type (Detected): "));
-        Serial.print(fileSystem->getDetectedFileType().toSimple());
+        Serial.print(_cachedFileSystemManager->getDetectedFileType().toSimple());
         Serial.print(F("\r\n"));
 
         Serial.print(F("Total Bytes Written: "));
-        Serial.print(fileSystem->getTotalBytesWritten());
+        Serial.print(_cachedFileSystemManager->getTotalBytesWritten());
         Serial.print(F(" bytes\r\n"));
         
         Serial.print(F("Current File Bytes Written: "));
-        Serial.print(fileSystem->getCurrentFileBytesWritten());
+        Serial.print(_cachedFileSystemManager->getCurrentFileBytesWritten());
         Serial.print(F(" bytes\r\n"));
 
         // Show byte tracking comparison
-        auto parallelPortManager = getServices().getParallelPortManager();
-        uint32_t totalRead = parallelPortManager->getTotalBytesReceived();
-        uint32_t totalWritten = fileSystem->getTotalBytesWritten();
+        // Use cached parallel port manager pointer
+        uint32_t totalRead = _cachedParallelPortManager->getTotalBytesReceived();
+        uint32_t totalWritten = _cachedFileSystemManager->getTotalBytesWritten();
         Serial.print(F("Data Integrity Check: "));
         if (totalRead == totalWritten) {
             Serial.print(F("GOOD ("));
@@ -940,7 +945,7 @@ void ConfigurationManager::printLastFileInfo() {
         }
 
         Serial.print(F("Write Errors: "));
-        Serial.print(fileSystem->getWriteErrors());
+        Serial.print(_cachedFileSystemManager->getWriteErrors());
         Serial.print(F("\r\n"));
     } else {
         Serial.print(F("No files saved yet.\r\n"));
@@ -950,22 +955,22 @@ void ConfigurationManager::printLastFileInfo() {
 }
 
 void ConfigurationManager::handleHeartbeatCommand(const String &command) {
-    auto displayManager = getServices().getDisplayManager();
-    auto systemManager = getServices().getSystemManager();
+    // Use cached display manager pointer
+    // Use cached system manager pointer
     String setting = command.substring(10); // Remove "heartbeat "
     setting.trim();
     setting.toLowerCase();
 
     if (setting == F("on") || setting == F("enable") || setting == F("true") || setting == F("1")) {
-        systemManager->setSerialHeartbeatEnabled(true);
+        _cachedSystemManager->setSerialHeartbeatEnabled(true);
         Serial.print(F("Serial heartbeat enabled\r\n"));
-        displayManager->displayMessage(Common::DisplayMessage::INFO, F("Heartbeat ON"));
+        _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("Heartbeat ON"));
     } else if (setting == F("off") || setting == F("disable") || setting == F("false") || setting == F("0")) {
-        systemManager->setSerialHeartbeatEnabled(false);
+        _cachedSystemManager->setSerialHeartbeatEnabled(false);
         Serial.print(F("Serial heartbeat disabled\r\n"));
-        displayManager->displayMessage(Common::DisplayMessage::INFO, F("Heartbeat OFF"));
+        _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("Heartbeat OFF"));
     } else if (setting == F("status")) {
-        bool enabled = systemManager->isSerialHeartbeatEnabled();
+        bool enabled = _cachedSystemManager->isSerialHeartbeatEnabled();
         Serial.print(F("Serial heartbeat is "));
         Serial.print(enabled ? F("enabled") : F("disabled"));
         Serial.print(F("\r\n"));
@@ -978,7 +983,7 @@ void ConfigurationManager::handleHeartbeatCommand(const String &command) {
 }
 
 void ConfigurationManager::handleLEDCommand(const String &command) {
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached display manager pointer
     // Expected format: "led l1 on", "led l2 off", "led status"
     String params = command.substring(4); // Remove "led "
     params.trim();
@@ -991,27 +996,27 @@ void ConfigurationManager::handleLEDCommand(const String &command) {
         if (action == F("on") || action == F("1") || action == F("true")) {
             digitalWrite(Common::Pins::LPT_READ_LED, HIGH);
             Serial.print(F("L1 LED (LPT Read Activity) turned ON\r\n"));
-            displayManager->displayMessage(Common::DisplayMessage::INFO, F("L1 LED ON"));
+            _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("L1 LED ON"));
         } else if (action == F("off") || action == F("0") || action == F("false")) {
             digitalWrite(Common::Pins::LPT_READ_LED, LOW);
             Serial.print(F("L1 LED (LPT Read Activity) turned OFF\r\n"));
-            displayManager->displayMessage(Common::DisplayMessage::INFO, F("L1 LED OFF"));
+            _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("L1 LED OFF"));
         } else {
             Serial.print(F("Invalid action for L1. Use: led l1 on/off\r\n"));
         }
     } else if (params.startsWith(F("l2 "))) {
         String action = params.substring(3);
         action.trim();
-        auto displayManager = getServices().getDisplayManager();
+        // Use cached display manager pointer
 
         if (action == F("on") || action == F("1") || action == F("true")) {
             digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
             Serial.print(F("L2 LED (Data Write Activity) turned ON\r\n"));
-            displayManager->displayMessage(Common::DisplayMessage::INFO, F("L2 LED ON"));
+            _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("L2 LED ON"));
         } else if (action == F("off") || action == F("0") || action == F("false")) {
             digitalWrite(Common::Pins::DATA_WRITE_LED, LOW);
             Serial.print(F("L2 LED (Data Write Activity) turned OFF\r\n"));
-            displayManager->displayMessage(Common::DisplayMessage::INFO, F("L2 LED OFF"));
+            _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("L2 LED OFF"));
         } else {
             Serial.print(F("Invalid action for L2. Use: led l2 on/off\r\n"));
         }
@@ -1038,7 +1043,7 @@ void ConfigurationManager::handleLEDCommand(const String &command) {
 }
 
 void ConfigurationManager::handleListCommand(const String &command) {
-    auto fileSystem = getServices().getFileSystemManager();
+    // Use cached file system manager pointer
     String target = command.substring(5); // Remove "list "
     target.trim();
     target.toLowerCase();
@@ -1047,13 +1052,13 @@ void ConfigurationManager::handleListCommand(const String &command) {
         Serial.print(F("\r\n=== SD Card File Listing ===\r\n"));
 
         // Check SD card status first
-        if (!fileSystem->isSDCardPresent()) {
+        if (!_cachedFileSystemManager->isSDCardPresent()) {
             Serial.print(F("SD Card: Not Detected\r\n"));
             Serial.print(F("=============================\r\n"));
             return;
         }
 
-        if (!fileSystem->isSDAvailable()) {
+        if (!_cachedFileSystemManager->isSDAvailable()) {
             Serial.print(F("SD Card: Detected but not available\r\n"));
             Serial.print(F("=============================\r\n"));
             return;
@@ -1134,7 +1139,7 @@ void ConfigurationManager::handleListCommand(const String &command) {
 }
 
 void ConfigurationManager::handleDebugCommand(const String &command) {
-    auto systemManager = getServices().getSystemManager();
+    // Use cached system manager pointer
     String params = command.substring(6); // Remove "debug "
     params.trim();
     params.toLowerCase();
@@ -1144,13 +1149,13 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
         lcdParams.trim();
 
         if (lcdParams == F("on")) {
-            systemManager->setLCDDebugEnabled(true);
+            _cachedSystemManager->setLCDDebugEnabled(true);
             Serial.print(F("LCD debug mode enabled - LCD messages will be output to serial\r\n"));
         } else if (lcdParams == F("off")) {
-            systemManager->setLCDDebugEnabled(false);
+            _cachedSystemManager->setLCDDebugEnabled(false);
             Serial.print(F("LCD debug mode disabled\r\n"));
         } else if (lcdParams == F("status")) {
-            bool enabled = systemManager->isLCDDebugEnabled();
+            bool enabled = _cachedSystemManager->isLCDDebugEnabled();
             Serial.print(F("LCD debug mode: "));
             Serial.print(enabled ? F("ENABLED") : F("DISABLED"));
             Serial.print(F("\r\n"));
@@ -1165,14 +1170,14 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
         lptParams.trim();
 
         if (lptParams == F("on")) {
-            systemManager->setParallelDebugEnabled(true);
+            _cachedSystemManager->setParallelDebugEnabled(true);
             Serial.print(F("Parallel port debug mode enabled - All LPT operations will be logged to serial\r\n"));
             Serial.print(F("Warning: This will generate significant serial output during data capture!\r\n"));
         } else if (lptParams == F("off")) {
-            systemManager->setParallelDebugEnabled(false);
+            _cachedSystemManager->setParallelDebugEnabled(false);
             Serial.print(F("Parallel port debug mode disabled\r\n"));
         } else if (lptParams == F("status")) {
-            bool enabled = systemManager->isParallelDebugEnabled();
+            bool enabled = _cachedSystemManager->isParallelDebugEnabled();
             Serial.print(F("Parallel port debug mode: "));
             Serial.print(enabled ? F("ENABLED") : F("DISABLED"));
             Serial.print(F("\r\n"));
@@ -1199,46 +1204,46 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
 }
 
 void ConfigurationManager::clearLPTBuffer() {
-    auto parallelPort = getServices().getParallelPortManager();
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached parallel port manager pointer
+    // Use cached display manager pointer
     
     Serial.print(F("\r\n=== Clearing LPT Buffer ===\r\n"));
     
     // Show buffer status before clearing
-    uint16_t bufferLevel = parallelPort->getBufferLevel();
+    uint16_t bufferLevel = _cachedParallelPortManager->getBufferLevel();
     Serial.print(F("Buffer level before: "));
     Serial.print(bufferLevel);
     Serial.print(F("/"));
-    Serial.print(getServices().getConfigurationService()->getRingBufferSize());
+    Serial.print(_cachedConfigurationService->getRingBufferSize());
     Serial.print(F(" bytes\r\n"));
     
     // Clear the buffer
-    parallelPort->clearBuffer();
+    _cachedParallelPortManager->clearBuffer();
     
     // Show buffer status after clearing
-    bufferLevel = parallelPort->getBufferLevel();
+    bufferLevel = _cachedParallelPortManager->getBufferLevel();
     Serial.print(F("Buffer level after: "));
     Serial.print(bufferLevel);
     Serial.print(F("/"));
-    Serial.print(getServices().getConfigurationService()->getRingBufferSize());
+    Serial.print(_cachedConfigurationService->getRingBufferSize());
     Serial.print(F(" bytes\r\n"));
     
     Serial.print(F("LPT buffer cleared successfully\r\n"));
     Serial.print(F("===========================\r\n"));
     
-    displayManager->displayMessage(Common::DisplayMessage::INFO, F("Buffer Cleared"));
+    _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("Buffer Cleared"));
 }
 
 void ConfigurationManager::resetCriticalState() {
-    auto parallelPort = getServices().getParallelPortManager();
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached parallel port manager pointer
+    // Use cached display manager pointer
     
     Serial.print(F("\r\n=== Resetting Critical State ===\r\n"));
     
-    bool wasCritical = parallelPort->isCriticalFlowControlActive();
+    bool wasCritical = _cachedParallelPortManager->isCriticalFlowControlActive();
     
     // Reset the critical state
-    parallelPort->resetCriticalState();
+    _cachedParallelPortManager->resetCriticalState();
     
     Serial.print(F("Critical flow control state: "));
     Serial.print(wasCritical ? F("WAS ACTIVE - Now Reset") : F("Was not active"));
@@ -1248,14 +1253,14 @@ void ConfigurationManager::resetCriticalState() {
     Serial.print(F("===============================\r\n"));
     
     if (wasCritical) {
-        displayManager->displayMessage(Common::DisplayMessage::INFO, F("Critical Reset"));
+        _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("Critical Reset"));
     } else {
-        displayManager->displayMessage(Common::DisplayMessage::INFO, F("No Critical State"));
+        _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("No Critical State"));
     }
 }
 
 void ConfigurationManager::handleLCDThrottleCommand(const String& command) {
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached display manager pointer
     String params = command.substring(12); // Remove "lcdthrottle "
     params.trim();
     params.toLowerCase();
@@ -1263,17 +1268,17 @@ void ConfigurationManager::handleLCDThrottleCommand(const String& command) {
     Serial.print(F("\r\n=== LCD Throttle Control ===\r\n"));
     
     if (params == F("on") || params == F("enable") || params == F("true")) {
-        displayManager->setStorageOperationActive(true);
+        _cachedDisplayManager->setStorageOperationActive(true);
         Serial.print(F("LCD refresh throttled to 500ms\r\n"));
         Serial.print(F("Storage operation mode: ACTIVE\r\n"));
-        displayManager->displayMessage(Common::DisplayMessage::INFO, F("LCD Throttled"));
+        _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("LCD Throttled"));
     } else if (params == F("off") || params == F("disable") || params == F("false")) {
-        displayManager->setStorageOperationActive(false);
+        _cachedDisplayManager->setStorageOperationActive(false);
         Serial.print(F("LCD refresh restored to 100ms\r\n"));
         Serial.print(F("Storage operation mode: INACTIVE\r\n"));
-        displayManager->displayMessage(Common::DisplayMessage::INFO, F("LCD Normal"));
+        _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("LCD Normal"));
     } else if (params == F("status")) {
-        bool isThrottled = displayManager->isStorageOperationActive();
+        bool isThrottled = _cachedDisplayManager->isStorageOperationActive();
         Serial.print(F("Storage Operation Active: "));
         Serial.print(isThrottled ? F("YES") : F("NO"));
         Serial.print(F("\r\n"));
@@ -1300,8 +1305,8 @@ bool ConfigurationManager::selfTest() {
     Serial.print(F("  Testing configuration values... "));
     
     // Test critical pin configurations
-    auto configService = getServices().getConfigurationService();
-    if (configService && configService->getHeartbeatPin() >= 0 && configService->getHeartbeatPin() <= 53) {
+    // Use cached configuration service pointer
+    if (_cachedConfigurationService->getHeartbeatPin() >= 0 && _cachedConfigurationService->getHeartbeatPin() <= 53) {
         Serial.print(F("✅ OK\r\n"));
     } else {
         Serial.print(F("❌ FAIL - Invalid pin configuration\r\n"));
@@ -1331,32 +1336,32 @@ const char *ConfigurationManager::getComponentName() const {
 bool ConfigurationManager::validateDependencies() const {
     bool valid = true;
 
-    auto systemManager = getServices().getSystemManager();
-    if (!systemManager) {
+    // Use cached system manager pointer
+    if (!_cachedSystemManager) {
         Serial.print(F("  Missing SystemManager dependency\r\n"));
         valid = false;
     }
 
-    auto fileSystem = getServices().getFileSystemManager();
-    if (!fileSystem) {
+    // Use cached file system manager pointer
+    if (!_cachedFileSystemManager) {
         Serial.print(F("  Missing FileSystemManager dependency\r\n"));
         valid = false;
     }
 
-    auto displayManager = getServices().getDisplayManager();
-    if (!displayManager) {
+    // Use cached display manager pointer
+    if (!_cachedDisplayManager) {
         Serial.print(F("  Missing DisplayManager dependency\r\n"));
         valid = false;
     }
 
-    auto timeManager = getServices().getTimeManager();
-    if (!timeManager) {
+    // Use cached time manager pointer
+    if (!_cachedTimeManager) {
         Serial.print(F("  Missing TimeManager dependency\r\n"));
         valid = false;
     }
 
-    auto parallelPortManager = getServices().getParallelPortManager();
-    if (!parallelPortManager) {
+    // Use cached parallel port manager pointer
+    if (!_cachedParallelPortManager) {
         Serial.print(F("  Missing ParallelPortManager dependency\r\n"));
         valid = false;
     }
@@ -1367,51 +1372,45 @@ bool ConfigurationManager::validateDependencies() const {
 void ConfigurationManager::printDependencyStatus() const {
     Serial.print(F("Con Dependencies:\r\n"));
 
-    auto systemManager = getServices().getSystemManager();
+    // Use cached system manager pointer
     Serial.print(F("  SystemManager: "));
-    Serial.print(systemManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedSystemManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 
-    auto fileSystem = getServices().getFileSystemManager();
+    // Use cached file system manager pointer
     Serial.print(F("  FileSystemManager: "));
-    Serial.print(fileSystem ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedFileSystemManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached display manager pointer
     Serial.print(F("  DisplayManager: "));
-    Serial.print(displayManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedDisplayManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 
-    auto timeManager = getServices().getTimeManager();
+    // Use cached time manager pointer
     Serial.print(F("  TimeManager: "));
-    Serial.print(timeManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedTimeManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 
-    auto parallelPortManager = getServices().getParallelPortManager();
+    // Use cached parallel port manager pointer
     Serial.print(F("  ParallelPortManager: "));
-    Serial.print(parallelPortManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedParallelPortManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 }
 
 void ConfigurationManager::handleFlowControlCommand(const String& command) {
-    auto parallelPortManager = getServices().getParallelPortManager();
-    if (!parallelPortManager) {
-        Serial.print(F("ERROR: ParallelPortManager not available\r\n"));
-        return;
-    }
-
     String param = command.substring(12); // Skip "flowcontrol "
     param.trim();
 
     if (param.equalsIgnoreCase(F("on")) || param.equalsIgnoreCase(F("enable"))) {
-        parallelPortManager->setHardwareFlowControlEnabled(true);
+        _cachedParallelPortManager->setHardwareFlowControlEnabled(true);
         Serial.print(F("Hardware flow control enabled\r\n"));
     } else if (param.equalsIgnoreCase(F("off")) || param.equalsIgnoreCase(F("disable"))) {
-        parallelPortManager->setHardwareFlowControlEnabled(false);
+        _cachedParallelPortManager->setHardwareFlowControlEnabled(false);
         Serial.print(F("Hardware flow control disabled\r\n"));
     } else if (param.equalsIgnoreCase(F("status")) || param.length() == 0) {
         Serial.print(F("Hardware flow control: "));
-        Serial.print(parallelPortManager->isHardwareFlowControlEnabled() ? F("ENABLED") : F("DISABLED"));
+        Serial.print(_cachedParallelPortManager->isHardwareFlowControlEnabled() ? F("ENABLED") : F("DISABLED"));
         Serial.print(F("\r\n"));
     } else {
         Serial.print(F("Usage: flowcontrol on/off/status\r\n"));
@@ -1419,18 +1418,12 @@ void ConfigurationManager::handleFlowControlCommand(const String& command) {
 }
 
 void ConfigurationManager::printFlowControlStatistics() {
-    auto parallelPortManager = getServices().getParallelPortManager();
-    if (!parallelPortManager) {
-        Serial.print(F("ERROR: ParallelPortManager not available\r\n"));
-        return;
-    }
-
-    if (!parallelPortManager->isHardwareFlowControlEnabled()) {
+    if (!_cachedParallelPortManager->isHardwareFlowControlEnabled()) {
         Serial.print(F("Hardware flow control is disabled\r\n"));
         return;
     }
 
-    auto stats = parallelPortManager->getFlowControlStatistics();
+    auto stats = _cachedParallelPortManager->getFlowControlStatistics();
     
     Serial.print(F("\r\n=== Hardware Flow Control Statistics ===\r\n"));
     Serial.print(F("Current State: "));
@@ -1472,8 +1465,8 @@ void ConfigurationManager::printFlowControlStatistics() {
 }
 
 unsigned long ConfigurationManager::getUpdateInterval() const {
-    auto configService = getServices().getConfigurationService();
-    return configService ? configService->getConfigurationInterval() : 50; // Default 50ms
+    // Use cached configuration service pointer
+    return _cachedConfigurationService->getConfigurationInterval();
 }
 
 } // namespace DeviceBridge::Components

@@ -49,16 +49,16 @@ public:
     ~HeartbeatLEDManager();
     
     // Lifecycle management (IComponent interface)
-    bool initialize() override;
-    void update(unsigned long currentTime) override;
-    void stop() override;
+    bool initialize() override final;
+    void update(unsigned long currentTime) override final;
+    void stop() override final;
     
     // IComponent interface implementation
-    bool selfTest() override;
-    const char* getComponentName() const override;
-    bool validateDependencies() const override;
-    void printDependencyStatus() const override;
-    unsigned long getUpdateInterval() const override;
+    bool selfTest() override final;
+    const char* getComponentName() const override final;
+    bool validateDependencies() const override final;
+    void printDependencyStatus() const override final;
+    unsigned long getUpdateInterval() const override final;
     
     // Mode control
     void setMode(HeartbeatMode mode);

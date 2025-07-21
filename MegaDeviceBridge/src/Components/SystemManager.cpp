@@ -29,6 +29,9 @@ SystemManager::SystemManager()
 SystemManager::~SystemManager() { stop(); }
 
 bool SystemManager::initialize() {
+    // Cache service dependencies first (performance optimization)
+    cacheServiceDependencies();
+    
     _systemStatus = Common::SystemStatus::INITIALIZING;
     return true;
 }
@@ -73,19 +76,19 @@ void SystemManager::processSystemCommand(const Common::SystemCommand &cmd) {
 }
 
 void SystemManager::processStorageSelectCommand(uint8_t value) {
-    auto fileSystemManager = getServices().getFileSystemManager();
+    // Use cached file system manager pointer
     if (value >= Common::StorageType::Count)
         return; // avoid out-of-bounds
 
     Common::StorageType storageType = Common::StorageType(static_cast<Common::StorageType::Value>(value));
-    fileSystemManager->setStorageType(storageType);
+    _cachedFileSystemManager->setStorageType(storageType);
     sendDisplayMessage(Common::DisplayMessage::INFO, storageType.toString());
 }
 
 void SystemManager::processFileTypeCommand(uint8_t value) {
     if (value > Common::FileType::BINARY)
         return; // avoid out-of-bounds
-    auto fileSystemManager = getServices().getFileSystemManager();
+    // Use cached file system manager pointer
 
     Common::FileType fileType(static_cast<Common::FileType::Value>(value));
 
@@ -93,7 +96,7 @@ void SystemManager::processFileTypeCommand(uint8_t value) {
     sendDisplayMessage(Common::DisplayMessage::INFO, fileType.toString());
 
     // Apply the selected file type
-    fileSystemManager->setFileType(fileType);
+    _cachedFileSystemManager->setFileType(fileType);
 }
 
 void SystemManager::processTimeSetCommand(const char *data) {
@@ -116,8 +119,8 @@ void SystemManager::logSystemStatus() {
     }
 
     char timeMessage[32] = "MISSING!";
-    auto timeManager = getServices().getTimeManager();
-    timeManager->getFormattedDateTime(timeMessage, sizeof(timeMessage));
+    // Use cached time manager pointer
+    _cachedTimeManager->getFormattedDateTime(timeMessage, sizeof(timeMessage));
 
     // Read analog value for button debugging (10-bit: 0-1023)
     int16_t buttonAnalog = analogRead(Common::Pins::LCD_BUTTONS);
@@ -209,12 +212,12 @@ void SystemManager::handleError(Common::ErrorCode error) {
 }
 
 void SystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const char *message) {
-    auto displayManager = getServices().getDisplayManager();
-    displayManager->displayMessage(type, message);
+    // Use cached display manager pointer
+    _cachedDisplayManager->displayMessage(type, message);
 }
 void SystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper *message) {
-    auto displayManager = getServices().getDisplayManager();
-    displayManager->displayMessage(type, message);
+    // Use cached display manager pointer
+    _cachedDisplayManager->displayMessage(type, message);
 }
 
 void SystemManager::printSystemInfo() {
@@ -251,9 +254,9 @@ uint16_t SystemManager::getFreeMemory() const {
 }
 
 void SystemManager::validateHardware() {
-    auto displayManager = getServices().getDisplayManager();
-    auto timeManager = getServices().getTimeManager();
-    auto fileSystemManager = getServices().getFileSystemManager();
+    // Use cached display manager pointer
+    // Use cached time manager pointer
+    // Use cached file system manager pointer
     Serial.print(F("\r\n=== Hardware Validation Test ===\r\n"));
 
     bool allComponentsOK = true;
@@ -263,14 +266,14 @@ void SystemManager::validateHardware() {
     bool fsOK = true;
 
     // Check if FileSystemManager has storage available
-    if (fileSystemManager->isSDAvailable()) {
+    if (_cachedFileSystemManager->isSDAvailable()) {
         Serial.print(F("SD-OK "));
     } else {
         Serial.print(F("SD-FAIL "));
         fsOK = false;
     }
 
-    if (fileSystemManager->isEEPROMAvailable()) {
+    if (_cachedFileSystemManager->isEEPROMAvailable()) {
         Serial.print(F("EEPROM-OK "));
     } else {
         Serial.print(F("EEPROM-FAIL "));
@@ -286,7 +289,7 @@ void SystemManager::validateHardware() {
 
     // Test TimeManager (RTC)
     Serial.print(F("Time Manager: "));
-    if (timeManager->isRTCAvailable()) {
+    if (_cachedTimeManager->isRTCAvailable()) {
         Serial.print(F("RTC-OK ✅\r\n"));
     } else {
         Serial.print(F("RTC-FAIL ❌\r\n"));
@@ -295,7 +298,7 @@ void SystemManager::validateHardware() {
 
     // Test DisplayManager (LCD)
     Serial.print(F("Display Manager: LCD-OK ✅\r\n"));
-    displayManager->displayMessage(Common::DisplayMessage::INFO, F("HW Test"));
+    _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("HW Test"));
 
     // Test ParallelPortManager
     Serial.print(F("Parallel Port Manager: LPT-OK ✅\r\n"));
@@ -374,26 +377,26 @@ const char *SystemManager::getComponentName() const {
 bool SystemManager::validateDependencies() const {
     bool valid = true;
 
-    auto displayManager = getServices().getDisplayManager();
-    if (!displayManager) {
+    // Use cached display manager pointer
+    if (!_cachedDisplayManager) {
         Serial.print(F("  Missing DisplayManager dependency\r\n"));
         valid = false;
     }
 
-    auto fileSystemManager = getServices().getFileSystemManager();
-    if (!fileSystemManager) {
+    // Use cached file system manager pointer
+    if (!_cachedSystemManager) {
         Serial.print(F("  Missing FileSystemManager dependency\r\n"));
         valid = false;
     }
 
-    auto timeManager = getServices().getTimeManager();
-    if (!timeManager) {
+    // Use cached time manager pointer
+    if (!_cachedTimeManager) {
         Serial.print(F("  Missing TimeManager dependency\r\n"));
         valid = false;
     }
 
-    auto parallelPortManager = getServices().getParallelPortManager();
-    if (!parallelPortManager) {
+    // Use cached parallel port manager pointer
+    if (!_cachedParallelPortManager) {
         Serial.print(F("  Missing ParallelPortManager dependency\r\n"));
         valid = false;
     }
@@ -404,30 +407,30 @@ bool SystemManager::validateDependencies() const {
 void SystemManager::printDependencyStatus() const {
     Serial.print(F("SystemManager Dependencies:\r\n"));
 
-    auto displayManager = getServices().getDisplayManager();
+    // Use cached display manager pointer
     Serial.print(F("  DisplayManager: "));
-    Serial.print(displayManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedDisplayManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 
-    auto fileSystemManager = getServices().getFileSystemManager();
+    // Use cached file system manager pointer
     Serial.print(F("  FileSystemManager: "));
-    Serial.print(fileSystemManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedSystemManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 
-    auto timeManager = getServices().getTimeManager();
+    // Use cached time manager pointer
     Serial.print(F("  TimeManager: "));
-    Serial.print(timeManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedTimeManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 
-    auto parallelPortManager = getServices().getParallelPortManager();
+    // Use cached parallel port manager pointer
     Serial.print(F("  ParallelPortManager: "));
-    Serial.print(parallelPortManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedParallelPortManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 }
 
 unsigned long SystemManager::getUpdateInterval() const {
-    auto configService = getServices().getConfigurationService();
-    return configService ? configService->getSystemInterval() : 5000; // Default 5 seconds
+    // Use cached configuration service pointer
+    return _cachedConfigurationService ? _cachedConfigurationService->getSystemInterval() : 5000; // Default 5 seconds
 }
 
 } // namespace DeviceBridge::Components

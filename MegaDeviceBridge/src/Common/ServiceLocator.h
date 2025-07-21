@@ -120,8 +120,33 @@ public:
     }
     
 protected:
-    // Helper for getting services
+    // Helper for getting services (legacy - prefer cached pointers)
     ServiceLocator& getServices() const { return ServiceLocator::getInstance(); }
+    
+    // Cached service pointers for performance (initialized once in initialize())
+    Components::ParallelPortManager* _cachedParallelPortManager = nullptr;
+    Components::FileSystemManager* _cachedFileSystemManager = nullptr;
+    Components::DisplayManager* _cachedDisplayManager = nullptr;
+    Components::TimeManager* _cachedTimeManager = nullptr;
+    Components::SystemManager* _cachedSystemManager = nullptr;
+    Components::ConfigurationManager* _cachedConfigurationManager = nullptr;
+    Components::HeartbeatLEDManager* _cachedHeartbeatLEDManager = nullptr;
+    Common::ConfigurationService* _cachedConfigurationService = nullptr;
+    User::Display* _cachedDisplay = nullptr;
+    
+    // Cache initialization method - call this FIRST in each component's initialize()
+    void cacheServiceDependencies() {
+        auto& services = ServiceLocator::getInstance();
+        _cachedParallelPortManager = services.getParallelPortManager();
+        _cachedFileSystemManager = services.getFileSystemManager();
+        _cachedDisplayManager = services.getDisplayManager();
+        _cachedTimeManager = services.getTimeManager();
+        _cachedSystemManager = services.getSystemManager();
+        _cachedConfigurationManager = services.getConfigurationManager();
+        _cachedHeartbeatLEDManager = services.getHeartbeatLEDManager();
+        _cachedConfigurationService = services.getConfigurationService();
+        _cachedDisplay = services.getDisplay();
+    }
     
     // Time tracking
     unsigned long _lastUpdateTime = 0;

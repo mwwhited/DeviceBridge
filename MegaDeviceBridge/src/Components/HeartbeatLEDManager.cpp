@@ -23,6 +23,9 @@ HeartbeatLEDManager::~HeartbeatLEDManager() {
 }
 
 bool HeartbeatLEDManager::initialize() {
+    // Cache service dependencies first (performance optimization)
+    cacheServiceDependencies();
+    
     pinMode(_pin, OUTPUT);
     digitalWrite(_pin, LOW);
     _ledState = false;
@@ -55,9 +58,9 @@ void HeartbeatLEDManager::stop() {
 
 void HeartbeatLEDManager::updateNormalHeartbeat() {
     uint32_t currentTime = millis();
-    auto config = getServices().getConfigurationService();
+    // Use cached configuration service pointer
     
-    if (currentTime - _lastUpdate >= config->getHeartbeatInterval()) {
+    if (currentTime - _lastUpdate >= _cachedConfigurationService->getHeartbeatInterval()) {
         setLEDState(!_ledState);
         _lastUpdate = currentTime;
     }
@@ -222,8 +225,8 @@ const char* HeartbeatLEDManager::getComponentName() const {
 bool HeartbeatLEDManager::validateDependencies() const {
     bool valid = true;
     
-    auto configService = getServices().getConfigurationService();
-    if (!configService) {
+    // Use cached configuration service pointer
+    if (!_cachedConfigurationManager) {
         Serial.print(F("  Missing ConfigurationService dependency\r\n"));
         valid = false;
     }
@@ -234,15 +237,15 @@ bool HeartbeatLEDManager::validateDependencies() const {
 void HeartbeatLEDManager::printDependencyStatus() const {
     Serial.print(F("HeartbeatLEDManager Dependencies:\r\n"));
     
-    auto configService = getServices().getConfigurationService();
+    // Use cached configuration service pointer
     Serial.print(F("  ConfigurationService: "));
-    Serial.print(configService ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedConfigurationService ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 }
 
 unsigned long HeartbeatLEDManager::getUpdateInterval() const {
-    auto configService = getServices().getConfigurationService();
-    return configService ? configService->getHeartbeatInterval() : 100; // Default 100ms
+    // Use cached configuration service pointer
+    return  _cachedConfigurationService->getHeartbeatInterval();
 }
 
 } // namespace DeviceBridge::Components

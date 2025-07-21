@@ -82,6 +82,9 @@ namespace DeviceBridge::Components
 
     bool DisplayManager::initialize()
     {
+        // Cache service dependencies first (performance optimization)
+        cacheServiceDependencies();
+        
         // Display should already be initialized by main
         return true;
     }
@@ -129,7 +132,6 @@ namespace DeviceBridge::Components
 
     void DisplayManager::updateDisplay(unsigned long currentTime)
     {
-        auto timeManager = getServices().getTimeManager();
         // Check if we should show time when truly idle (not in menu, not during storage operations)
         if (!_displayFlags.inMenu && !_displayFlags.storageOperationActive && (currentTime - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
         {
@@ -137,7 +139,7 @@ namespace DeviceBridge::Components
             {
                 _displayFlags.showingTime = true;
                 char timeStr[32];
-                timeManager->getFormattedTime(timeStr, sizeof(timeStr));
+                _cachedTimeManager->getFormattedTime(timeStr, sizeof(timeStr));
                 showTimeDisplay(timeStr);
             }
         }
@@ -210,7 +212,7 @@ namespace DeviceBridge::Components
             return _lastButtonState;
         }
 
-        uint16_t buttonValue = analogRead(A0);
+        uint16_t buttonValue = analogRead(54); // A0 pin number
 
         // Tolerance for analog readings using direct constants
         if (buttonValue < Common::Buttons::RIGHT_THRESHOLD)
@@ -309,7 +311,6 @@ namespace DeviceBridge::Components
 
     void DisplayManager::sendCommand(Common::SystemCommand::Type type, uint8_t value, const char *data)
     {
-        auto systemManager = getServices().getSystemManager();
         Common::SystemCommand cmd;
         cmd.type = type;
         cmd.value = value;
@@ -323,7 +324,7 @@ namespace DeviceBridge::Components
             cmd.data[0] = '\0';
         }
 
-        systemManager->processSystemCommand(cmd);
+        _cachedSystemManager->processSystemCommand(cmd);
     }
 
     void DisplayManager::showMessage(const char *message, const char *line2)
@@ -386,9 +387,8 @@ namespace DeviceBridge::Components
 
     void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const char *message, const char *line2)
     {
-        auto systemManager = getServices().getSystemManager();
         // Debug mode: output LCD messages to serial
-        if (systemManager->isLCDDebugEnabled())
+        if (_cachedSystemManager->isLCDDebugEnabled())
         {
             Serial.print(F("[LCD] "));
             switch (type)
@@ -434,9 +434,8 @@ namespace DeviceBridge::Components
     }
     void DisplayManager::displayMessage(Common::DisplayMessage::Type type, const __FlashStringHelper *message, const __FlashStringHelper *line2)
     {
-        auto systemManager = getServices().getSystemManager();
         // Debug mode: output LCD messages to serial
-        if (systemManager->isLCDDebugEnabled())
+        if (_cachedSystemManager->isLCDDebugEnabled())
         {
             Serial.print(F("[LCD] "));
             switch (type)
@@ -588,15 +587,13 @@ namespace DeviceBridge::Components
     {
         bool valid = true;
 
-        auto timeManager = getServices().getTimeManager();
-        if (!timeManager)
+        if (!_cachedTimeManager)
         {
             Serial.print(F("  Missing TimeManager dependency\r\n"));
             valid = false;
         }
 
-        auto systemManager = getServices().getSystemManager();
-        if (!systemManager)
+        if (!_cachedSystemManager)
         {
             Serial.print(F("  Missing SystemManager dependency\r\n"));
             valid = false;
@@ -609,20 +606,17 @@ namespace DeviceBridge::Components
     {
         Serial.print(F("DisplayManager Dependencies:\r\n"));
 
-        auto timeManager = getServices().getTimeManager();
         Serial.print(F("  TimeManager: "));
-        Serial.print(timeManager ? F("✅ Available") : F("❌ Missing"));
+        Serial.print(_cachedTimeManager ? F("✅ Available") : F("❌ Missing"));
         Serial.print(F("\r\n"));
 
-        auto systemManager = getServices().getSystemManager();
         Serial.print(F("  SystemManager: "));
-        Serial.print(systemManager ? F("✅ Available") : F("❌ Missing"));
+        Serial.print(_cachedSystemManager ? F("✅ Available") : F("❌ Missing"));
         Serial.print(F("\r\n"));
     }
 
     unsigned long DisplayManager::getUpdateInterval() const {
-        auto configService = getServices().getConfigurationService();
-        return configService ? configService->getDisplayInterval() : 100; // Default 100ms
+        return _cachedConfigurationService ? _cachedConfigurationService->getDisplayInterval() : 100; // Default 100ms
     }
 
 } // namespace DeviceBridge::Components

@@ -15,6 +15,9 @@ TimeManager::TimeManager() : _rtcAvailable(false), _lastTimeUpdate(0), _timeVali
 TimeManager::~TimeManager() { stop(); }
 
 bool TimeManager::initialize() {
+    // Cache service dependencies first (performance optimization)
+    cacheServiceDependencies();
+    
     _rtcAvailable = initializeRTC();
     return _rtcAvailable;
 }
@@ -52,8 +55,7 @@ void TimeManager::updateTimeDisplay() {
 
     char timeBuffer[32];
     formatTime(timeBuffer, sizeof(timeBuffer));
-    auto displayManager = getServices().getDisplayManager();
-    displayManager->displayMessage(Common::DisplayMessage::TIME, timeBuffer);
+    _cachedDisplayManager->displayMessage(Common::DisplayMessage::TIME, timeBuffer);
 }
 
 void TimeManager::formatTime(char *buffer, size_t bufferSize) {
@@ -182,8 +184,7 @@ const char* TimeManager::getComponentName() const {
 bool TimeManager::validateDependencies() const {
     bool valid = true;
     
-    auto displayManager = getServices().getDisplayManager();
-    if (!displayManager) {
+    if (!_cachedDisplayManager) {
         Serial.print(F("  Missing DisplayManager dependency\r\n"));
         valid = false;
     }
@@ -194,15 +195,13 @@ bool TimeManager::validateDependencies() const {
 void TimeManager::printDependencyStatus() const {
     Serial.print(F("TimeManager Dependencies:\r\n"));
     
-    auto displayManager = getServices().getDisplayManager();
     Serial.print(F("  DisplayManager: "));
-    Serial.print(displayManager ? F("✅ Available") : F("❌ Missing"));
+    Serial.print(_cachedDisplayManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
 }
 
 unsigned long TimeManager::getUpdateInterval() const {
-    auto configService = getServices().getConfigurationService();
-    return configService ? configService->getTimeInterval() : 1000; // Default 1 second
+    return _cachedConfigurationService ? _cachedConfigurationService->getTimeInterval() : 1000; // Default 1 second
 }
 
 } // namespace DeviceBridge::Components
