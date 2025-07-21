@@ -7,7 +7,7 @@ namespace DeviceBridge::Common {
 
 // Data structure for parallel port to file manager communication
 struct __attribute__((packed)) DataChunk {
-  uint8_t data[256];  // Reduced from 512 to 256 bytes to fit in RAM
+  uint8_t data[Buffer::DATA_CHUNK_SIZE];  // Match ring buffer size for optimal data transfer
   uint16_t length;
   uint32_t timestamp;
   uint8_t isNewFile;    // Use uint8_t instead of bool for consistent size

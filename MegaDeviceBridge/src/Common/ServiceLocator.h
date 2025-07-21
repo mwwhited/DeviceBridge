@@ -13,6 +13,7 @@ namespace Components {
     class TimeManager;
     class SystemManager;
     class ConfigurationManager;
+    class HeartbeatLEDManager;
 }
 
 namespace Common {
@@ -36,6 +37,7 @@ private:
     Components::TimeManager* _timeManager;
     Components::SystemManager* _systemManager;
     Components::ConfigurationManager* _configurationManager;
+    Components::HeartbeatLEDManager* _heartbeatLEDManager;
     Common::ConfigurationService* _configurationService;
     User::Display* _display;
     
@@ -57,6 +59,7 @@ public:
     void registerTimeManager(Components::TimeManager* manager);
     void registerSystemManager(Components::SystemManager* manager);
     void registerConfigurationManager(Components::ConfigurationManager* manager);
+    void registerHeartbeatLEDManager(Components::HeartbeatLEDManager* manager);
     void registerConfigurationService(Common::ConfigurationService* service);
     void registerDisplay(User::Display* display);
     
@@ -67,6 +70,7 @@ public:
     Components::TimeManager* getTimeManager() const;
     Components::SystemManager* getSystemManager() const;
     Components::ConfigurationManager* getConfigurationManager() const;
+    Components::HeartbeatLEDManager* getHeartbeatLEDManager() const;
     Common::ConfigurationService* getConfigurationService() const;
     User::Display* getDisplay() const;
     
@@ -82,11 +86,12 @@ public:
 private:
     void printComponentStatus(const char* name, void* ptr) const;
     void printComponentStatus(const __FlashStringHelper* name, void* ptr) const;
+    void triggerSOSError(const __FlashStringHelper* errorCode) const;
 };
 
 /**
  * Base interface for all system components
- * Provides common lifecycle and validation methods
+ * Provides common lifecycle and validation methods with encapsulated timing
  */
 class IComponent {
 public:
@@ -94,7 +99,7 @@ public:
     
     // Lifecycle management
     virtual bool initialize() = 0;
-    virtual void update() = 0;
+    virtual void update(unsigned long currentTime) = 0;
     virtual void stop() = 0;
     
     // Self-testing capabilities
@@ -105,9 +110,21 @@ public:
     virtual bool validateDependencies() const = 0;
     virtual void printDependencyStatus() const = 0;
     
+    // Time management
+    virtual unsigned long getUpdateInterval() const = 0;
+    virtual bool shouldUpdate(unsigned long currentTime) const {
+        return (currentTime - _lastUpdateTime) >= getUpdateInterval();
+    }
+    virtual void markUpdated(unsigned long currentTime) {
+        _lastUpdateTime = currentTime;
+    }
+    
 protected:
     // Helper for getting services
     ServiceLocator& getServices() const { return ServiceLocator::getInstance(); }
+    
+    // Time tracking
+    unsigned long _lastUpdateTime = 0;
 };
 
 } // namespace DeviceBridge

@@ -70,6 +70,12 @@ namespace DeviceBridge::Parallel
     uint32_t getInterruptCount() const { return _interruptCount; }
     uint32_t getDataCount() const { return _dataCount; }
     
+    // Control signal debugging
+    bool isStrobeLow() { return _control.isStrobeLow(); }
+    bool isAutoFeedLow() { return _control.isAutoFeedLow(); }
+    bool isInitializeLow() { return _control.isInitializeLow(); }
+    bool isSelectInLow() { return _control.isSelectInLow(); }
+    
     // Buffer management methods
     void clearBuffer();
     uint16_t getBufferSize() const;

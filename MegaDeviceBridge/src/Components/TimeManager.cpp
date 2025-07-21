@@ -1,5 +1,6 @@
 #include "TimeManager.h"
 #include "DisplayManager.h"
+#include "../Common/ConfigurationService.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,9 +16,8 @@ bool TimeManager::initialize() {
     return _rtcAvailable;
 }
 
-void TimeManager::update() {
+void TimeManager::update(unsigned long currentTime) {
     // Update time display periodically (called from main loop)
-    uint32_t currentTime = millis();
     if (currentTime - _lastTimeUpdate >= Common::RTOS::TIME_UPDATE_MS) {
         updateTimeDisplay();
         _lastTimeUpdate = currentTime;
@@ -165,10 +165,7 @@ bool TimeManager::selfTest() {
         result = false;
     }
     
-    // Test dependencies
-    if (!validateDependencies()) {
-        result = false;
-    }
+    // Dependencies validated by ServiceLocator at startup
     
     return result;
 }
@@ -196,6 +193,11 @@ void TimeManager::printDependencyStatus() const {
     Serial.print(F("  DisplayManager: "));
     Serial.print(displayManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
+}
+
+unsigned long TimeManager::getUpdateInterval() const {
+    auto configService = getServices().getConfigurationService();
+    return configService ? configService->getTimeInterval() : 1000; // Default 1 second
 }
 
 } // namespace DeviceBridge::Components

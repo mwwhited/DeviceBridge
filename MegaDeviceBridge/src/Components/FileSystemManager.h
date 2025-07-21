@@ -6,6 +6,10 @@
 #include "../Common/Types.h"
 #include "../Common/Config.h"
 #include "../Common/ServiceLocator.h"
+#include "../Storage/IFileSystem.h"
+#include "../Storage/SDCardFileSystem.h"
+#include "../Storage/EEPROMFileSystem.h"
+#include "../Storage/SerialTransferFileSystem.h"
 
 namespace DeviceBridge::Components {
 
@@ -18,13 +22,23 @@ class FileSystemManager : public DeviceBridge::IComponent {
 private:
     // Note: No longer storing direct references - using ServiceLocator
     
-    // Storage instances  
+    // Modular storage instances using IFileSystem interface
+    Storage::SDCardFileSystem _sdCardFileSystem;
+    Storage::EEPROMFileSystem _eepromFileSystem;
+    Storage::SerialTransferFileSystem _serialTransferFileSystem;
+    Storage::IFileSystem* _activeFileSystem;
+    
+    // Legacy compatibility (to be removed)
     File _currentFile;
     W25Q128Manager _eeprom;
     
     // Storage status
     bool _sdAvailable;
     bool _eepromAvailable;
+    
+    // Hot-swap detection
+    bool _lastSDCardDetectState;
+    uint32_t _lastSDCardCheckTime;
     
     // EEPROM file management
     uint32_t _eepromCurrentAddress;
@@ -40,11 +54,21 @@ private:
     Common::FileType _detectedFileType;  // Auto-detected file type (if auto-detection enabled)
     bool _isFileOpen;
     
-    // Storage operations
+    // Storage operations (legacy)
     bool initializeSD();
     bool initializeEEPROM();
     bool writeDataChunk(const Common::DataChunk& chunk);
     bool closeCurrentFile();
+    
+    // Modular storage operations
+    bool initializeFileSystem();
+    bool selectActiveFileSystem(Common::StorageType storageType);
+    Storage::IFileSystem* getFileSystemForType(Common::StorageType storageType);
+    
+    // Hot-swap detection
+    bool checkSDCardPresence();
+    void handleSDCardInsertion();
+    void handleSDCardRemoval();
     
     // Storage management
     bool switchStorage(Common::StorageType newType);
@@ -67,7 +91,7 @@ public:
     
     // Lifecycle management (IComponent interface)
     bool initialize() override;
-    void update() override;  // Called from main loop
+    void update(unsigned long currentTime) override;  // Called from main loop
     void stop() override;
     
     // IComponent interface implementation
@@ -75,6 +99,7 @@ public:
     const char* getComponentName() const override;
     bool validateDependencies() const override;
     void printDependencyStatus() const override;
+    unsigned long getUpdateInterval() const override;
     
     // Data processing (called by ParallelPortManager)
     void processDataChunk(const Common::DataChunk& chunk);
@@ -97,6 +122,7 @@ public:
     uint32_t getSDCardFileCount() const;  // Explicitly count SD card files
     const char* getCurrentFilename() const { return _currentFilename; }
     uint32_t getTotalBytesWritten() const { return _totalBytesWritten; }
+    uint32_t getCurrentFileBytesWritten() const { return _currentFileBytesWritten; }
     uint16_t getWriteErrors() const { return _writeErrors; }
     
     // Hardware status
@@ -107,7 +133,8 @@ private:
     // Helper methods
     uint32_t countFilesRecursive(const char* dirPath) const;
     // Statistics
-    uint32_t _totalBytesWritten;
+    uint32_t _totalBytesWritten;      // Total bytes written across all files
+    uint32_t _currentFileBytesWritten; // Bytes written to current file
     uint16_t _writeErrors;
 };
 

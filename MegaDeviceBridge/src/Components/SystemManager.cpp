@@ -3,6 +3,7 @@
 #include "FileSystemManager.h"
 #include "ParallelPortManager.h"
 #include "TimeManager.h"
+#include "../Common/ConfigurationService.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -26,9 +27,8 @@ bool SystemManager::initialize() {
     return true;
 }
 
-void SystemManager::update() {
+void SystemManager::update(unsigned long currentTime) {
     // Periodic system monitoring (called from main loop)
-    uint32_t currentTime = millis();
     if (currentTime - _lastSystemCheck >= Common::RTOS::SYSTEM_MONITOR_MS) {
         monitorSystemHealth();
         _lastSystemCheck = currentTime;
@@ -325,10 +325,36 @@ bool SystemManager::selfTest() {
 
     bool result = true;
 
-    // Test dependencies
-    if (!validateDependencies()) {
+    // Test memory availability
+    Serial.print(F("  Testing system memory... "));
+    uint16_t freeRAM = freeRam();
+    
+    if (freeRAM > 1000) {
+        Serial.print(F("✅ OK ("));
+        Serial.print(freeRAM);
+        Serial.print(F(" bytes free)\r\n"));
+    } else if (freeRAM > 500) {
+        Serial.print(F("⚠️  LOW ("));
+        Serial.print(freeRAM);
+        Serial.print(F(" bytes free)\r\n"));
+    } else {
+        Serial.print(F("❌ CRITICAL ("));
+        Serial.print(freeRAM);
+        Serial.print(F(" bytes free)\r\n"));
         result = false;
     }
+    
+    // Test system status tracking
+    Serial.print(F("  Testing status tracking... "));
+    if (_systemStatus != Common::SystemStatus::INITIALIZING) {
+        Serial.print(F("✅ OK (status: "));
+        Serial.print((int)_systemStatus);
+        Serial.print(F(")\r\n"));
+    } else {
+        Serial.print(F("⚠️  Still initializing\r\n"));
+    }
+    
+    // Dependencies validated by ServiceLocator at startup
 
     return result;
 }
@@ -387,6 +413,11 @@ void SystemManager::printDependencyStatus() const {
     Serial.print(F("  ParallelPortManager: "));
     Serial.print(parallelPortManager ? F("✅ Available") : F("❌ Missing"));
     Serial.print(F("\r\n"));
+}
+
+unsigned long SystemManager::getUpdateInterval() const {
+    auto configService = getServices().getConfigurationService();
+    return configService ? configService->getSystemInterval() : 5000; // Default 5 seconds
 }
 
 } // namespace DeviceBridge::Components

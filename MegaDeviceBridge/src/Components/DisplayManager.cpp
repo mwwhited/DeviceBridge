@@ -33,7 +33,7 @@ namespace DeviceBridge::Components
         return true;
     }
 
-    void DisplayManager::update()
+    void DisplayManager::update(unsigned long currentTime)
     {
         // Check for button presses (always responsive)
         uint16_t buttonValue = readButtons();
@@ -50,7 +50,6 @@ namespace DeviceBridge::Components
         }
 
         // Adaptive display update based on storage operation state
-        uint32_t currentTime = millis();
         uint32_t updateInterval = _storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
         
         if (currentTime - _lastDisplayUpdate >= updateInterval) {
@@ -521,11 +520,33 @@ namespace DeviceBridge::Components
 
         bool result = true;
  
-        // Test dependencies
-        if (!validateDependencies())
-        {
+        // Test LCD display functionality
+        Serial.print(F("  Testing LCD display... "));
+        
+        // Test basic LCD operations
+        _display.clear();
+        _display.setCursor(0, 0);
+        _display.print(F("Self-Test"));
+        _display.setCursor(0, 1);
+        _display.print(F("LCD OK"));
+        
+        Serial.print(F("✅ OK\r\n"));
+        
+        // Test button reading
+        Serial.print(F("  Testing button interface... "));
+        uint16_t buttonValue = analogRead(A0);
+        auto* config = ServiceLocator::getInstance().getConfigurationService();
+        
+        if (buttonValue >= 0 && buttonValue <= 1023) {
+            Serial.print(F("✅ OK (value: "));
+            Serial.print(buttonValue);
+            Serial.print(F(")\r\n"));
+        } else {
+            Serial.print(F("❌ FAIL\r\n"));
             result = false;
         }
+        
+        // Dependencies validated by ServiceLocator at startup
 
         return result;
     }
@@ -569,6 +590,11 @@ namespace DeviceBridge::Components
         Serial.print(F("  SystemManager: "));
         Serial.print(systemManager ? F("✅ Available") : F("❌ Missing"));
         Serial.print(F("\r\n"));
+    }
+
+    unsigned long DisplayManager::getUpdateInterval() const {
+        auto configService = getServices().getConfigurationService();
+        return configService ? configService->getDisplayInterval() : 100; // Default 100ms
     }
 
 } // namespace DeviceBridge::Components

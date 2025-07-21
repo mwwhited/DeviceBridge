@@ -11,6 +11,7 @@
 #include "./Components/TimeManager.h"
 #include "./Components/SystemManager.h"
 #include "./Components/ConfigurationManager.h"
+#include "./Components/HeartbeatLEDManager.h"
 
 // Common definitions
 #include "./Common/Types.h"
@@ -49,31 +50,24 @@ DeviceBridge::User::Display display(
     DeviceBridge::Common::Pins::LCD_D6,
     DeviceBridge::Common::Pins::LCD_D7);
 
-// Component managers
-DeviceBridge::Components::ParallelPortManager* parallelPortManager = nullptr;
-DeviceBridge::Components::FileSystemManager* fileSystemManager = nullptr;
-DeviceBridge::Components::DisplayManager* displayManager = nullptr;
-DeviceBridge::Components::TimeManager* timeManager = nullptr;
-DeviceBridge::Components::SystemManager* systemManager = nullptr;
-DeviceBridge::Components::ConfigurationManager* configurationManager = nullptr;
+// Component managers - Array-based management
+DeviceBridge::IComponent* components[7];
 DeviceBridge::Common::ConfigurationService* configurationService = nullptr;
 
-// Timing for cooperative multitasking
-unsigned long lastParallelUpdate = 0;
-unsigned long lastFileSystemUpdate = 0;
-unsigned long lastDisplayUpdate = 0;
-unsigned long lastTimeUpdate = 0;
-unsigned long lastSystemUpdate = 0;
-unsigned long lastHeartbeatUpdate = 0;
-unsigned long lastConfigurationUpdate = 0;
+// Component indices for easy access
+constexpr uint8_t PARALLEL_PORT_INDEX = 0;
+constexpr uint8_t FILE_SYSTEM_INDEX = 1;
+constexpr uint8_t DISPLAY_INDEX = 2;
+constexpr uint8_t TIME_INDEX = 3;
+constexpr uint8_t SYSTEM_INDEX = 4;
+constexpr uint8_t CONFIGURATION_INDEX = 5;
+constexpr uint8_t HEARTBEAT_LED_INDEX = 6;
+constexpr uint8_t COMPONENT_COUNT = 7;
 
 // Update intervals (milliseconds) - now accessed via ConfigurationService
 
 void setup()
 {
-  pinMode(DeviceBridge::Common::Pins::HEARTBEAT, OUTPUT);
-  digitalWrite(DeviceBridge::Common::Pins::HEARTBEAT, LOW); // Start with LED off
-
   Serial.begin(DeviceBridge::Common::Serial::BAUD_RATE);
   while (!Serial) { delay(10); }
   
@@ -88,17 +82,26 @@ void setup()
   DeviceBridge::ServiceLocator& services = DeviceBridge::ServiceLocator::getInstance();
   
   // Create component managers (no queues/mutexes needed)
-  parallelPortManager = new DeviceBridge::Components::ParallelPortManager(printerPort);
-  fileSystemManager = new DeviceBridge::Components::FileSystemManager();
-  displayManager = new DeviceBridge::Components::DisplayManager(display);
-  timeManager = new DeviceBridge::Components::TimeManager();
-  systemManager = new DeviceBridge::Components::SystemManager();
-  configurationManager = new DeviceBridge::Components::ConfigurationManager();
+  components[PARALLEL_PORT_INDEX] = new DeviceBridge::Components::ParallelPortManager(printerPort);
+  components[FILE_SYSTEM_INDEX] = new DeviceBridge::Components::FileSystemManager();
+  components[DISPLAY_INDEX] = new DeviceBridge::Components::DisplayManager(display);
+  components[TIME_INDEX] = new DeviceBridge::Components::TimeManager();
+  components[SYSTEM_INDEX] = new DeviceBridge::Components::SystemManager();
+  components[CONFIGURATION_INDEX] = new DeviceBridge::Components::ConfigurationManager();
+  components[HEARTBEAT_LED_INDEX] = new DeviceBridge::Components::HeartbeatLEDManager();
   configurationService = new DeviceBridge::Common::ConfigurationService();
   
   // Verify component creation
-  if (!parallelPortManager || !fileSystemManager || !displayManager || 
-      !timeManager || !systemManager || !configurationManager || !configurationService) {
+  bool allComponentsCreated = true;
+  for (uint8_t i = 0; i < COMPONENT_COUNT; i++) {
+    if (!components[i]) {
+      Serial.print(F("FATAL: Failed to create component "));
+      Serial.print(i);
+      Serial.print(F("\r\n"));
+      allComponentsCreated = false;
+    }
+  }
+  if (!configurationService || !allComponentsCreated) {
     Serial.print(F("FATAL: Failed to create component managers\r\n"));
     while(1) { delay(1000); }
   }
@@ -106,12 +109,13 @@ void setup()
   // Register all components with ServiceLocator
   Serial.print(F("Registering components with ServiceLocator...\r\n"));
   services.registerDisplay(&display);
-  services.registerParallelPortManager(parallelPortManager);
-  services.registerFileSystemManager(fileSystemManager);
-  services.registerDisplayManager(displayManager);
-  services.registerTimeManager(timeManager);
-  services.registerSystemManager(systemManager);
-  services.registerConfigurationManager(configurationManager);
+  services.registerParallelPortManager(static_cast<DeviceBridge::Components::ParallelPortManager*>(components[PARALLEL_PORT_INDEX]));
+  services.registerFileSystemManager(static_cast<DeviceBridge::Components::FileSystemManager*>(components[FILE_SYSTEM_INDEX]));
+  services.registerDisplayManager(static_cast<DeviceBridge::Components::DisplayManager*>(components[DISPLAY_INDEX]));
+  services.registerTimeManager(static_cast<DeviceBridge::Components::TimeManager*>(components[TIME_INDEX]));
+  services.registerSystemManager(static_cast<DeviceBridge::Components::SystemManager*>(components[SYSTEM_INDEX]));
+  services.registerConfigurationManager(static_cast<DeviceBridge::Components::ConfigurationManager*>(components[CONFIGURATION_INDEX]));
+  services.registerHeartbeatLEDManager(static_cast<DeviceBridge::Components::HeartbeatLEDManager*>(components[HEARTBEAT_LED_INDEX]));
   services.registerConfigurationService(configurationService);
   
   // Validate all dependencies are registered
@@ -123,28 +127,12 @@ void setup()
   // Initialize all components
   Serial.print(F("Initializing components...\r\n"));
   
-  if (!parallelPortManager->initialize()) {
-    Serial.print(F("WARNING: Parallel port initialization failed\r\n"));
-  }
-  
-  if (!fileSystemManager->initialize()) {
-    Serial.print(F("WARNING: File system initialization failed\r\n"));
-  }
-  
-  if (!displayManager->initialize()) {
-    Serial.print(F("WARNING: Display initialization failed\r\n"));
-  }
-  
-  if (!timeManager->initialize()) {
-    Serial.print(F("WARNING: Time manager initialization failed\r\n"));
-  }
-  
-  if (!systemManager->initialize()) {
-    Serial.print(F("WARNING: System manager initialization failed\r\n"));
-  }
-  
-  if (!configurationManager->initialize()) {
-    Serial.print(F("WARNING: Configuration manager initialization failed\r\n"));
+  for (uint8_t i = 0; i < COMPONENT_COUNT; i++) {
+    if (!components[i]->initialize()) {
+      Serial.print(F("WARNING: Component "));
+      Serial.print(components[i]->getComponentName());
+      Serial.print(F(" initialization failed\r\n"));
+    }
   }
   
   Serial.print(F("All systems initialized successfully!\r\n"));
@@ -160,62 +148,20 @@ void setup()
   }
   
   Serial.print(F("Connect TDS2024 to parallel port and use LCD buttons for control.\r\n"));
-  
-  // Initialize timing
-  lastParallelUpdate = millis();
-  lastFileSystemUpdate = millis();
-  lastDisplayUpdate = millis();
-  lastTimeUpdate = millis();
-  lastSystemUpdate = millis();
-  lastConfigurationUpdate = millis();
 }
 
 void loop()
 {
   unsigned long currentTime = millis();
   
-  // Parallel port manager - highest priority, most frequent
-  if (currentTime - lastParallelUpdate >= configurationService->getParallelInterval()) {
-    parallelPortManager->update();
-    lastParallelUpdate = currentTime;
-  }
-  
-  // File system manager - handle data storage
-  if (currentTime - lastFileSystemUpdate >= configurationService->getFileSystemInterval()) {
-    fileSystemManager->update();
-    lastFileSystemUpdate = currentTime;
-  }
-  
-  // Display manager - user interface updates
-  if (currentTime - lastDisplayUpdate >= configurationService->getDisplayInterval()) {
-    displayManager->update();
-    lastDisplayUpdate = currentTime;
-  }
-  
-  // Time manager - RTC and time-based operations
-  if (currentTime - lastTimeUpdate >= configurationService->getTimeInterval()) {
-    timeManager->update();
-    lastTimeUpdate = currentTime;
-  }
-  
-  // System manager - monitoring and health checks
-  if (currentTime - lastSystemUpdate >= configurationService->getSystemInterval()) {
-    systemManager->update();
-    lastSystemUpdate = currentTime;
-  }
-
-  // Heartbeat manager
-  if (currentTime - lastHeartbeatUpdate >= configurationService->getHeartbeatInterval()) {
-    digitalWrite(DeviceBridge::Common::Pins::HEARTBEAT, !digitalRead(DeviceBridge::Common::Pins::HEARTBEAT));
-    lastHeartbeatUpdate = currentTime;
-  }
-  
-  // Configuration manager - serial commands and settings
-  if (currentTime - lastConfigurationUpdate >= configurationService->getConfigurationInterval()) {
-    configurationManager->update();
-    lastConfigurationUpdate = currentTime;
+  // Update all components using encapsulated timing
+  for (uint8_t i = 0; i < COMPONENT_COUNT; i++) {
+    if (components[i]->shouldUpdate(currentTime)) {
+      components[i]->update(currentTime);
+      components[i]->markUpdated(currentTime);
+    }
   }
   
   // Small delay to prevent overwhelming the CPU
-  delayMicroseconds(100);
+  delayMicroseconds(10);
 }

@@ -25,6 +25,7 @@ private:
     // Data buffer for loop-based processing
     Common::DataChunk _currentChunk;
     uint16_t _chunkIndex;
+    uint32_t _chunkStartTime;
     
     // File boundary detection
     bool detectNewFile();
@@ -33,6 +34,7 @@ private:
     // Data processing
     void processData();
     void sendChunk();
+    bool shouldSendPartialChunk() const;
     
     // Critical timeout handling
     void handleCriticalTimeout();
@@ -43,7 +45,7 @@ public:
     
     // Lifecycle management (IComponent interface)
     bool initialize() override;
-    void update() override;  // Called from main loop
+    void update(unsigned long currentTime) override;  // Called from main loop with timing
     void stop() override;
     
     // IComponent interface implementation
@@ -51,6 +53,7 @@ public:
     const char* getComponentName() const override;
     bool validateDependencies() const override;
     void printDependencyStatus() const override;
+    unsigned long getUpdateInterval() const override;
     
     // Status inquiry
     bool isReceiving() const { return _fileInProgress; }
@@ -65,6 +68,12 @@ public:
     // Debug methods
     uint32_t getInterruptCount() const;
     uint32_t getDataCount() const;
+    
+    // Control signal debugging
+    bool isStrobeLow();
+    bool isAutoFeedLow();
+    bool isInitializeLow();
+    bool isSelectInLow();
     
     // LPT locking for SPI/Serial operations
     void lockPort();

@@ -43,4 +43,20 @@ namespace DeviceBridge::Parallel
             (digitalRead(_select) << 3);
         return val;
     }
+    
+    bool Control::isStrobeLow(){
+        return digitalRead(_strobe) == LOW;
+    }
+    
+    bool Control::isAutoFeedLow(){
+        return digitalRead(_autoFeed) == LOW;
+    }
+    
+    bool Control::isInitializeLow(){
+        return digitalRead(_initialize) == LOW;
+    }
+    
+    bool Control::isSelectInLow(){
+        return digitalRead(_select) == LOW;
+    }
 }

@@ -25,7 +25,7 @@ namespace Limits {
   constexpr uint16_t MAX_MESSAGE_LENGTH = 32;
   constexpr uint32_t MAX_FILE_SIZE = 16777216UL; // 16MB
   constexpr uint8_t QUEUE_WARNING_THRESHOLD = 6; // 75% of 8
-  constexpr uint16_t BUFFER_WARNING_THRESHOLD = 384; // 75% of 512
+  constexpr uint16_t BUFFER_WARNING_THRESHOLD = 384; // 75% of 512 - calculated dynamically in flow control
 }
 
 // File System Configuration
@@ -50,6 +50,11 @@ namespace Serial {
   constexpr uint32_t BAUD_RATE = 115200;
   constexpr uint32_t TIMEOUT_MS = 1000;
   constexpr uint8_t BUFFER_SIZE = 64;
+}
+
+// Debug Configuration
+namespace Debug {
+  constexpr uint8_t HEADER_HEX_BYTES = 10;     // Number of bytes to show in hex dump for new files
 }
 
 // Hardware Pin Assignments (from Pinouts.md)
@@ -129,8 +134,11 @@ namespace Timing {
 // Buffer and Memory Configuration
 namespace Buffer {
   constexpr uint16_t RING_BUFFER_SIZE = 512;          // Main parallel port ring buffer
+  constexpr uint16_t DATA_CHUNK_SIZE = 512;           // Data chunk size (matches ring buffer for optimal transfer)
   constexpr uint16_t EEPROM_BUFFER_SIZE = 64;         // EEPROM write buffer (64 * 4 bytes = 256 bytes)
   constexpr uint32_t CRITICAL_TIMEOUT_MS = 20000;     // 20 seconds emergency timeout
+  constexpr uint32_t CHUNK_SEND_TIMEOUT_MS = 50;      // Send partial chunks after 50ms of data collection
+  constexpr uint16_t MIN_CHUNK_SIZE = 64;             // Minimum chunk size to send (unless timeout or EOF)
   
   // Flow control thresholds (percentages as fractions) - OPTIMIZED FOR TDS2024
   constexpr uint8_t FLOW_CONTROL_50_PERCENT = 1;      // 1/2 = 50% moderate threshold (was 60%)
