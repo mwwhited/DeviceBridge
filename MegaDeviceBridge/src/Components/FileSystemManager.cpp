@@ -15,7 +15,7 @@ FileSystemManager::FileSystemManager()
       _eepromBufferIndex(0), _activeStorage(Common::StorageType::AUTO_SELECT),
       _preferredStorage(Common::StorageType::SD_CARD), _fileCounter(0), _fileType(Common::FileType::AUTO_DETECT),
       _detectedFileType(Common::FileType::AUTO_DETECT), _totalBytesWritten(0), _currentFileBytesWritten(0), 
-      _writeErrors(0), _isFileOpen(false) {
+      _writeErrors(0), _isFileOpen(false), _lastSDCardDetectState(false), _lastSDCardCheckTime(0) {
     memset(_currentFilename, 0, sizeof(_currentFilename));
 }
 
@@ -24,6 +24,10 @@ FileSystemManager::~FileSystemManager() { stop(); }
 bool FileSystemManager::initialize() {
     _sdAvailable = initializeSD();
     _eepromAvailable = initializeEEPROM();
+    
+    // Initialize hot-swap detection state
+    _lastSDCardDetectState = checkSDCardPresence();
+    _lastSDCardCheckTime = millis();
 
     // Select initial storage type
     if (_preferredStorage.value == Common::StorageType::SD_CARD && _sdAvailable) {
@@ -43,8 +47,22 @@ bool FileSystemManager::initialize() {
 }
 
 void FileSystemManager::update(unsigned long currentTime) {
-    // Periodic storage health check (called from main loop)
-    // Can be used for background maintenance tasks if needed
+    // Check for SD card hot-swap every 1 second
+    if (currentTime - _lastSDCardCheckTime >= 1000) {
+        bool currentSDCardState = checkSDCardPresence();
+        
+        // SD card was inserted
+        if (currentSDCardState && !_lastSDCardDetectState) {
+            handleSDCardInsertion();
+        }
+        // SD card was removed
+        else if (!currentSDCardState && _lastSDCardDetectState) {
+            handleSDCardRemoval();
+        }
+        
+        _lastSDCardDetectState = currentSDCardState;
+        _lastSDCardCheckTime = currentTime;
+    }
 }
 
 void FileSystemManager::stop() { closeCurrentFile(); }
@@ -653,6 +671,62 @@ void FileSystemManager::printDependencyStatus() const {
 unsigned long FileSystemManager::getUpdateInterval() const {
     auto configService = getServices().getConfigurationService();
     return configService ? configService->getFileSystemInterval() : 10; // Default 10ms
+}
+
+// Hot-swap detection methods
+bool FileSystemManager::checkSDCardPresence() {
+    // Use SD Card Detect pin (active LOW)
+    // If SD_CD pin is LOW, card is present
+    return digitalRead(Common::Pins::SD_CD) == LOW;
+}
+
+void FileSystemManager::handleSDCardInsertion() {
+    Serial.print(F("SD Card inserted - attempting re-initialization...\r\n"));
+    
+    // Attempt to re-initialize SD card
+    bool initSuccess = initializeSD();
+    
+    if (initSuccess) {
+        _sdAvailable = true;
+        Serial.print(F("SD Card re-initialization successful!\r\n"));
+        sendDisplayMessage(Common::DisplayMessage::INFO, F("SD Card Ready"));
+        
+        // If we were previously using EEPROM due to SD failure,
+        // and user prefers SD, switch back to SD
+        if (_preferredStorage.value == Common::StorageType::SD_CARD && 
+            _activeStorage.value != Common::StorageType::SD_CARD) {
+            Serial.print(F("Switching back to preferred SD storage\r\n"));
+            setStorageType(Common::StorageType(Common::StorageType::SD_CARD));
+        }
+    } else {
+        _sdAvailable = false;
+        Serial.print(F("SD Card re-initialization failed\r\n"));
+        sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Init Failed"));
+    }
+}
+
+void FileSystemManager::handleSDCardRemoval() {
+    Serial.print(F("SD Card removed\r\n"));
+    
+    // Close any open file on SD card
+    if (_isFileOpen && _activeStorage.value == Common::StorageType::SD_CARD) {
+        closeCurrentFile();
+        Serial.print(F("Closed file due to SD card removal\r\n"));
+    }
+    
+    _sdAvailable = false;
+    sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Card Removed"));
+    
+    // If we were using SD card and it's removed, switch to fallback storage
+    if (_activeStorage.value == Common::StorageType::SD_CARD) {
+        if (_eepromAvailable) {
+            Serial.print(F("Switching to EEPROM storage\r\n"));
+            setStorageType(Common::StorageType(Common::StorageType::EEPROM));
+        } else {
+            Serial.print(F("No fallback storage available\r\n"));
+            setStorageType(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
+        }
+    }
 }
 
 } // namespace DeviceBridge::Components

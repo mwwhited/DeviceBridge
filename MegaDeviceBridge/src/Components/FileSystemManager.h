@@ -26,6 +26,10 @@ private:
     bool _sdAvailable;
     bool _eepromAvailable;
     
+    // Hot-swap detection
+    bool _lastSDCardDetectState;
+    uint32_t _lastSDCardCheckTime;
+    
     // EEPROM file management
     uint32_t _eepromCurrentAddress;
     uint32_t _eepromWriteBuffer[Common::Buffer::EEPROM_BUFFER_SIZE]; // 256-byte buffer (64 * 4 bytes)
@@ -45,6 +49,11 @@ private:
     bool initializeEEPROM();
     bool writeDataChunk(const Common::DataChunk& chunk);
     bool closeCurrentFile();
+    
+    // Hot-swap detection
+    bool checkSDCardPresence();
+    void handleSDCardInsertion();
+    void handleSDCardRemoval();
     
     // Storage management
     bool switchStorage(Common::StorageType newType);
