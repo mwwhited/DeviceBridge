@@ -40,7 +40,7 @@ private:
     uint8_t _menuSelection;
     
     // Display management
-    void updateDisplay();
+    void updateDisplay(unsigned long currentTime);
     void processMessage(const Common::DisplayMessage& msg);
     void showMainScreen();
     void showTimeDisplay(const char* timeStr);

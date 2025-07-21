@@ -42,7 +42,7 @@ namespace DeviceBridge::Components
         {
             handleButtonPress(buttonValue);
             _lastButtonState = buttonValue;
-            _lastButtonTime = millis();
+            _lastButtonTime = currentTime;
         }
         else if (buttonValue == config->getButtonNoneValue())
         {
@@ -53,7 +53,7 @@ namespace DeviceBridge::Components
         uint32_t updateInterval = _storageOperationActive ? _storageUpdateInterval : _normalUpdateInterval;
         
         if (currentTime - _lastDisplayUpdate >= updateInterval) {
-            updateDisplay();
+            updateDisplay(currentTime);
             _lastDisplayUpdate = currentTime;
         }
     }
@@ -75,11 +75,11 @@ namespace DeviceBridge::Components
         }
     }
 
-    void DisplayManager::updateDisplay()
+    void DisplayManager::updateDisplay(unsigned long currentTime)
     {
         auto timeManager = getServices().getTimeManager();
         // Check if we should show time when truly idle (not in menu, not during storage operations)
-        if (!_inMenu && !_storageOperationActive && (millis() - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
+        if (!_inMenu && !_storageOperationActive && (currentTime - _lastMessageTime) > Common::Display::IDLE_TIME_MS)
         {
             if (!_showingTime)
             {
