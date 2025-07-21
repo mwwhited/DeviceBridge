@@ -616,7 +616,7 @@ namespace DeviceBridge::Components
     }
 
     unsigned long DisplayManager::getUpdateInterval() const {
-        return _cachedConfigurationService ? _cachedConfigurationService->getDisplayInterval() : 100; // Default 100ms
+        return _cachedConfigurationService->getDisplayInterval(); // Default 100ms
     }
 
 } // namespace DeviceBridge::Components

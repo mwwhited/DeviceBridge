@@ -459,7 +459,7 @@ DeviceBridge::Parallel::HardwareFlowControl::Statistics ParallelPortManager::get
 }
 
 unsigned long ParallelPortManager::getUpdateInterval() const {
-    return _cachedConfigurationService ? _cachedConfigurationService->getParallelInterval() : 1; // Default 1ms for real-time
+    return _cachedConfigurationService->getParallelInterval(); // Default 1ms for real-time
 }
 
 } // namespace DeviceBridge::Components

@@ -201,7 +201,7 @@ void TimeManager::printDependencyStatus() const {
 }
 
 unsigned long TimeManager::getUpdateInterval() const {
-    return _cachedConfigurationService ? _cachedConfigurationService->getTimeInterval() : 1000; // Default 1 second
+    return _cachedConfigurationService->getTimeInterval();
 }
 
 } // namespace DeviceBridge::Components

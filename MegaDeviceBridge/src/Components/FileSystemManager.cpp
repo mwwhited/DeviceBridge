@@ -706,7 +706,7 @@ void FileSystemManager::printDependencyStatus() const {
 
 unsigned long FileSystemManager::getUpdateInterval() const {
     // Use cached configuration service pointer
-    return _cachedConfigurationService ? _cachedConfigurationService->getFileSystemInterval() : 10; // Default 10ms
+    return _cachedConfigurationService->getFileSystemInterval(); // Default 10ms
 }
 
 // Hot-swap detection methods

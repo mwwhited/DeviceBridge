@@ -430,7 +430,7 @@ void SystemManager::printDependencyStatus() const {
 
 unsigned long SystemManager::getUpdateInterval() const {
     // Use cached configuration service pointer
-    return _cachedConfigurationService ? _cachedConfigurationService->getSystemInterval() : 5000; // Default 5 seconds
+    return _cachedConfigurationService->getSystemInterval(); // Default 5 seconds
 }
 
 } // namespace DeviceBridge::Components
