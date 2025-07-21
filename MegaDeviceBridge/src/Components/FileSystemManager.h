@@ -6,6 +6,10 @@
 #include "../Common/Types.h"
 #include "../Common/Config.h"
 #include "../Common/ServiceLocator.h"
+#include "../Storage/IFileSystem.h"
+#include "../Storage/SDCardFileSystem.h"
+#include "../Storage/EEPROMFileSystem.h"
+#include "../Storage/SerialTransferFileSystem.h"
 
 namespace DeviceBridge::Components {
 
@@ -18,7 +22,13 @@ class FileSystemManager : public DeviceBridge::IComponent {
 private:
     // Note: No longer storing direct references - using ServiceLocator
     
-    // Storage instances  
+    // Modular storage instances using IFileSystem interface
+    Storage::SDCardFileSystem _sdCardFileSystem;
+    Storage::EEPROMFileSystem _eepromFileSystem;
+    Storage::SerialTransferFileSystem _serialTransferFileSystem;
+    Storage::IFileSystem* _activeFileSystem;
+    
+    // Legacy compatibility (to be removed)
     File _currentFile;
     W25Q128Manager _eeprom;
     
@@ -44,11 +54,16 @@ private:
     Common::FileType _detectedFileType;  // Auto-detected file type (if auto-detection enabled)
     bool _isFileOpen;
     
-    // Storage operations
+    // Storage operations (legacy)
     bool initializeSD();
     bool initializeEEPROM();
     bool writeDataChunk(const Common::DataChunk& chunk);
     bool closeCurrentFile();
+    
+    // Modular storage operations
+    bool initializeFileSystem();
+    bool selectActiveFileSystem(Common::StorageType storageType);
+    Storage::IFileSystem* getFileSystemForType(Common::StorageType storageType);
     
     // Hot-swap detection
     bool checkSDCardPresence();

@@ -11,7 +11,7 @@
 namespace DeviceBridge::Components {
 
 FileSystemManager::FileSystemManager()
-    : _eeprom(Common::Pins::EEPROM_CS), _sdAvailable(false), _eepromAvailable(false), _eepromCurrentAddress(0),
+    : _activeFileSystem(nullptr), _eeprom(Common::Pins::EEPROM_CS), _sdAvailable(false), _eepromAvailable(false), _eepromCurrentAddress(0),
       _eepromBufferIndex(0), _activeStorage(Common::StorageType::AUTO_SELECT),
       _preferredStorage(Common::StorageType::SD_CARD), _fileCounter(0), _fileType(Common::FileType::AUTO_DETECT),
       _detectedFileType(Common::FileType::AUTO_DETECT), _totalBytesWritten(0), _currentFileBytesWritten(0), 
@@ -22,6 +22,13 @@ FileSystemManager::FileSystemManager()
 FileSystemManager::~FileSystemManager() { stop(); }
 
 bool FileSystemManager::initialize() {
+    // Initialize modular file system
+    if (!initializeFileSystem()) {
+        sendDisplayMessage(Common::DisplayMessage::ERROR, F("FileSystem Init Failed"));
+        return false;
+    }
+    
+    // Legacy initialization for compatibility
     _sdAvailable = initializeSD();
     _eepromAvailable = initializeEEPROM();
     
@@ -29,7 +36,7 @@ bool FileSystemManager::initialize() {
     _lastSDCardDetectState = checkSDCardPresence();
     _lastSDCardCheckTime = millis();
 
-    // Select initial storage type
+    // Select initial storage type and active file system
     if (_preferredStorage.value == Common::StorageType::SD_CARD && _sdAvailable) {
         _activeStorage = Common::StorageType::SD_CARD;
     } else if (_preferredStorage.value == Common::StorageType::EEPROM && _eepromAvailable) {
@@ -42,8 +49,11 @@ bool FileSystemManager::initialize() {
         _activeStorage = Common::StorageType::SERIAL_TRANSFER;
         sendDisplayMessage(Common::DisplayMessage::ERROR, F("No Storage!"));
     }
+    
+    // Set active file system based on selected storage
+    selectActiveFileSystem(_activeStorage);
 
-    return _sdAvailable || _eepromAvailable;
+    return _sdAvailable || _eepromAvailable || _activeFileSystem != nullptr;
 }
 
 void FileSystemManager::update(unsigned long currentTime) {
@@ -466,44 +476,63 @@ void FileSystemManager::sendDisplayMessage(Common::DisplayMessage::Type type, co
 
 void FileSystemManager::setStorageType(Common::StorageType type) {
     if (_activeStorage.value != type.value) {
-        closeCurrentFile(); // Close any open file before switching
-        _activeStorage.value = type.value;
+        // Use modular file system switching
+        if (selectActiveFileSystem(type)) {
+            Serial.print(F("Successfully switched to storage: "));
+            Serial.print(_activeFileSystem->getStorageName());
+            Serial.print(F("\r\n"));
+        } else {
+            // Fallback to legacy method for compatibility
+            closeCurrentFile(); // Close any open file before switching
+            _activeStorage.value = type.value;
 
-        // Verify the new storage type is available
-        switch (type.value) {
-        case Common::StorageType::SD_CARD:
-            if (!_sdAvailable) {
-                sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Not Available"));
-                _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
+            // Verify the new storage type is available
+            switch (type.value) {
+            case Common::StorageType::SD_CARD:
+                if (!_sdAvailable) {
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, F("SD Not Available"));
+                    _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
+                    selectActiveFileSystem(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
+                }
+                break;
+
+            case Common::StorageType::EEPROM:
+                if (!_eepromAvailable) {
+                    sendDisplayMessage(Common::DisplayMessage::ERROR, F("EEPROM Not Available"));
+                    _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
+                    selectActiveFileSystem(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
+                }
+                break;
+
+            case Common::StorageType::SERIAL_TRANSFER:
+                // Always available
+                selectActiveFileSystem(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
+                break;
+
+            case Common::StorageType::AUTO_SELECT:
+                if (_sdAvailable) {
+                    _activeStorage.value = Common::StorageType::SD_CARD;
+                    selectActiveFileSystem(Common::StorageType(Common::StorageType::SD_CARD));
+                } else if (_eepromAvailable) {
+                    _activeStorage.value = Common::StorageType::EEPROM;
+                    selectActiveFileSystem(Common::StorageType(Common::StorageType::EEPROM));
+                } else {
+                    _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
+                    selectActiveFileSystem(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
+                }
+                break;
             }
-            break;
-
-        case Common::StorageType::EEPROM:
-            if (!_eepromAvailable) {
-                sendDisplayMessage(Common::DisplayMessage::ERROR, F("EEPROM Not Available"));
-                _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
-            }
-            break;
-
-        case Common::StorageType::SERIAL_TRANSFER:
-            // Always available
-            break;
-
-        case Common::StorageType::AUTO_SELECT:
-            if (_sdAvailable) {
-                _activeStorage.value = Common::StorageType::SD_CARD;
-            } else if (_eepromAvailable) {
-                _activeStorage.value = Common::StorageType::EEPROM;
-            } else {
-                _activeStorage.value = Common::StorageType::SERIAL_TRANSFER;
-            }
-            break;
         }
     }
 }
 
 uint32_t FileSystemManager::getFilesStored() const {
-    // Return count based on active storage type
+    // Use modular file system if available
+    if (_activeFileSystem && _activeFileSystem->isAvailable()) {
+        return _activeFileSystem->getFileCount();
+    }
+    
+    // Fallback to legacy method
     switch (_activeStorage.value) {
     case Common::StorageType::SD_CARD:
         return getSDCardFileCount();
@@ -726,6 +755,80 @@ void FileSystemManager::handleSDCardRemoval() {
             Serial.print(F("No fallback storage available\r\n"));
             setStorageType(Common::StorageType(Common::StorageType::SERIAL_TRANSFER));
         }
+    }
+}
+
+// Modular file system implementation
+bool FileSystemManager::initializeFileSystem() {
+    bool sdInit = _sdCardFileSystem.initialize();
+    bool eepromInit = _eepromFileSystem.initialize();
+    bool serialInit = _serialTransferFileSystem.initialize();
+    
+    if (!sdInit) {
+        Serial.print(F("SD Card file system initialization failed\r\n"));
+    }
+    if (!eepromInit) {
+        Serial.print(F("EEPROM file system initialization failed\r\n"));
+    }
+    if (!serialInit) {
+        Serial.print(F("Serial Transfer file system initialization failed\r\n"));
+    }
+    
+    // At least one file system must be available
+    return sdInit || eepromInit || serialInit;
+}
+
+bool FileSystemManager::selectActiveFileSystem(Common::StorageType storageType) {
+    Storage::IFileSystem* newFileSystem = getFileSystemForType(storageType);
+    
+    if (!newFileSystem) {
+        Serial.print(F("No file system available for storage type: "));
+        Serial.print(storageType.value);
+        Serial.print(F("\r\n"));
+        return false;
+    }
+    
+    if (!newFileSystem->isAvailable()) {
+        Serial.print(F("File system not available for storage type: "));
+        Serial.print(storageType.value);
+        Serial.print(F("\r\n"));
+        return false;
+    }
+    
+    // Close any open file in the current file system
+    if (_activeFileSystem && _activeFileSystem->hasActiveFile()) {
+        _activeFileSystem->closeFile();
+    }
+    
+    _activeFileSystem = newFileSystem;
+    _activeStorage = storageType;
+    
+    Serial.print(F("Switched to file system: "));
+    Serial.print(_activeFileSystem->getStorageName());
+    Serial.print(F("\r\n"));
+    
+    return true;
+}
+
+Storage::IFileSystem* FileSystemManager::getFileSystemForType(Common::StorageType storageType) {
+    switch (storageType.value) {
+        case Common::StorageType::SD_CARD:
+            return &_sdCardFileSystem;
+        case Common::StorageType::EEPROM:
+            return &_eepromFileSystem;
+        case Common::StorageType::SERIAL_TRANSFER:
+            return &_serialTransferFileSystem;
+        case Common::StorageType::AUTO_SELECT:
+            // Return the first available file system
+            if (_sdCardFileSystem.isAvailable()) {
+                return &_sdCardFileSystem;
+            } else if (_eepromFileSystem.isAvailable()) {
+                return &_eepromFileSystem;
+            } else {
+                return &_serialTransferFileSystem;
+            }
+        default:
+            return nullptr;
     }
 }
 
