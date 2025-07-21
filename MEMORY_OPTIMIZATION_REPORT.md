@@ -496,7 +496,7 @@ Uptime: 0 seconds
 Total Errors: 0
 Commands Processed: 0
 === Memory Info ===
-Free SRAM: 2252 bytes
+Free SRAM: 2259 bytes
 
 === Component Status ===
 SD Card: Available
