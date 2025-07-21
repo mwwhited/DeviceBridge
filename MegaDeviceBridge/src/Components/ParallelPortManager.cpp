@@ -5,6 +5,9 @@
 #include "../Common/ConfigurationService.h"
 #include <string.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "ParallelPortManager";
+
 namespace DeviceBridge::Components {
 
 ParallelPortManager::ParallelPortManager(Parallel::Port &port)
@@ -426,7 +429,11 @@ bool ParallelPortManager::selfTest() {
     return result;
 }
 
-const char *ParallelPortManager::getComponentName() const { return "ParallelPortManager"; }
+const char *ParallelPortManager::getComponentName() const { 
+    static char name_buffer[24];
+    strcpy_P(name_buffer, component_name);
+    return name_buffer;
+}
 
 bool ParallelPortManager::validateDependencies() const {
     bool valid = true;

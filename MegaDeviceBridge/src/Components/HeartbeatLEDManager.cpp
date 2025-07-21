@@ -3,6 +3,9 @@
 #include <Arduino.h>
 #include <string.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "HeartbeatLEDManager";
+
 namespace DeviceBridge::Components {
 
 // Initialize SOS pattern array
@@ -211,7 +214,9 @@ bool HeartbeatLEDManager::selfTest() {
 }
 
 const char* HeartbeatLEDManager::getComponentName() const {
-    return "HeartbeatLEDManager";
+    static char name_buffer[24];
+    strcpy_P(name_buffer, component_name);
+    return name_buffer;
 }
 
 bool HeartbeatLEDManager::validateDependencies() const {

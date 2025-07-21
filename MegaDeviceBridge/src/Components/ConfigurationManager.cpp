@@ -8,6 +8,9 @@
 #include <Arduino.h>
 #include <string.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "ConfigurationManager";
+
 namespace DeviceBridge::Components {
 
 ConfigurationManager::ConfigurationManager() : _lastCommandCheck(0) {}
@@ -1313,7 +1316,11 @@ bool ConfigurationManager::selfTest() {
     return result;
 }
 
-const char *ConfigurationManager::getComponentName() const { return "ConfigurationManager"; }
+const char *ConfigurationManager::getComponentName() const { 
+    static char name_buffer[24];
+    strcpy_P(name_buffer, component_name);
+    return name_buffer;
+}
 
 bool ConfigurationManager::validateDependencies() const {
     bool valid = true;

@@ -7,6 +7,9 @@
 #include <Arduino.h>
 #include <string.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "SystemManager";
+
 // Memory management globals
 extern int __heap_start;
 extern int *__brkval;
@@ -359,7 +362,11 @@ bool SystemManager::selfTest() {
     return result;
 }
 
-const char *SystemManager::getComponentName() const { return "SystemManager"; }
+const char *SystemManager::getComponentName() const { 
+    static char name_buffer[24];
+    strcpy_P(name_buffer, component_name);
+    return name_buffer;
+}
 
 bool SystemManager::validateDependencies() const {
     bool valid = true;

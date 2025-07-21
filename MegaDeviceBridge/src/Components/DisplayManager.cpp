@@ -7,6 +7,9 @@
 #include <string.h>
 #include <Arduino.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "DisplayManager";
+
 namespace DeviceBridge::Components
 {
 
@@ -553,7 +556,9 @@ namespace DeviceBridge::Components
 
     const char *DisplayManager::getComponentName() const
     {
-        return "DisplayManager";
+        static char name_buffer[24];
+        strcpy_P(name_buffer, component_name);
+        return name_buffer;
     }
 
     bool DisplayManager::validateDependencies() const

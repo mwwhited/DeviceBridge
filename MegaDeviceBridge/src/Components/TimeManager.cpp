@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "TimeManager";
+
 namespace DeviceBridge::Components {
 
 TimeManager::TimeManager() : _rtcAvailable(false), _lastTimeUpdate(0), _timeValid(false) {}
@@ -171,7 +174,9 @@ bool TimeManager::selfTest() {
 }
 
 const char* TimeManager::getComponentName() const {
-    return "TimeManager";
+    static char name_buffer[24];
+    strcpy_P(name_buffer, component_name);
+    return name_buffer;
 }
 
 bool TimeManager::validateDependencies() const {

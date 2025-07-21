@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <string.h>
 
+// PROGMEM component name for memory optimization
+static const char component_name[] PROGMEM = "FileSystemManager";
+
 namespace DeviceBridge::Components {
 
 FileSystemManager::FileSystemManager()
@@ -663,7 +666,11 @@ bool FileSystemManager::selfTest() {
     return result;
 }
 
-const char *FileSystemManager::getComponentName() const { return "FileSystemManager"; }
+const char *FileSystemManager::getComponentName() const { 
+    static char name_buffer[24];
+    strcpy_P(name_buffer, component_name);
+    return name_buffer;
+}
 
 bool FileSystemManager::validateDependencies() const {
     bool valid = true;
