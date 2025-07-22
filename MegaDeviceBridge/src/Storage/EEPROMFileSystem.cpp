@@ -98,6 +98,15 @@ bool EEPROMFileSystem::createFile(const char* filename) {
     uint32_t fileAddress = findNextFreeFileAddress();
     Serial.print(F("EEPROM: File address: 0x"));
     Serial.println(fileAddress, HEX);
+    Serial.print(F("EEPROM: FLASH_SIZE: "));
+    Serial.println(FLASH_SIZE);
+    Serial.print(F("EEPROM: Space check: "));
+    Serial.print(fileAddress + 1024);
+    Serial.print(F(" > "));
+    Serial.print(FLASH_SIZE);
+    Serial.print(F(" = "));
+    Serial.println((fileAddress + 1024 > FLASH_SIZE) ? F("TRUE") : F("FALSE"));
+    
     if (fileAddress + 1024 > FLASH_SIZE) { // Ensure minimum space
         Serial.println(F("EEPROM: ❌ Not enough space"));
         setError(FileSystemErrors::INSUFFICIENT_SPACE, "Not enough flash space");
@@ -421,7 +430,7 @@ int EEPROMFileSystem::scanForFile(const char* filename) {
 int EEPROMFileSystem::findFreeDirectorySlot() {
     for (int i = 0; i < MAX_FILES; i++) {
         DirectoryEntry entry;
-        if (!readDirectoryEntry(i, entry) || entry.reserved == FLAG_UNUSED || entry.reserved == FLAG_DELETED) {
+        if (!readDirectoryEntry(i, entry) || entry.reserved == FLAG_UNUSED || entry.reserved == FLAG_DELETED || entry.reserved == 0xFFFFFFFF) {
             return i;
         }
     }
@@ -456,7 +465,7 @@ bool EEPROMFileSystem::writeDirectoryEntry(int index, const DirectoryEntry& entr
     if (!_eeprom.readData(address, (uint8_t*)&testEntry, sizeof(testEntry))) {
         Serial.println(F("EEPROM: ⚠️ Read failed, assuming needs erase"));
         needsErase = true;
-    } else if (testEntry.reserved != FLAG_UNUSED) {
+    } else if (testEntry.reserved != FLAG_UNUSED && testEntry.reserved != 0xFFFFFFFF) {
         Serial.print(F("EEPROM: Entry not unused ("));
         Serial.print(testEntry.reserved);
         Serial.println(F("), needs erase"));

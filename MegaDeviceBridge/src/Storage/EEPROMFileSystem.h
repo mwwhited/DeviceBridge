@@ -16,32 +16,34 @@ namespace DeviceBridge::Storage {
  * - Optimized for Arduino Mega memory constraints
  */
 class EEPROMFileSystem : public IFileSystem {
+public:
+    // Filesystem constants (public for older C++ standard compatibility)
+    static constexpr uint32_t FLASH_SIZE = 16UL * 1024UL * 1024UL;  // 16MB W25Q128
+    static constexpr uint32_t SECTOR_SIZE = 4096UL;             // 4KB sectors
+    static constexpr uint8_t FILENAME_LENGTH = 32;            // "20250722/161810.bin" + margin
+    static constexpr uint32_t DIRECTORY_ENTRIES_PER_SECTOR = SECTOR_SIZE / 48UL;  // 85 entries per sector
+    static constexpr uint32_t MAX_FILES = 256UL;                // Total file limit
+    static constexpr uint32_t FILE_DATA_START = 8192UL;        // Start after 2 directory sectors
+
 private:
+    
     DeviceBridge::Components::W25Q128Manager _eeprom;
     bool _initialized;
     bool _mounted;
     uint32_t _currentFileAddress;
     uint32_t _currentFileSize;
-    char _currentFilename[16]; // Reduced size for "00001122\334455.EXT"
+    char _currentFilename[FILENAME_LENGTH]; // Full path support "20250722/161810.bin"
     
-    // Filesystem constants
-    static constexpr uint32_t FLASH_SIZE = 16 * 1024 * 1024;  // 16MB W25Q128
-    static constexpr uint32_t SECTOR_SIZE = 4096;             // 4KB sectors
-    static constexpr uint32_t DIRECTORY_ENTRIES_PER_SECTOR = SECTOR_SIZE / 32;  // 128 entries per sector
-    static constexpr uint32_t MAX_FILES = 256;                // Total file limit
-    static constexpr uint8_t FILENAME_LENGTH = 20;            // "00001122\334455.EXT"
-    static constexpr uint32_t FILE_DATA_START = 8192;        // Start after 2 directory sectors
-    
-    // Compact directory entry (32 bytes)
+    // Compact directory entry (48 bytes)
     struct DirectoryEntry {
-        char filename[FILENAME_LENGTH]; // 20 bytes - "00001122\334455.EXT"
+        char filename[FILENAME_LENGTH]; // 32 bytes - "20250722/161810.bin" + margin
         uint32_t address;              // 4 bytes - file start address
         uint32_t size;                 // 4 bytes - file size
         uint32_t crc32;                // 4 bytes - filename CRC for quick lookup
         uint32_t reserved;             // 4 bytes - reserved/flags
     } __attribute__((packed));
     
-    static_assert(sizeof(DirectoryEntry) == 36, "DirectoryEntry must be 36 bytes");
+    static_assert(sizeof(DirectoryEntry) == 48, "DirectoryEntry must be 48 bytes");
     
     // File flags in reserved field
     static constexpr uint32_t FLAG_UNUSED = 0x00000000;
