@@ -191,6 +191,92 @@ private:
 - **Debug System**: Complete parallel port debug logging for troubleshooting
 - **Production Status**: Critical blocking issue resolved for real TDS2024 integration
 
+## EEPROM Filesystem Development Patterns ⭐⭐⭐⭐⭐⭐⭐⭐⭐ (2025-07-22)
+
+### Ultra-Minimal Memory Architecture - REVOLUTIONARY ✅
+**BREAKTHROUGH: 97.6% RAM reduction achieved through zero directory caching**
+
+#### Memory Optimization Principles (MANDATORY)
+```cpp
+// ❌ WRONG: Memory-intensive directory caching
+class EEPROMFileSystem {
+    DirectoryEntry _directory[MAX_FILES];  // 672 bytes RAM - AVOID!
+    bool _directoryLoaded;
+    bool _directoryModified;
+};
+
+// ✅ CORRECT: Ultra-minimal with on-demand scanning  
+class EEPROMFileSystem {
+    char _currentFilename[16];            // Only 16 bytes RAM
+    // All directory access via direct EEPROM scanning
+};
+```
+
+#### On-Demand Directory Access Pattern
+```cpp
+// File operations scan EEPROM directly - zero RAM caching
+bool listFiles(char* buffer, uint16_t bufferSize) {
+    uint16_t offset = 0;
+    // Real-time EEPROM scanning - no RAM directory needed
+    for (int i = 0; i < MAX_FILES; i++) {
+        DirectoryEntry entry;
+        if (readDirectoryEntry(i, entry) && entry.reserved == FLAG_USED) {
+            offset += snprintf(buffer + offset, bufferSize - offset,
+                             "  %s (%lu bytes)\r\n", entry.filename, entry.size);
+        }
+    }
+    return true;
+}
+```
+
+#### CRC32 Optimization for Fast Lookups
+```cpp
+// Fast filename searches using hash pre-filtering
+int scanForFile(const char* filename) {
+    uint32_t targetCrc = calculateCRC32(filename);
+    
+    for (int i = 0; i < MAX_FILES; i++) {
+        DirectoryEntry entry;
+        if (readDirectoryEntry(i, entry)) {
+            // CRC32 pre-filter before expensive string comparison
+            if (entry.reserved == FLAG_USED && entry.crc32 == targetCrc && 
+                strcmp(entry.filename, filename) == 0) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+```
+
+#### Filename Format Validation
+```cpp
+// Enforce strict "00001122\\334455.EXT" format
+bool isValidFilename(const char* filename) {
+    size_t len = strlen(filename);
+    if (len < 14 || len >= FILENAME_LENGTH) return false;
+    
+    // Check format: 8 digits + backslash + 6 digits + dot + extension
+    for (int i = 0; i < 8; i++) {
+        if (!isdigit(filename[i])) return false;
+    }
+    if (filename[8] != '\\') return false;
+    for (int i = 9; i < 15; i++) {
+        if (!isdigit(filename[i])) return false;
+    }
+    if (filename[15] != '.') return false;
+    
+    return (len == 18 || len == 19); // Extension 2-3 chars
+}
+```
+
+### Memory Optimization Guidelines
+- **Zero Directory Caching**: Never store directory in RAM - scan EEPROM on-demand
+- **Minimal State Tracking**: Only track currently active file information
+- **CRC32 Pre-filtering**: Use hash-based lookups before string comparisons
+- **Format Enforcement**: Strict filename validation prevents corruption
+- **Compilation Compatibility**: Use explicit conditionals instead of min()/max()
+
 ## Performance-Optimized Component Development Pattern ⭐⭐⭐⭐⭐⭐⭐
 
 ### Component Implementation Steps (MANDATORY)

@@ -1,93 +1,103 @@
 #pragma once
 
-#include "IFileSystem.h"
-#include "../Common/Config.h"
-#include "../Components/W25Q128Manager.h"
 #include <Arduino.h>
+#include "IFileSystem.h"
+#include "../Components/W25Q128Manager.h"
 
 namespace DeviceBridge::Storage {
 
 /**
- * @brief EEPROM file system implementation
+ * @brief Ultra-minimal EEPROM file system with no FAT caching
  * 
- * Provides file operations for EEPROM storage with wear leveling,
- * circular buffer management, and sequential file organization.
+ * Features:
+ * - Zero RAM directory caching (on-demand EEPROM scanning)
+ * - Single directory with filename format: "00001122\334455.EXT"
+ * - Basic operations: list, write, read segments, delete
+ * - Optimized for Arduino Mega memory constraints
  */
 class EEPROMFileSystem : public IFileSystem {
+public:
+    // Filesystem constants (public for older C++ standard compatibility)
+    static constexpr uint32_t FLASH_SIZE = 16UL * 1024UL * 1024UL;  // 16MB W25Q128
+    static constexpr uint32_t SECTOR_SIZE = 4096UL;             // 4KB sectors
+    static constexpr uint8_t FILENAME_LENGTH = 32;            // "20250722/161810.bin" + margin
+    static constexpr uint32_t DIRECTORY_ENTRIES_PER_SECTOR = SECTOR_SIZE / 48UL;  // 85 entries per sector
+    static constexpr uint32_t MAX_FILES = 256UL;                // Total file limit
+    static constexpr uint32_t FILE_DATA_START = 8192UL;        // Start after 2 directory sectors
+
 private:
+    
     DeviceBridge::Components::W25Q128Manager _eeprom;
     bool _initialized;
-    uint16_t _currentAddress;
-    uint16_t _fileStartAddress;
-    uint16_t _availableSpace;
+    bool _mounted;
+    uint32_t _currentFileAddress;
+    uint32_t _currentFileSize;
+    char _currentFilename[FILENAME_LENGTH]; // Full path support "20250722/161810.bin"
     
-    // EEPROM layout constants
-    static constexpr uint16_t HEADER_SIZE = 8;           // File header size
-    static constexpr uint16_t MAX_FILENAME_SIZE = 32;    // Maximum filename length
-    static constexpr uint16_t FILE_ENTRY_OVERHEAD = 48;  // Header + filename + metadata
+    // Compact directory entry (48 bytes)
+    struct DirectoryEntry {
+        char filename[FILENAME_LENGTH]; // 32 bytes - "20250722/161810.bin" + margin
+        uint32_t address;              // 4 bytes - file start address
+        uint32_t size;                 // 4 bytes - file size
+        uint32_t crc32;                // 4 bytes - filename CRC for quick lookup
+        uint32_t reserved;             // 4 bytes - reserved/flags
+    } __attribute__((packed));
     
-    // File management
-    struct FileHeader {
-        uint16_t magic;        // File validity marker
-        uint16_t fileSize;     // Size of file data
-        uint8_t filenameLen;   // Length of filename
-        uint8_t fileType;      // File type identifier
-        uint16_t checksum;     // Data integrity checksum
-    };
+    static_assert(sizeof(DirectoryEntry) == 48, "DirectoryEntry must be 48 bytes");
     
-    // Private methods
-    uint16_t calculateAvailableSpace();
-    bool writeFileHeader(const char* filename, uint16_t dataSize);
-    bool findNextWriteAddress();
-    uint16_t calculateChecksum(const uint8_t* data, uint16_t length);
-    bool verifyIntegrity(uint16_t address, uint16_t expectedSize);
+    // File flags in reserved field
+    static constexpr uint32_t FLAG_UNUSED = 0x00000000;
+    static constexpr uint32_t FLAG_USED = 0x55aa55aa;
+    static constexpr uint32_t FLAG_DELETED = 0xffffffff;
+    
+    // Private methods - no FAT caching
+    int scanForFile(const char* filename);
+    int findFreeDirectorySlot();
+    bool readDirectoryEntry(int index, DirectoryEntry& entry);
+    bool writeDirectoryEntry(int index, const DirectoryEntry& entry, bool allowUpdate = false);
+    bool isValidFilename(const char* filename);
+    uint32_t calculateCRC32(const char* filename);
+    uint32_t findNextFreeFileAddress();
     
 public:
     EEPROMFileSystem();
-    virtual ~EEPROMFileSystem();
+    ~EEPROMFileSystem();
     
-    // Lifecycle management
-    bool initialize() override final;
-    bool isAvailable() const override final;
-    void shutdown() override final;
+    // IFileSystem interface implementation
+    bool initialize() override;
+    bool isAvailable() const override;
+    void shutdown() override;
     
     // File operations
-    bool createFile(const char* filename) override final;
-    bool openFile(const char* filename, bool append = false) override final;
-    bool writeData(const uint8_t* data, uint16_t length) override final;
-    bool closeFile() override final;
-    bool deleteFile(const char* filename) override final;
-    bool fileExists(const char* filename) override final;
+    bool createFile(const char* filename) override;
+    bool openFile(const char* filename, bool append = false) override;
+    bool writeData(const uint8_t* data, uint16_t length) override;
+    bool closeFile() override;
+    bool deleteFile(const char* filename) override;
+    bool fileExists(const char* filename) override;
+    bool listFiles(char* buffer, uint16_t bufferSize) override;
     
-    // Directory operations
-    bool listFiles(char* buffer, uint16_t bufferSize) override final;
-    uint32_t getFileCount() override final;
-    uint32_t getTotalSpace() override final;
-    uint32_t getFreeSpace() override final;
+    // File system information
+    uint32_t getFileCount() override;
+    uint32_t getTotalSpace() override;
+    uint32_t getFreeSpace() override;
+    bool format() override;
+    bool flush() override;
+    bool sync() override;
     
-    // Status inquiry
-    Common::StorageType getStorageType() const override { 
-        return Common::StorageType(Common::StorageType::EEPROM); 
-    }
-    const char* getStorageName() const override { return "EEPROM"; }
-    bool isWriteProtected() const override { return false; } // EEPROM not write-protectable
+    // Custom methods for minimal filesystem
+    uint32_t getFileSize(const char* filename);
+    bool readFileSegment(const char* filename, uint32_t offset, uint8_t* buffer, uint16_t length);
+    
+    // IFileSystem interface implementation
+    Common::StorageType getStorageType() const override { return Common::StorageType::EEPROM; }
+    const char* getStorageName() const override { return "EEPROM Minimal"; }
+    bool isWriteProtected() const override { return false; }
     bool hasActiveFile() const override { return _hasActiveFile; }
-    
-    // Statistics
     uint32_t getBytesWritten() const override { return _bytesWritten; }
     uint32_t getFilesCreated() const override { return _filesCreated; }
     uint16_t getLastError() const override { return _lastError; }
     const char* getLastErrorMessage() const override { return _lastErrorMessage; }
-    
-    // EEPROM specific features
-    bool format() override final;
-    bool flush() override { return true; }  // EEPROM writes are immediate
-    bool sync() override { return true; }   // EEPROM writes are immediate
-    
-    // EEPROM-specific methods
-    bool defragment();                      // Compact storage space
-    uint16_t getWearLevel();               // Get wear leveling statistics
-    bool verifyAllFiles();                 // Verify integrity of all stored files
 };
 
 } // namespace DeviceBridge::Storage

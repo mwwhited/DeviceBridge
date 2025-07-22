@@ -90,6 +90,15 @@ namespace FileSystemErrors {
     static constexpr uint16_t HARDWARE_ERROR = 11;
     static constexpr uint16_t INVALID_FILENAME = 12;
     static constexpr uint16_t FILE_NOT_FOUND = 13;
+    // Additional error codes for LittleFS support
+    static constexpr uint16_t INVALID_PARAMETER = 14;
+    static constexpr uint16_t CORRUPTION_DETECTED = 15;
+    static constexpr uint16_t FILE_EXISTS = 16;
+    static constexpr uint16_t INVALID_PATH = 17;
+    static constexpr uint16_t DIRECTORY_NOT_EMPTY = 18;
+    static constexpr uint16_t FILE_TOO_LARGE = 19;
+    static constexpr uint16_t OUT_OF_MEMORY = 20;
+    static constexpr uint16_t UNKNOWN_ERROR = 21;
 }
 
 } // namespace DeviceBridge::Storage

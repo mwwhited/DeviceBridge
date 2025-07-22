@@ -86,6 +86,8 @@ public:
     bool isLCDDebugEnabled() const { return _debugFlags.lcdDebugEnabled; }
     void setParallelDebugEnabled(bool enabled) { _debugFlags.parallelDebugEnabled = enabled ? 1 : 0; }
     bool isParallelDebugEnabled() const { return _debugFlags.parallelDebugEnabled; }
+    void setEEPROMDebugEnabled(bool enabled) { _debugFlags.eepromDebugEnabled = enabled ? 1 : 0; }
+    bool isEEPROMDebugEnabled() const { return _debugFlags.eepromDebugEnabled; }
         
 private:
     // Statistics tracking
@@ -98,7 +100,8 @@ private:
         uint8_t serialHeartbeatEnabled : 1;
         uint8_t lcdDebugEnabled : 1;
         uint8_t parallelDebugEnabled : 1;
-        uint8_t reserved : 5;  // For future flags
+        uint8_t eepromDebugEnabled : 1;
+        uint8_t reserved : 4;  // For future flags
     } _debugFlags;
 };
 

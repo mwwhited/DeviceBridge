@@ -345,9 +345,27 @@ bool FileSystemManager::createNewFile() {
         break;
 
     case Common::StorageType::EEPROM:
-        // TODO: Implement EEPROM file creation
-        _flags.isFileOpen = false;
-        return false;
+        if (_flags.eepromAvailable) {
+            sendDisplayMessage(Common::DisplayMessage::INFO, _currentFilename);
+            
+            // Use the modular EEPROM filesystem
+            if (_eepromFileSystem.createFile(_currentFilename)) {
+                _flags.isFileOpen = true;
+                _currentFileBytesWritten = 0;
+                _fileCounter++;
+                sendDisplayMessage(Common::DisplayMessage::INFO, F("EEPROM File Created"));
+                return true;
+            } else {
+                sendDisplayMessage(Common::DisplayMessage::ERROR, F("EEPROM Create Failed"));
+                _flags.isFileOpen = false;
+                return false;
+            }
+        } else {
+            sendDisplayMessage(Common::DisplayMessage::ERROR, F("EEPROM Not Available"));
+            _flags.isFileOpen = false;
+            return false;
+        }
+        break;
 
     case Common::StorageType::SERIAL_TRANSFER:
         // For serial transfer, we'll send data directly
@@ -401,8 +419,14 @@ bool FileSystemManager::writeDataChunk(const Common::DataChunk &chunk) {
         break;
 
     case Common::StorageType::EEPROM:
-        // TODO: Implement EEPROM write
-        return false;
+        if (_eepromFileSystem.writeData(chunk.data, chunk.length)) {
+            _totalBytesWritten += chunk.length;
+            _currentFileBytesWritten += chunk.length;
+            success = true;
+        } else {
+            success = false;
+        }
+        break;
 
     case Common::StorageType::SERIAL_TRANSFER:
         // TODO: Implement serial transfer
@@ -438,7 +462,10 @@ bool FileSystemManager::closeCurrentFile() {
         break;
 
     case Common::StorageType::EEPROM:
-        // TODO: Implement EEPROM file close
+        result = _eepromFileSystem.closeFile();
+        if (result) {
+            _fileCounter++; // Increment counter for successful EEPROM file
+        }
         break;
 
     case Common::StorageType::SERIAL_TRANSFER:
@@ -461,7 +488,7 @@ bool FileSystemManager::closeCurrentFile() {
 }
 
 void FileSystemManager::generateFilename(char *buffer, size_t bufferSize) {
-    // Use timestamp-based filename format: yyyyMMddHHmmss.ext
+    // Use same timestamp-based filename format for all storage types
     generateTimestampFilename(buffer, bufferSize);
 }
 
@@ -610,6 +637,20 @@ bool FileSystemManager::isSDCardPresent() const {
 
 bool FileSystemManager::isSDWriteProtected() const {
     return digitalRead(Common::Pins::SD_WP) == HIGH; // Active HIGH
+}
+
+bool FileSystemManager::listEEPROMFiles(char* buffer, uint16_t bufferSize) const {
+    if (!buffer || bufferSize == 0) {
+        return false;
+    }
+    
+    if (!_flags.eepromAvailable) {
+        snprintf(buffer, bufferSize, "EEPROM not available\r\n");
+        return true;
+    }
+    
+    // Delegate to the EEPROM filesystem's listFiles method
+    return _eepromFileSystem.listFiles(buffer, bufferSize);
 }
 
 Common::FileType FileSystemManager::detectFileType(const uint8_t *data, uint16_t length) {
@@ -856,6 +897,10 @@ Storage::IFileSystem* FileSystemManager::getFileSystemForType(Common::StorageTyp
         default:
             return nullptr;
     }
+}
+
+bool FileSystemManager::formatEEPROM() {
+    return _eepromFileSystem.format();
 }
 
 } // namespace DeviceBridge::Components

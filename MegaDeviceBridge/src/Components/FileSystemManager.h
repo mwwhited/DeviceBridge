@@ -131,6 +131,10 @@ public:
     bool isSDCardPresent() const;     // Physical card detect
     bool isSDWriteProtected() const;  // Write protect detection
     
+    // EEPROM file operations
+    bool listEEPROMFiles(char* buffer, uint16_t bufferSize) const;
+    bool formatEEPROM();
+    
 private:
     // Helper methods
     uint32_t countFilesRecursive(const char* dirPath) const;

@@ -124,6 +124,8 @@ void ConfigurationManager::processCommand(const String &command) {
         printLastFileInfo();
     } else if (command.startsWith(F("list "))) {
         handleListCommand(command);
+    } else if (command.startsWith(F("format "))) {
+        handleFormatCommand(command);
     } else if (command.equalsIgnoreCase(F("restart")) || command.equalsIgnoreCase(F("reset"))) {
         Serial.print(F("Restarting system...\r\n"));
         delay(100);
@@ -159,8 +161,11 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  led l1/l2 on/off  - Control L1 (LPT) and L2 (Write) LEDs\r\n"));
     Serial.print(F("  debug lcd on/off      - Enable/disable LCD debug output to serial\r\n"));
     Serial.print(F("  debug parallel on/off - Enable/disable parallel port debug logging\r\n"));
+    Serial.print(F("  debug eeprom on/off   - Enable/disable EEPROM debug logging\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
     Serial.print(F("  list sd           - List all files on SD card\r\n"));
+    Serial.print(F("  list eeprom       - List all files on EEPROM\r\n"));
+    Serial.print(F("  format eeprom     - Format EEPROM filesystem (erases all files)\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage           - Show storage/hardware status\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
@@ -1132,9 +1137,52 @@ void ConfigurationManager::handleListCommand(const String &command) {
         Serial.print(totalSize);
         Serial.print(F(" bytes\r\n"));
         Serial.print(F("=============================\r\n"));
+    } else if (target == F("eeprom")) {
+        Serial.print(F("\r\n=== EEPROM File Listing ===\r\n"));
+        
+        // Check EEPROM status first
+        if (!_cachedFileSystemManager->isEEPROMAvailable()) {
+            Serial.print(F("EEPROM: Not Available\r\n"));
+            Serial.print(F("============================\r\n"));
+            return;
+        }
+        
+        // Use the EEPROM filesystem's listFiles method
+        char buffer[1024];
+        if (_cachedFileSystemManager->listEEPROMFiles(buffer, sizeof(buffer))) {
+            Serial.print(buffer);
+        } else {
+            Serial.print(F("Failed to list EEPROM files\r\n"));
+        }
+        Serial.print(F("============================\r\n"));
+        
     } else {
-        Serial.print(F("Usage: list sd\r\n"));
-        Serial.print(F("  list sd  - Show all files on SD card root directory\r\n"));
+        Serial.print(F("Usage: list [sd|eeprom]\r\n"));
+        Serial.print(F("  list sd     - Show all files on SD card\r\n"));
+        Serial.print(F("  list eeprom - Show all files on EEPROM\r\n"));
+    }
+}
+
+void ConfigurationManager::handleFormatCommand(const String &command) {
+    String params = command.substring(7); // Remove "format "
+    params.trim();
+    params.toLowerCase();
+
+    if (params == F("eeprom")) {
+        Serial.print(F("\r\n=== EEPROM Format ===\r\n"));
+        Serial.print(F("⚠️ WARNING: This will erase all files on EEPROM!\r\n"));
+        Serial.print(F("Formatting EEPROM filesystem...\r\n"));
+        
+        if (_cachedFileSystemManager->formatEEPROM()) {
+            Serial.print(F("✅ EEPROM formatted successfully\r\n"));
+        } else {
+            Serial.print(F("❌ EEPROM format failed\r\n"));
+        }
+        Serial.print(F("=====================\r\n"));
+        
+    } else {
+        Serial.print(F("Usage: format eeprom\r\n"));
+        Serial.print(F("  format eeprom - Format EEPROM filesystem (erases all files)\r\n"));
     }
 }
 
@@ -1188,10 +1236,34 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
             Serial.print(F("  debug parallel status - Show current parallel debug mode status\r\n"));
             Serial.print(F("Warning: Parallel debug generates extensive output during data capture\r\n"));
         }
+    } else if (params.startsWith(F("eeprom"))) {
+        String eepromParams = params.substring(7); // Remove "eeprom "
+        eepromParams.trim();
+
+        if (eepromParams == F("on")) {
+            _cachedSystemManager->setEEPROMDebugEnabled(true);
+            Serial.print(F("EEPROM debug mode enabled - All EEPROM operations will be logged to serial\r\n"));
+            Serial.print(F("Includes: file creation, writing, directory operations, and error details\r\n"));
+        } else if (eepromParams == F("off")) {
+            _cachedSystemManager->setEEPROMDebugEnabled(false);
+            Serial.print(F("EEPROM debug mode disabled\r\n"));
+        } else if (eepromParams == F("status")) {
+            bool enabled = _cachedSystemManager->isEEPROMDebugEnabled();
+            Serial.print(F("EEPROM debug mode: "));
+            Serial.print(enabled ? F("ENABLED") : F("DISABLED"));
+            Serial.print(F("\r\n"));
+        } else {
+            Serial.print(F("Usage: debug eeprom [on|off|status]\r\n"));
+            Serial.print(F("  debug eeprom on     - Enable EEPROM debug output to serial\r\n"));
+            Serial.print(F("  debug eeprom off    - Disable EEPROM debug output\r\n"));
+            Serial.print(F("  debug eeprom status - Show current EEPROM debug mode status\r\n"));
+            Serial.print(F("Shows: file operations, directory management, space calculations, etc.\r\n"));
+        }
     } else {
         Serial.print(F("Debug Commands:\r\n"));
         Serial.print(F("  debug lcd on/off/status      - Control LCD debug output to serial\r\n"));
         Serial.print(F("  debug parallel on/off/status - Control parallel port debug logging\r\n"));
+        Serial.print(F("  debug eeprom on/off/status   - Control EEPROM debug logging\r\n"));
         Serial.print(F("  debug lpt on/off/status      - Same as parallel (alias)\r\n"));
         Serial.print(F("Examples:\r\n"));
         Serial.print(F("  debug lcd on         - Enable LCD message mirroring to serial\r\n"));
@@ -1200,6 +1272,9 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
         Serial.print(F("  debug parallel on    - Enable parallel port debug logging\r\n"));
         Serial.print(F("  debug parallel off   - Disable parallel port debug logging\r\n"));
         Serial.print(F("  debug parallel status - Show parallel port debug status\r\n"));
+        Serial.print(F("  debug eeprom on      - Enable EEPROM filesystem debug logging\r\n"));
+        Serial.print(F("  debug eeprom off     - Disable EEPROM filesystem debug logging\r\n"));
+        Serial.print(F("  debug eeprom status  - Show EEPROM debug status\r\n"));
     }
 }
 

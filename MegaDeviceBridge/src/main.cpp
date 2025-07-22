@@ -72,24 +72,61 @@ void setup()
   while (!Serial) { delay(10); }
   
   Serial.print(F("Device Bridge Initializing (Loop-based)...\r\n"));
+  Serial.flush();
   
   // Initialize hardware
+  Serial.print(F("Initializing printer port...\r\n"));
+  Serial.flush();
   printerPort.initialize();
+  
+  Serial.print(F("Initializing display...\r\n"));
+  Serial.flush();
   display.initialize();
   
   // Initialize ServiceLocator
+  Serial.print(F("Initializing ServiceLocator...\r\n"));
+  Serial.flush();
   DeviceBridge::ServiceLocator::initialize();
   DeviceBridge::ServiceLocator& services = DeviceBridge::ServiceLocator::getInstance();
   
   // Create component managers (no queues/mutexes needed)
+  Serial.print(F("Creating component managers...\r\n"));
+  Serial.flush();
+  
+  Serial.print(F("Creating ParallelPortManager...\r\n"));
+  Serial.flush();
   components[PARALLEL_PORT_INDEX] = new DeviceBridge::Components::ParallelPortManager(printerPort);
+  
+  Serial.print(F("Creating FileSystemManager...\r\n"));
+  Serial.flush();
   components[FILE_SYSTEM_INDEX] = new DeviceBridge::Components::FileSystemManager();
+  
+  Serial.print(F("Creating DisplayManager...\r\n"));
+  Serial.flush();
   components[DISPLAY_INDEX] = new DeviceBridge::Components::DisplayManager(display);
+  
+  Serial.print(F("Creating TimeManager...\r\n"));
+  Serial.flush();
   components[TIME_INDEX] = new DeviceBridge::Components::TimeManager();
+  
+  Serial.print(F("Creating SystemManager...\r\n"));
+  Serial.flush();
   components[SYSTEM_INDEX] = new DeviceBridge::Components::SystemManager();
+  
+  Serial.print(F("Creating ConfigurationManager...\r\n"));
+  Serial.flush();
   components[CONFIGURATION_INDEX] = new DeviceBridge::Components::ConfigurationManager();
+  
+  Serial.print(F("Creating HeartbeatLEDManager...\r\n"));
+  Serial.flush();
   components[HEARTBEAT_LED_INDEX] = new DeviceBridge::Components::HeartbeatLEDManager();
+  
+  Serial.print(F("Creating ConfigurationService...\r\n"));
+  Serial.flush();
   configurationService = new DeviceBridge::Common::ConfigurationService();
+  
+  Serial.print(F("Component managers created successfully\r\n"));
+  Serial.flush();
   
   // Verify component creation
   bool allComponentsCreated = true;
@@ -128,11 +165,23 @@ void setup()
   Serial.print(F("Initializing components...\r\n"));
   
   for (uint8_t i = 0; i < COMPONENT_COUNT; i++) {
+    Serial.print(F("Initializing component "));
+    Serial.print(i);
+    Serial.print(F(": "));
+    Serial.print(components[i]->getComponentName());
+    Serial.print(F("...\r\n"));
+    Serial.flush();
+    
     if (!components[i]->initialize()) {
       Serial.print(F("WARNING: Component "));
       Serial.print(components[i]->getComponentName());
       Serial.print(F(" initialization failed\r\n"));
+    } else {
+      Serial.print(F("Component "));
+      Serial.print(components[i]->getComponentName());
+      Serial.print(F(" initialized OK\r\n"));
     }
+    Serial.flush();
   }
   
   Serial.print(F("All systems initialized successfully!\r\n"));

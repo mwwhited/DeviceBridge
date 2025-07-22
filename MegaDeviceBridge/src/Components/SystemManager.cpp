@@ -23,6 +23,7 @@ SystemManager::SystemManager()
     _debugFlags.serialHeartbeatEnabled = 0;  // Default to off
     _debugFlags.lcdDebugEnabled = 0;         // Default to off
     _debugFlags.parallelDebugEnabled = 0;    // Default to off
+    _debugFlags.eepromDebugEnabled = 0;      // Default to off
     _debugFlags.reserved = 0;
 }
 
