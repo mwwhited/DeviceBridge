@@ -1,7 +1,20 @@
 #include "EEPROMFileSystem.h"
+#include "../Components/SystemManager.h"
+#include "../Common/ServiceLocator.h"
 #include <string.h>
 
 namespace DeviceBridge::Storage {
+
+// Helper function to check if EEPROM debug is enabled
+static bool isEEPROMDebugEnabled() {
+    auto& services = DeviceBridge::ServiceLocator::getInstance();
+    auto* systemManager = services.getSystemManager();
+    return systemManager && systemManager->isEEPROMDebugEnabled();
+}
+
+// Macro for conditional debug printing - support multiple args
+#define EEPROM_DEBUG_PRINT(...) do { if (isEEPROMDebugEnabled()) { Serial.print(__VA_ARGS__); } } while(0)
+#define EEPROM_DEBUG_PRINTLN(...) do { if (isEEPROMDebugEnabled()) { Serial.println(__VA_ARGS__); } } while(0)
 
 EEPROMFileSystem::EEPROMFileSystem() 
     : _eeprom(Common::Pins::EEPROM_CS), _initialized(false), _mounted(false),
@@ -57,8 +70,8 @@ void EEPROMFileSystem::shutdown() {
 }
 
 bool EEPROMFileSystem::createFile(const char* filename) {
-    Serial.print(F("EEPROM: Creating file: "));
-    Serial.println(filename);
+    EEPROM_DEBUG_PRINT(F("EEPROM: Creating file: "));
+    EEPROM_DEBUG_PRINTLN(filename);
     
     if (!isAvailable()) {
         Serial.println(F("EEPROM: ❌ Not available"));
@@ -86,8 +99,8 @@ bool EEPROMFileSystem::createFile(const char* filename) {
     
     // Find free directory slot
     int freeSlot = findFreeDirectorySlot();
-    Serial.print(F("EEPROM: Free slot: "));
-    Serial.println(freeSlot);
+    EEPROM_DEBUG_PRINT(F("EEPROM: Free slot: "));
+    EEPROM_DEBUG_PRINTLN(freeSlot);
     if (freeSlot < 0) {
         Serial.println(F("EEPROM: ❌ Directory full"));
         setError(FileSystemErrors::INSUFFICIENT_SPACE, "Directory full");
@@ -96,16 +109,16 @@ bool EEPROMFileSystem::createFile(const char* filename) {
     
     // Find next free file address
     uint32_t fileAddress = findNextFreeFileAddress();
-    Serial.print(F("EEPROM: File address: 0x"));
-    Serial.println(fileAddress, HEX);
-    Serial.print(F("EEPROM: FLASH_SIZE: "));
-    Serial.println(FLASH_SIZE);
-    Serial.print(F("EEPROM: Space check: "));
-    Serial.print(fileAddress + 1024);
-    Serial.print(F(" > "));
-    Serial.print(FLASH_SIZE);
-    Serial.print(F(" = "));
-    Serial.println((fileAddress + 1024 > FLASH_SIZE) ? F("TRUE") : F("FALSE"));
+    EEPROM_DEBUG_PRINT(F("EEPROM: File address: 0x"));
+    EEPROM_DEBUG_PRINTLN(fileAddress, HEX);
+    EEPROM_DEBUG_PRINT(F("EEPROM: FLASH_SIZE: "));
+    EEPROM_DEBUG_PRINTLN(FLASH_SIZE);
+    EEPROM_DEBUG_PRINT(F("EEPROM: Space check: "));
+    EEPROM_DEBUG_PRINT(fileAddress + 1024);
+    EEPROM_DEBUG_PRINT(F(" > "));
+    EEPROM_DEBUG_PRINT(FLASH_SIZE);
+    EEPROM_DEBUG_PRINT(F(" = "));
+    EEPROM_DEBUG_PRINTLN((fileAddress + 1024 > FLASH_SIZE) ? F("TRUE") : F("FALSE"));
     
     if (fileAddress + 1024 > FLASH_SIZE) { // Ensure minimum space
         Serial.println(F("EEPROM: ❌ Not enough space"));
@@ -119,14 +132,14 @@ bool EEPROMFileSystem::createFile(const char* filename) {
     strncpy(entry.filename, filename, FILENAME_LENGTH - 1);
     entry.filename[FILENAME_LENGTH - 1] = '\0';
     entry.address = fileAddress;
-    entry.size = 0;
+    entry.size = 0xFFFFFFFF;  // Pre-allocate maximum size for Flash memory constraints
     entry.crc32 = calculateCRC32(filename);
     entry.reserved = FLAG_USED;
     
-    Serial.println(F("EEPROM: Writing directory entry..."));
+    EEPROM_DEBUG_PRINTLN(F("EEPROM: Writing directory entry..."));
     // Write directory entry to EEPROM
     if (!writeDirectoryEntry(freeSlot, entry)) {
-        Serial.println(F("EEPROM: ❌ Directory write failed"));
+        EEPROM_DEBUG_PRINTLN(F("EEPROM: ❌ Directory write failed"));
         setError(FileSystemErrors::FILE_WRITE_FAILED, "Directory write failed");
         return false;
     }
@@ -225,15 +238,15 @@ bool EEPROMFileSystem::closeFile() {
         return true;
     }
     
-    Serial.print(F("EEPROM: Closing file: "));
-    Serial.println(_currentFilename);
-    Serial.print(F("EEPROM: Final size: "));
-    Serial.println(_currentFileSize);
+    EEPROM_DEBUG_PRINT(F("EEPROM: Closing file: "));
+    EEPROM_DEBUG_PRINTLN(_currentFilename);
+    EEPROM_DEBUG_PRINT(F("EEPROM: Final size: "));
+    EEPROM_DEBUG_PRINTLN(_currentFileSize);
     
     // Find file entry and update size
     int fileSlot = scanForFile(_currentFilename);
-    Serial.print(F("EEPROM: File slot: "));
-    Serial.println(fileSlot);
+    EEPROM_DEBUG_PRINT(F("EEPROM: File slot: "));
+    EEPROM_DEBUG_PRINTLN(fileSlot);
     
     if (fileSlot >= 0) {
         DirectoryEntry entry;
@@ -445,8 +458,8 @@ bool EEPROMFileSystem::readDirectoryEntry(int index, DirectoryEntry& entry) {
 }
 
 bool EEPROMFileSystem::writeDirectoryEntry(int index, const DirectoryEntry& entry, bool allowUpdate) {
-    Serial.print(F("EEPROM: writeDirectoryEntry index="));
-    Serial.println(index);
+    EEPROM_DEBUG_PRINT(F("EEPROM: writeDirectoryEntry index="));
+    EEPROM_DEBUG_PRINTLN(index);
     
     if (index < 0 || index >= MAX_FILES) {
         Serial.println(F("EEPROM: ❌ Invalid index"));
@@ -454,8 +467,8 @@ bool EEPROMFileSystem::writeDirectoryEntry(int index, const DirectoryEntry& entr
     }
     
     uint32_t address = (index * sizeof(DirectoryEntry));
-    Serial.print(F("EEPROM: Directory entry address: 0x"));
-    Serial.println(address, HEX);
+    EEPROM_DEBUG_PRINT(F("EEPROM: Directory entry address: 0x"));
+    EEPROM_DEBUG_PRINTLN(address, HEX);
     
     // Check if we need to erase the sector
     uint32_t sectorAddress = (address / SECTOR_SIZE) * SECTOR_SIZE;
