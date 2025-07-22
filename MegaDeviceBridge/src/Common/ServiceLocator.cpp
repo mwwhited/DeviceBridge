@@ -134,42 +134,7 @@ void ServiceLocator::registerDisplay(User::Display* display) {
     _display = display;
 }
 
-// Component access methods
-Components::ParallelPortManager* ServiceLocator::getParallelPortManager() const {
-    return _parallelPortManager;
-}
-
-Components::FileSystemManager* ServiceLocator::getFileSystemManager() const {
-    return _fileSystemManager;
-}
-
-Components::DisplayManager* ServiceLocator::getDisplayManager() const {
-    return _displayManager;
-}
-
-Components::TimeManager* ServiceLocator::getTimeManager() const {
-    return _timeManager;
-}
-
-Components::SystemManager* ServiceLocator::getSystemManager() const {
-    return _systemManager;
-}
-
-Components::ConfigurationManager* ServiceLocator::getConfigurationManager() const {
-    return _configurationManager;
-}
-
-Components::HeartbeatLEDManager* ServiceLocator::getHeartbeatLEDManager() const {
-    return _heartbeatLEDManager;
-}
-
-Common::ConfigurationService* ServiceLocator::getConfigurationService() const {
-    return _configurationService;
-}
-
-User::Display* ServiceLocator::getDisplay() const {
-    return _display;
-}
+// Component access methods are now inlined in header for maximum performance
 
 bool ServiceLocator::validateAllDependencies() const {
     Serial.print(F("\r\n=== Service Locator Dependency Validation ===\r\n"));
@@ -270,17 +235,7 @@ bool ServiceLocator::isComponentRegistered(const char* componentName) const {
     return false;
 }
 
-uint8_t ServiceLocator::getRegisteredComponentCount() const {
-    uint8_t count = 0;
-    if (_display) count++;
-    if (_parallelPortManager) count++;
-    if (_fileSystemManager) count++;
-    if (_displayManager) count++;
-    if (_timeManager) count++;
-    if (_systemManager) count++;
-    if (_configurationManager) count++;
-    return count;
-}
+// getRegisteredComponentCount() is now inlined in header for performance
 
 void ServiceLocator::printComponentStatus(const char* name, void* ptr) const {
     Serial.print(F("  "));

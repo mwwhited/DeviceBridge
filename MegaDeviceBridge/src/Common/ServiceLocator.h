@@ -63,25 +63,35 @@ public:
     void registerConfigurationService(Common::ConfigurationService* service);
     void registerDisplay(User::Display* display);
     
-    // Component access
-    Components::ParallelPortManager* getParallelPortManager() const;
-    Components::FileSystemManager* getFileSystemManager() const;
-    Components::DisplayManager* getDisplayManager() const;
-    Components::TimeManager* getTimeManager() const;
-    Components::SystemManager* getSystemManager() const;
-    Components::ConfigurationManager* getConfigurationManager() const;
-    Components::HeartbeatLEDManager* getHeartbeatLEDManager() const;
-    Common::ConfigurationService* getConfigurationService() const;
-    User::Display* getDisplay() const;
+    // Component access - inlined for maximum performance
+    inline Components::ParallelPortManager* getParallelPortManager() const { return _parallelPortManager; }
+    inline Components::FileSystemManager* getFileSystemManager() const { return _fileSystemManager; }
+    inline Components::DisplayManager* getDisplayManager() const { return _displayManager; }
+    inline Components::TimeManager* getTimeManager() const { return _timeManager; }
+    inline Components::SystemManager* getSystemManager() const { return _systemManager; }
+    inline Components::ConfigurationManager* getConfigurationManager() const { return _configurationManager; }
+    inline Components::HeartbeatLEDManager* getHeartbeatLEDManager() const { return _heartbeatLEDManager; }
+    inline Common::ConfigurationService* getConfigurationService() const { return _configurationService; }
+    inline User::Display* getDisplay() const { return _display; }
     
     // System validation
     bool validateAllDependencies() const;
     void printDependencyStatus() const;
     bool runSystemSelfTest() const;
     
-    // Dependency checking
+    // Dependency checking - inlined for performance
     bool isComponentRegistered(const char* componentName) const;
-    uint8_t getRegisteredComponentCount() const;
+    inline uint8_t getRegisteredComponentCount() const {
+        uint8_t count = 0;
+        if (_display) count++;
+        if (_parallelPortManager) count++;
+        if (_fileSystemManager) count++;
+        if (_displayManager) count++;
+        if (_timeManager) count++;
+        if (_systemManager) count++;
+        if (_configurationManager) count++;
+        return count;
+    }
     
 private:
     void printComponentStatus(const char* name, void* ptr) const;

@@ -8,6 +8,16 @@
 // PROGMEM component name for memory optimization
 static const char component_name[] PROGMEM = "ParallelPortManager";
 
+// Performance-critical configuration constants cached for maximum speed
+// These values are accessed in interrupt-critical paths and must be compile-time constants
+namespace PerformanceConstants {
+    static constexpr uint8_t HEADER_HEX_BYTES = DeviceBridge::Common::Debug::HEADER_HEX_BYTES;
+    static constexpr uint32_t CHUNK_SEND_TIMEOUT_MS = DeviceBridge::Common::Buffer::CHUNK_SEND_TIMEOUT_MS;
+    static constexpr uint16_t MIN_CHUNK_SIZE = DeviceBridge::Common::Buffer::MIN_CHUNK_SIZE;
+    static constexpr uint16_t DATA_CHUNK_SIZE = DeviceBridge::Common::Buffer::DATA_CHUNK_SIZE;
+    static constexpr uint16_t KEEP_BUSY_MS = DeviceBridge::Common::Timing::KEEP_BUSY_MS;
+}
+
 namespace DeviceBridge::Components {
 
 ParallelPortManager::ParallelPortManager(Parallel::Port &port)
@@ -127,7 +137,7 @@ void ParallelPortManager::processData() {
                     }
                     
                     // Show hex dump of first N bytes for new files once we have enough data
-                    uint8_t headerBytes = _cachedConfigurationService->getHeaderHexBytes();
+                    constexpr uint8_t headerBytes = PerformanceConstants::HEADER_HEX_BYTES;
                     if (_currentFileBytes >= headerBytes && _currentChunk.isNewFile) {
                         Serial.print(F(" - HEADER HEX: "));
                         for (uint8_t i = 0; i < headerBytes; i++) {
@@ -228,8 +238,8 @@ bool ParallelPortManager::shouldSendPartialChunk() const {
     uint32_t chunkAge = currentTime - _chunkStartTime;
     
     // Send if timeout reached and we have minimum data, or if we have significant data
-    return (chunkAge >= _cachedConfigurationService->getChunkSendTimeoutMs() && _chunkIndex >= _cachedConfigurationService->getMinChunkSize()) ||
-           (_chunkIndex >= _cachedConfigurationService->getDataChunkSize() / 2); // Send when half full regardless of time
+    return (chunkAge >= PerformanceConstants::CHUNK_SEND_TIMEOUT_MS && _chunkIndex >= PerformanceConstants::MIN_CHUNK_SIZE) ||
+           (_chunkIndex >= PerformanceConstants::DATA_CHUNK_SIZE / 2); // Send when half full regardless of time
 }
 
 bool ParallelPortManager::detectNewFile() {
@@ -244,7 +254,7 @@ bool ParallelPortManager::detectEndOfFile() {
     }
 
     // Use millis() based timing for loop-based architecture
-    uint32_t fileTimeoutMs = _cachedConfigurationService->getKeepBusyMs(); // Use configured timeout
+    constexpr uint32_t fileTimeoutMs = PerformanceConstants::KEEP_BUSY_MS; // Use configured timeout
     uint32_t currentTime = millis();
     uint32_t timeSinceLastData = currentTime - _lastDataTime;
 
