@@ -29,19 +29,19 @@ private:
     static constexpr uint32_t SECTOR_SIZE = 4096;             // 4KB sectors
     static constexpr uint32_t DIRECTORY_ENTRIES_PER_SECTOR = SECTOR_SIZE / 32;  // 128 entries per sector
     static constexpr uint32_t MAX_FILES = 256;                // Total file limit
-    static constexpr uint8_t FILENAME_LENGTH = 16;            // "00001122\334455.EXT"
+    static constexpr uint8_t FILENAME_LENGTH = 20;            // "00001122\334455.EXT"
     static constexpr uint32_t FILE_DATA_START = 8192;        // Start after 2 directory sectors
     
     // Compact directory entry (32 bytes)
     struct DirectoryEntry {
-        char filename[FILENAME_LENGTH]; // 16 bytes - "00001122\334455.EXT"
+        char filename[FILENAME_LENGTH]; // 20 bytes - "00001122\334455.EXT"
         uint32_t address;              // 4 bytes - file start address
         uint32_t size;                 // 4 bytes - file size
         uint32_t crc32;                // 4 bytes - filename CRC for quick lookup
         uint32_t reserved;             // 4 bytes - reserved/flags
     } __attribute__((packed));
     
-    static_assert(sizeof(DirectoryEntry) == 32, "DirectoryEntry must be 32 bytes");
+    static_assert(sizeof(DirectoryEntry) == 36, "DirectoryEntry must be 36 bytes");
     
     // File flags in reserved field
     static constexpr uint32_t FLAG_UNUSED = 0x00000000;
