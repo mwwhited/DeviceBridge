@@ -472,17 +472,14 @@ bool EEPROMFileSystem::saveDirectory() {
 }
 
 int EEPROMFileSystem::findFileEntry(const char* filename) {
-    if (!filename) {
-        return -1;
-    }
-    
-    for (int i = 0; i < MAX_FILES; i++) {
-        DirectoryEntry& entry = _directory[i];
-        if (entry.flags == FLAG_USED && strcmp(entry.filename, filename) == 0) {
+    DirectoryEntry entry;
+    for (int i = 0; i < MAX_FILES; ++i) {
+        uint32_t addr = DIRECTORY_ADDRESS + i * sizeof(DirectoryEntry);
+        if (!_eeprom.readData(addr, (uint8_t*)&entry, sizeof(entry)))
+            continue;
+        if (entry.flags == FLAG_USED && strcmp(entry.filename, filename) == 0)
             return i;
-        }
     }
-    
     return -1;
 }
 

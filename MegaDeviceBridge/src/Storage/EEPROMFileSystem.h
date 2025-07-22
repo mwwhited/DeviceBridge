@@ -31,18 +31,17 @@ private:
     static constexpr uint32_t DIRECTORY_SIZE = SECTOR_SIZE;   // One sector for directory
     static constexpr uint32_t FILE_DATA_START = SECTOR_SIZE;  // Files start after directory
     static constexpr uint16_t MAX_FILES = 32;                 // Maximum number of files (reduced for RAM constraints)
-    static constexpr uint8_t FILENAME_LENGTH = 32;            // Maximum filename length
+    static constexpr uint8_t FILENAME_LENGTH = 12;            // Maximum filename length
     
     // Directory entry structure (48 bytes per entry)
     struct DirectoryEntry {
-        char filename[FILENAME_LENGTH];  // 32 bytes - filename
+        char filename[FILENAME_LENGTH];  // 12 bytes - filename
         uint32_t address;               // 4 bytes - file start address  
         uint32_t size;                  // 4 bytes - file size
         uint8_t flags;                  // 1 byte - file flags (used/deleted/etc)
-        uint8_t reserved[7];            // 7 bytes - reserved for future use
     } __attribute__((packed));
     
-    static_assert(sizeof(DirectoryEntry) == 48, "DirectoryEntry must be 48 bytes");
+    static_assert(sizeof(DirectoryEntry) == 21, "DirectoryEntry must be 21 bytes");
     
     // File flags
     static constexpr uint8_t FLAG_UNUSED = 0x00;
@@ -105,6 +104,7 @@ public:
     const char* getLastErrorMessage() const override { return _lastErrorMessage; }
     
 private:
+    //TODO: I need to remove the fat from memory
     DirectoryEntry _directory[MAX_FILES];
     bool _directoryLoaded;
     bool _directoryModified;
