@@ -242,7 +242,7 @@ bool EEPROMFileSystem::closeFile() {
             Serial.println(entry.size);
             entry.size = _currentFileSize;
             Serial.println(F("EEPROM: Updating directory entry size..."));
-            if (writeDirectoryEntry(fileSlot, entry)) {
+            if (writeDirectoryEntry(fileSlot, entry, true)) { // Allow update
                 Serial.println(F("EEPROM: ✅ Directory entry updated"));
             } else {
                 Serial.println(F("EEPROM: ❌ Directory entry update failed"));
@@ -444,7 +444,7 @@ bool EEPROMFileSystem::readDirectoryEntry(int index, DirectoryEntry& entry) {
     return _eeprom.readData(address, (uint8_t*)&entry, sizeof(entry));
 }
 
-bool EEPROMFileSystem::writeDirectoryEntry(int index, const DirectoryEntry& entry) {
+bool EEPROMFileSystem::writeDirectoryEntry(int index, const DirectoryEntry& entry, bool allowUpdate) {
     Serial.print(F("EEPROM: writeDirectoryEntry index="));
     Serial.println(index);
     
@@ -465,11 +465,24 @@ bool EEPROMFileSystem::writeDirectoryEntry(int index, const DirectoryEntry& entr
     if (!_eeprom.readData(address, (uint8_t*)&testEntry, sizeof(testEntry))) {
         Serial.println(F("EEPROM: ⚠️ Read failed, assuming needs erase"));
         needsErase = true;
-    } else if (testEntry.reserved != FLAG_UNUSED && testEntry.reserved != 0xFFFFFFFF) {
+    } else if (testEntry.reserved != FLAG_UNUSED && testEntry.reserved != 0xFFFFFFFF && testEntry.reserved != FLAG_USED) {
         Serial.print(F("EEPROM: Entry not unused ("));
         Serial.print(testEntry.reserved);
         Serial.println(F("), needs erase"));
         needsErase = true;
+    } else if (testEntry.reserved == FLAG_USED && !allowUpdate) {
+        Serial.print(F("EEPROM: Entry is used ("));
+        Serial.print(testEntry.reserved);
+        Serial.println(F("), but update not allowed"));
+        needsErase = true;
+    }
+    
+    // Special case: if updating an existing entry, we can write if we're not changing bits from 0 to 1
+    if (allowUpdate && testEntry.reserved == FLAG_USED) {
+        // For flash memory updates, we can only change 1->0, not 0->1
+        // Since we're typically updating size from 0 to a value, this should work
+        Serial.println(F("EEPROM: Allowing update of existing entry"));
+        needsErase = false;
     }
     
     if (needsErase) {

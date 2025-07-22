@@ -54,7 +54,7 @@ private:
     int scanForFile(const char* filename);
     int findFreeDirectorySlot();
     bool readDirectoryEntry(int index, DirectoryEntry& entry);
-    bool writeDirectoryEntry(int index, const DirectoryEntry& entry);
+    bool writeDirectoryEntry(int index, const DirectoryEntry& entry, bool allowUpdate = false);
     bool isValidFilename(const char* filename);
     uint32_t calculateCRC32(const char* filename);
     uint32_t findNextFreeFileAddress();
