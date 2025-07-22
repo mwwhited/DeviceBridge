@@ -182,7 +182,7 @@ bool EEPROMFileSystem::openFile(const char* filename, bool append) {
     
     // Setup current file tracking
     _currentFileAddress = entry.address;
-    _currentFileSize = entry.size;
+    _currentFileSize = (entry.size == 0xFFFFFFFF) ? 0 : ~entry.size;
     strncpy(_currentFilename, filename, sizeof(_currentFilename) - 1);
     _currentFilename[sizeof(_currentFilename) - 1] = '\0';
     _hasActiveFile = true;
@@ -251,14 +251,18 @@ bool EEPROMFileSystem::closeFile() {
     if (fileSlot >= 0) {
         DirectoryEntry entry;
         if (readDirectoryEntry(fileSlot, entry)) {
-            Serial.print(F("EEPROM: Current entry size: "));
-            Serial.println(entry.size);
-            entry.size = _currentFileSize;
-            Serial.println(F("EEPROM: Updating directory entry size..."));
+            EEPROM_DEBUG_PRINT(F("EEPROM: Current entry size: "));
+            EEPROM_DEBUG_PRINTLN(entry.size);
+            // For Flash memory: change 0xFFFFFFFF (all 1s) to ~actualSize (complement)
+            // This allows us to only change bits from 1→0, which Flash can do
+            entry.size = ~_currentFileSize;  // Store bitwise complement
+            EEPROM_DEBUG_PRINTLN(F("EEPROM: Updating directory entry size..."));
+            EEPROM_DEBUG_PRINT(F("EEPROM: Setting size to complement: "));
+            EEPROM_DEBUG_PRINTLN(entry.size);
             if (writeDirectoryEntry(fileSlot, entry, true)) { // Allow update
-                Serial.println(F("EEPROM: ✅ Directory entry updated"));
+                EEPROM_DEBUG_PRINTLN(F("EEPROM: ✅ Directory entry updated"));
             } else {
-                Serial.println(F("EEPROM: ❌ Directory entry update failed"));
+                EEPROM_DEBUG_PRINTLN(F("EEPROM: ❌ Directory entry update failed"));
             }
         } else {
             Serial.println(F("EEPROM: ❌ Failed to read directory entry"));
@@ -319,9 +323,11 @@ bool EEPROMFileSystem::listFiles(char* buffer, uint16_t bufferSize) {
     for (int i = 0; i < MAX_FILES && offset < bufferSize - 50; i++) {
         DirectoryEntry entry;
         if (readDirectoryEntry(i, entry) && entry.reserved == FLAG_USED && entry.filename[0] != '\0') {
+            // Decode size: if 0xFFFFFFFF, file is still open; otherwise decode complement
+            uint32_t actualSize = (entry.size == 0xFFFFFFFF) ? 0 : ~entry.size;
             offset += snprintf(buffer + offset, bufferSize - offset,
                              "  %s (%lu bytes) [DEBUG: reserved=0x%08lx]\r\n", 
-                             entry.filename, entry.size, entry.reserved);
+                             entry.filename, actualSize, entry.reserved);
             fileCount++;
         }
     }
@@ -395,7 +401,8 @@ uint32_t EEPROMFileSystem::getFileSize(const char* filename) {
     
     DirectoryEntry entry;
     if (readDirectoryEntry(fileSlot, entry)) {
-        return entry.size;
+        // Decode size: if 0xFFFFFFFF, file is still open; otherwise decode complement
+        return (entry.size == 0xFFFFFFFF) ? 0 : ~entry.size;
     }
     return 0;
 }
@@ -413,7 +420,8 @@ bool EEPROMFileSystem::readFileSegment(const char* filename, uint32_t offset, ui
         return false;
     }
     
-    if (offset >= entry.size || offset + length > entry.size) {
+    uint32_t actualSize = (entry.size == 0xFFFFFFFF) ? 0 : ~entry.size;
+    if (offset >= actualSize || offset + length > actualSize) {
         setError(FileSystemErrors::INVALID_PARAMETER, "Read beyond file");
         return false;
     }
@@ -544,7 +552,8 @@ uint32_t EEPROMFileSystem::findNextFreeFileAddress() {
     for (int i = 0; i < MAX_FILES; i++) {
         DirectoryEntry entry;
         if (readDirectoryEntry(i, entry) && entry.reserved == FLAG_USED) {
-            uint32_t fileEnd = entry.address + entry.size;
+            uint32_t actualSize = (entry.size == 0xFFFFFFFF) ? 0 : ~entry.size;
+            uint32_t fileEnd = entry.address + actualSize;
             if (fileEnd > maxAddress) {
                 maxAddress = fileEnd;
             }

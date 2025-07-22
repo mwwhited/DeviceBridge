@@ -1,0 +1,3 @@
+- Add a `read hex {file}` feature to the serial cli
+  - based on the current storage device the content of the named file should be output to the serial connection as a hex string
+  - if the current storage is Serial then it should just output `NOT SUPPORTED`
