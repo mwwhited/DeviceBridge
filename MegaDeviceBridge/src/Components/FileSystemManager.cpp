@@ -612,6 +612,20 @@ bool FileSystemManager::isSDWriteProtected() const {
     return digitalRead(Common::Pins::SD_WP) == HIGH; // Active HIGH
 }
 
+bool FileSystemManager::listEEPROMFiles(char* buffer, uint16_t bufferSize) const {
+    if (!buffer || bufferSize == 0) {
+        return false;
+    }
+    
+    if (!_flags.eepromAvailable) {
+        snprintf(buffer, bufferSize, "EEPROM not available\r\n");
+        return true;
+    }
+    
+    // Delegate to the EEPROM filesystem's listFiles method
+    return _eepromFileSystem.listFiles(buffer, bufferSize);
+}
+
 Common::FileType FileSystemManager::detectFileType(const uint8_t *data, uint16_t length) {
     // Need at least 4 bytes for detection
     if (length < 4) {

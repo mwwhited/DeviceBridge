@@ -281,21 +281,28 @@ Automatically identifies file types based on data headers:
 - **Multi-Error Protection**: After 5+ consecutive errors, signals TDS2024 to stop transmission
 
 ### 2. FileSystemManager
-**Purpose**: Unified storage interface with failover capability
+**Purpose**: Unified storage interface with ultra-minimal EEPROM filesystem
 **Priority**: High (2) - Data integrity critical
 **Stack**: 512 bytes
 
-#### Storage Hierarchy:
+#### Storage Hierarchy with Minimal EEPROM Filesystem:
 1. **Primary**: SD Card (preferred, high capacity)
-2. **Secondary**: W25Q128 EEPROM (16MB, reliable)
+2. **Secondary**: W25Q128 EEPROM (16MB, minimal RAM footprint)
 3. **Tertiary**: Serial Transfer (real-time streaming)
 
+#### Ultra-Minimal EEPROM Implementation:
+- **Zero Directory Caching**: 656 bytes RAM reclaimed (672 → 16 bytes)
+- **On-Demand Scanning**: All directory operations read EEPROM directly
+- **Filename Format**: "00001122\\334455.EXT" with strict validation
+- **CRC32 Optimization**: Fast filename lookups with hash-based pre-filtering
+- **Serial CLI Integration**: `list eeprom` command for file management
+
 #### Responsibilities:
-- Manage storage device initialization
+- Manage storage device initialization with minimal memory usage
 - Handle automatic failover between storage types
-- Generate timestamp-based filenames
-- Coordinate with W25Q128Manager for EEPROM operations
-- Monitor storage capacity and health
+- Generate timestamp-based filenames with enforced format validation
+- Coordinate with W25Q128Manager for direct EEPROM operations
+- Monitor storage capacity and health with zero RAM directory overhead
 - **TDS2024 Error Response**: Signal oscilloscope when file operations fail
 - **Performance**: Uses cached service pointers for storage operations
 

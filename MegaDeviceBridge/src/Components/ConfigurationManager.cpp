@@ -161,6 +161,7 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  debug parallel on/off - Enable/disable parallel port debug logging\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
     Serial.print(F("  list sd           - List all files on SD card\r\n"));
+    Serial.print(F("  list eeprom       - List all files on EEPROM\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage           - Show storage/hardware status\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
@@ -1132,9 +1133,29 @@ void ConfigurationManager::handleListCommand(const String &command) {
         Serial.print(totalSize);
         Serial.print(F(" bytes\r\n"));
         Serial.print(F("=============================\r\n"));
+    } else if (target == F("eeprom")) {
+        Serial.print(F("\r\n=== EEPROM File Listing ===\r\n"));
+        
+        // Check EEPROM status first
+        if (!_cachedFileSystemManager->isEEPROMAvailable()) {
+            Serial.print(F("EEPROM: Not Available\r\n"));
+            Serial.print(F("============================\r\n"));
+            return;
+        }
+        
+        // Use the EEPROM filesystem's listFiles method
+        char buffer[1024];
+        if (_cachedFileSystemManager->listEEPROMFiles(buffer, sizeof(buffer))) {
+            Serial.print(buffer);
+        } else {
+            Serial.print(F("Failed to list EEPROM files\r\n"));
+        }
+        Serial.print(F("============================\r\n"));
+        
     } else {
-        Serial.print(F("Usage: list sd\r\n"));
-        Serial.print(F("  list sd  - Show all files on SD card root directory\r\n"));
+        Serial.print(F("Usage: list [sd|eeprom]\r\n"));
+        Serial.print(F("  list sd     - Show all files on SD card\r\n"));
+        Serial.print(F("  list eeprom - Show all files on EEPROM\r\n"));
     }
 }
 

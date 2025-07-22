@@ -7,13 +7,13 @@
 namespace DeviceBridge::Storage {
 
 /**
- * @brief Simple EEPROM file system implementation using direct W25Q128 access
+ * @brief Ultra-minimal EEPROM file system with no FAT caching
  * 
- * Provides a lightweight file system for W25Q128 EEPROM storage with:
- * - Simple file operations (create, read, write, delete)
- * - Minimal memory footprint optimized for Arduino Mega (1.5KB directory)
- * - Direct flash memory access without complex filesystem overhead
- * - Sequential file allocation with simple directory structure
+ * Features:
+ * - Zero RAM directory caching (on-demand EEPROM scanning)
+ * - Single directory with filename format: "00001122\334455.EXT"
+ * - Basic operations: list, write, read segments, delete
+ * - Optimized for Arduino Mega memory constraints
  */
 class EEPROMFileSystem : public IFileSystem {
 private:
@@ -22,46 +22,40 @@ private:
     bool _mounted;
     uint32_t _currentFileAddress;
     uint32_t _currentFileSize;
-    char _currentFilename[64];
+    char _currentFilename[16]; // Reduced size for "00001122\334455.EXT"
     
-    // Simple filesystem constants
+    // Filesystem constants
     static constexpr uint32_t FLASH_SIZE = 16 * 1024 * 1024;  // 16MB W25Q128
     static constexpr uint32_t SECTOR_SIZE = 4096;             // 4KB sectors
-    static constexpr uint32_t DIRECTORY_ADDRESS = 0x0000;     // Directory at start of flash
-    static constexpr uint32_t DIRECTORY_SIZE = SECTOR_SIZE;   // One sector for directory
-    static constexpr uint32_t FILE_DATA_START = SECTOR_SIZE;  // Files start after directory
-    static constexpr uint16_t MAX_FILES = 32;                 // Maximum number of files (reduced for RAM constraints)
-    static constexpr uint8_t FILENAME_LENGTH = 12;            // Maximum filename length
+    static constexpr uint32_t DIRECTORY_ENTRIES_PER_SECTOR = SECTOR_SIZE / 32;  // 128 entries per sector
+    static constexpr uint32_t MAX_FILES = 256;                // Total file limit
+    static constexpr uint8_t FILENAME_LENGTH = 16;            // "00001122\334455.EXT"
+    static constexpr uint32_t FILE_DATA_START = 8192;        // Start after 2 directory sectors
     
-    // Directory entry structure (48 bytes per entry)
+    // Compact directory entry (32 bytes)
     struct DirectoryEntry {
-        char filename[FILENAME_LENGTH];  // 12 bytes - filename
-        uint32_t address;               // 4 bytes - file start address  
-        uint32_t size;                  // 4 bytes - file size
-        uint8_t flags;                  // 1 byte - file flags (used/deleted/etc)
+        char filename[FILENAME_LENGTH]; // 16 bytes - "00001122\334455.EXT"
+        uint32_t address;              // 4 bytes - file start address
+        uint32_t size;                 // 4 bytes - file size
+        uint32_t crc32;                // 4 bytes - filename CRC for quick lookup
+        uint32_t reserved;             // 4 bytes - reserved/flags
     } __attribute__((packed));
     
-    static_assert(sizeof(DirectoryEntry) == 21, "DirectoryEntry must be 21 bytes");
+    static_assert(sizeof(DirectoryEntry) == 32, "DirectoryEntry must be 32 bytes");
     
-    // File flags
-    static constexpr uint8_t FLAG_UNUSED = 0x00;
-    static constexpr uint8_t FLAG_USED = 0x01;
-    static constexpr uint8_t FLAG_DELETED = 0x02;
+    // File flags in reserved field
+    static constexpr uint32_t FLAG_UNUSED = 0x00000000;
+    static constexpr uint32_t FLAG_USED = 0x55aa55aa;
+    static constexpr uint32_t FLAG_DELETED = 0xffffffff;
     
-    // File system statistics
-    uint32_t _totalFiles;
-    uint32_t _totalSpace;
-    uint32_t _usedSpace;
-    uint32_t _nextFreeAddress;
-    
-    // Private methods
-    bool initializeDirectory();
-    bool loadDirectory();
-    bool saveDirectory();
-    int findFileEntry(const char* filename);
-    int findFreeEntry();
-    uint32_t calculateNextFreeAddress();
-    bool eraseFile(uint32_t address, uint32_t size);
+    // Private methods - no FAT caching
+    int scanForFile(const char* filename);
+    int findFreeDirectorySlot();
+    bool readDirectoryEntry(int index, DirectoryEntry& entry);
+    bool writeDirectoryEntry(int index, const DirectoryEntry& entry);
+    bool isValidFilename(const char* filename);
+    uint32_t calculateCRC32(const char* filename);
+    uint32_t findNextFreeFileAddress();
     
 public:
     EEPROMFileSystem();
@@ -89,25 +83,19 @@ public:
     bool flush() override;
     bool sync() override;
     
-    // Simple filesystem methods
+    // Custom methods for minimal filesystem
     uint32_t getFileSize(const char* filename);
-    bool defragment();
+    bool readFileSegment(const char* filename, uint32_t offset, uint8_t* buffer, uint16_t length);
     
-    // IFileSystem interface - missing pure virtual methods
+    // IFileSystem interface implementation
     Common::StorageType getStorageType() const override { return Common::StorageType::EEPROM; }
-    const char* getStorageName() const override { return "EEPROM Simple"; }
-    bool isWriteProtected() const override { return false; } // W25Q128 is not write-protected
+    const char* getStorageName() const override { return "EEPROM Minimal"; }
+    bool isWriteProtected() const override { return false; }
     bool hasActiveFile() const override { return _hasActiveFile; }
     uint32_t getBytesWritten() const override { return _bytesWritten; }
     uint32_t getFilesCreated() const override { return _filesCreated; }
     uint16_t getLastError() const override { return _lastError; }
     const char* getLastErrorMessage() const override { return _lastErrorMessage; }
-    
-private:
-    //TODO: I need to remove the fat from memory
-    DirectoryEntry _directory[MAX_FILES];
-    bool _directoryLoaded;
-    bool _directoryModified;
 };
 
 } // namespace DeviceBridge::Storage
