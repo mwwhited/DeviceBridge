@@ -124,6 +124,8 @@ void ConfigurationManager::processCommand(const String &command) {
         printLastFileInfo();
     } else if (command.startsWith(F("list "))) {
         handleListCommand(command);
+    } else if (command.startsWith(F("format "))) {
+        handleFormatCommand(command);
     } else if (command.equalsIgnoreCase(F("restart")) || command.equalsIgnoreCase(F("reset"))) {
         Serial.print(F("Restarting system...\r\n"));
         delay(100);
@@ -162,6 +164,7 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
     Serial.print(F("  list sd           - List all files on SD card\r\n"));
     Serial.print(F("  list eeprom       - List all files on EEPROM\r\n"));
+    Serial.print(F("  format eeprom     - Format EEPROM filesystem (erases all files)\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage           - Show storage/hardware status\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
@@ -1156,6 +1159,29 @@ void ConfigurationManager::handleListCommand(const String &command) {
         Serial.print(F("Usage: list [sd|eeprom]\r\n"));
         Serial.print(F("  list sd     - Show all files on SD card\r\n"));
         Serial.print(F("  list eeprom - Show all files on EEPROM\r\n"));
+    }
+}
+
+void ConfigurationManager::handleFormatCommand(const String &command) {
+    String params = command.substring(7); // Remove "format "
+    params.trim();
+    params.toLowerCase();
+
+    if (params == F("eeprom")) {
+        Serial.print(F("\r\n=== EEPROM Format ===\r\n"));
+        Serial.print(F("⚠️ WARNING: This will erase all files on EEPROM!\r\n"));
+        Serial.print(F("Formatting EEPROM filesystem...\r\n"));
+        
+        if (_cachedFileSystemManager->formatEEPROM()) {
+            Serial.print(F("✅ EEPROM formatted successfully\r\n"));
+        } else {
+            Serial.print(F("❌ EEPROM format failed\r\n"));
+        }
+        Serial.print(F("=====================\r\n"));
+        
+    } else {
+        Serial.print(F("Usage: format eeprom\r\n"));
+        Serial.print(F("  format eeprom - Format EEPROM filesystem (erases all files)\r\n"));
     }
 }
 

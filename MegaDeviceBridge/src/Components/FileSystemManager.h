@@ -133,6 +133,7 @@ public:
     
     // EEPROM file operations
     bool listEEPROMFiles(char* buffer, uint16_t bufferSize) const;
+    bool formatEEPROM();
     
 private:
     // Helper methods

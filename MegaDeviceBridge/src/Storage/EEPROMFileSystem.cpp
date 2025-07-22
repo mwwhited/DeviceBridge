@@ -25,8 +25,20 @@ bool EEPROMFileSystem::initialize() {
         return false;
     }
     
-    Serial.print(F("EEPROM: W25Q128 detected - minimal FS ready\r\n"));
     _initialized = true;
+    
+    // Check if filesystem is formatted by reading first directory entry
+    DirectoryEntry firstEntry;
+    if (!_eeprom.readData(0, (uint8_t*)&firstEntry, sizeof(firstEntry))) {
+        Serial.println(F("EEPROM: ⚠️ Cannot read directory - formatting..."));
+        if (!format()) {
+            Serial.println(F("EEPROM: ❌ Format failed"));
+            _mounted = false;
+            return false;
+        }
+    }
+    
+    Serial.print(F("EEPROM: W25Q128 detected - minimal FS ready\r\n"));
     _mounted = true;
     clearError();
     return true;
@@ -45,36 +57,49 @@ void EEPROMFileSystem::shutdown() {
 }
 
 bool EEPROMFileSystem::createFile(const char* filename) {
+    Serial.print(F("EEPROM: Creating file: "));
+    Serial.println(filename);
+    
     if (!isAvailable()) {
+        Serial.println(F("EEPROM: ❌ Not available"));
         setError(FileSystemErrors::NOT_AVAILABLE, "EEPROM not available");
         return false;
     }
     
     if (_hasActiveFile) {
+        Serial.println(F("EEPROM: Closing existing file"));
         closeFile();
     }
     
     if (!isValidFilename(filename)) {
+        Serial.println(F("EEPROM: ❌ Invalid filename"));
         setError(FileSystemErrors::INVALID_FILENAME, "Invalid filename format");
         return false;
     }
     
     // Check if file already exists by scanning EEPROM
     if (scanForFile(filename) >= 0) {
+        Serial.println(F("EEPROM: ❌ File exists"));
         setError(FileSystemErrors::FILE_EXISTS, "File already exists");
         return false;
     }
     
     // Find free directory slot
     int freeSlot = findFreeDirectorySlot();
+    Serial.print(F("EEPROM: Free slot: "));
+    Serial.println(freeSlot);
     if (freeSlot < 0) {
+        Serial.println(F("EEPROM: ❌ Directory full"));
         setError(FileSystemErrors::INSUFFICIENT_SPACE, "Directory full");
         return false;
     }
     
     // Find next free file address
     uint32_t fileAddress = findNextFreeFileAddress();
+    Serial.print(F("EEPROM: File address: 0x"));
+    Serial.println(fileAddress, HEX);
     if (fileAddress + 1024 > FLASH_SIZE) { // Ensure minimum space
+        Serial.println(F("EEPROM: ❌ Not enough space"));
         setError(FileSystemErrors::INSUFFICIENT_SPACE, "Not enough flash space");
         return false;
     }
@@ -89,8 +114,10 @@ bool EEPROMFileSystem::createFile(const char* filename) {
     entry.crc32 = calculateCRC32(filename);
     entry.reserved = FLAG_USED;
     
+    Serial.println(F("EEPROM: Writing directory entry..."));
     // Write directory entry to EEPROM
     if (!writeDirectoryEntry(freeSlot, entry)) {
+        Serial.println(F("EEPROM: ❌ Directory write failed"));
         setError(FileSystemErrors::FILE_WRITE_FAILED, "Directory write failed");
         return false;
     }
@@ -189,14 +216,33 @@ bool EEPROMFileSystem::closeFile() {
         return true;
     }
     
+    Serial.print(F("EEPROM: Closing file: "));
+    Serial.println(_currentFilename);
+    Serial.print(F("EEPROM: Final size: "));
+    Serial.println(_currentFileSize);
+    
     // Find file entry and update size
     int fileSlot = scanForFile(_currentFilename);
+    Serial.print(F("EEPROM: File slot: "));
+    Serial.println(fileSlot);
+    
     if (fileSlot >= 0) {
         DirectoryEntry entry;
         if (readDirectoryEntry(fileSlot, entry)) {
+            Serial.print(F("EEPROM: Current entry size: "));
+            Serial.println(entry.size);
             entry.size = _currentFileSize;
-            writeDirectoryEntry(fileSlot, entry);
+            Serial.println(F("EEPROM: Updating directory entry size..."));
+            if (writeDirectoryEntry(fileSlot, entry)) {
+                Serial.println(F("EEPROM: ✅ Directory entry updated"));
+            } else {
+                Serial.println(F("EEPROM: ❌ Directory entry update failed"));
+            }
+        } else {
+            Serial.println(F("EEPROM: ❌ Failed to read directory entry"));
         }
+    } else {
+        Serial.println(F("EEPROM: ❌ File not found in directory"));
     }
     
     _hasActiveFile = false;
@@ -252,7 +298,8 @@ bool EEPROMFileSystem::listFiles(char* buffer, uint16_t bufferSize) {
         DirectoryEntry entry;
         if (readDirectoryEntry(i, entry) && entry.reserved == FLAG_USED && entry.filename[0] != '\0') {
             offset += snprintf(buffer + offset, bufferSize - offset,
-                             "  %s (%lu bytes)\r\n", entry.filename, entry.size);
+                             "  %s (%lu bytes) [DEBUG: reserved=0x%08lx]\r\n", 
+                             entry.filename, entry.size, entry.reserved);
             fileCount++;
         }
     }
@@ -389,62 +436,56 @@ bool EEPROMFileSystem::readDirectoryEntry(int index, DirectoryEntry& entry) {
 }
 
 bool EEPROMFileSystem::writeDirectoryEntry(int index, const DirectoryEntry& entry) {
-    if (index < 0 || index >= MAX_FILES) return false;
+    Serial.print(F("EEPROM: writeDirectoryEntry index="));
+    Serial.println(index);
+    
+    if (index < 0 || index >= MAX_FILES) {
+        Serial.println(F("EEPROM: ❌ Invalid index"));
+        return false;
+    }
     
     uint32_t address = (index * sizeof(DirectoryEntry));
+    Serial.print(F("EEPROM: Directory entry address: 0x"));
+    Serial.println(address, HEX);
     
     // Check if we need to erase the sector
     uint32_t sectorAddress = (address / SECTOR_SIZE) * SECTOR_SIZE;
     DirectoryEntry testEntry;
-    if (!_eeprom.readData(address, (uint8_t*)&testEntry, sizeof(testEntry)) ||
-        testEntry.reserved != FLAG_UNUSED) {
-        // Need to read entire sector, modify, erase, and rewrite
-        uint8_t* sectorBuffer = new uint8_t[SECTOR_SIZE];
-        if (!sectorBuffer) return false;
-        
-        // Read current sector
-        if (_eeprom.readData(sectorAddress, sectorBuffer, SECTOR_SIZE)) {
-            // Modify the entry
-            memcpy(sectorBuffer + (address - sectorAddress), &entry, sizeof(entry));
-            
-            // Erase and rewrite
-            if (_eeprom.eraseSector(sectorAddress)) {
-                uint32_t pageSize = _eeprom.getPageSize();
-                for (uint32_t offset = 0; offset < SECTOR_SIZE; offset += pageSize) {
-                    _eeprom.writePage(sectorAddress + offset, sectorBuffer + offset, pageSize);
-                }
-            }
-        }
-        delete[] sectorBuffer;
-        return true;
+    bool needsErase = false;
+    
+    if (!_eeprom.readData(address, (uint8_t*)&testEntry, sizeof(testEntry))) {
+        Serial.println(F("EEPROM: ⚠️ Read failed, assuming needs erase"));
+        needsErase = true;
+    } else if (testEntry.reserved != FLAG_UNUSED) {
+        Serial.print(F("EEPROM: Entry not unused ("));
+        Serial.print(testEntry.reserved);
+        Serial.println(F("), needs erase"));
+        needsErase = true;
+    }
+    
+    if (needsErase) {
+        Serial.println(F("EEPROM: ❌ Sector needs erase - filesystem requires formatting"));
+        Serial.println(F("EEPROM: Use 'format eeprom' command first"));
+        return false;
     }
     
     // Can write directly
-    return _eeprom.writePage(address, (const uint8_t*)&entry, sizeof(entry));
+    Serial.println(F("EEPROM: Direct write"));
+    bool result = _eeprom.writePage(address, (const uint8_t*)&entry, sizeof(entry));
+    Serial.print(F("EEPROM: Direct write result: "));
+    Serial.println(result ? F("✅") : F("❌"));
+    return result;
 }
 
 bool EEPROMFileSystem::isValidFilename(const char* filename) {
     if (!filename) return false;
     
     size_t len = strlen(filename);
-    if (len < 14 || len >= FILENAME_LENGTH) return false;
+    // Just check that filename fits in our buffer and isn't empty
+    if (len == 0 || len >= FILENAME_LENGTH) return false;
     
-    // Check format: "00001122\\334455.EXT"
-    // Should be 8 digits + backslash + 6 digits + dot + extension
-    for (int i = 0; i < 8; i++) {
-        if (!isdigit(filename[i])) return false;
-    }
-    
-    if (filename[8] != '\\') return false;
-    
-    for (int i = 9; i < 15; i++) {
-        if (!isdigit(filename[i])) return false;
-    }
-    
-    if (filename[15] != '.') return false;
-    
-    // Extension should be 2-3 characters
-    return (len == 18 || len == 19);
+    // Accept any filename that fits - no pattern restrictions
+    return true;
 }
 
 uint32_t EEPROMFileSystem::calculateCRC32(const char* filename) {
