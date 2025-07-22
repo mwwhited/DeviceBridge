@@ -1,46 +1,52 @@
 #pragma once
 
 #include "IFileSystem.h"
+#include "W25Q128BlockDevice.h"
 #include "../Common/Config.h"
 #include "../Components/W25Q128Manager.h"
 #include <Arduino.h>
+#include "lfs.h"
 
 namespace DeviceBridge::Storage {
 
 /**
- * @brief EEPROM file system implementation
+ * @brief EEPROM file system implementation using LittleFS
  * 
- * Provides file operations for EEPROM storage with wear leveling,
- * circular buffer management, and sequential file organization.
+ * Provides a robust file system for W25Q128 EEPROM storage with:
+ * - Wear leveling and power-loss resilience
+ * - Directory structure support
+ * - File operations (create, read, write, delete)
+ * - Metadata and file listing capabilities
  */
 class EEPROMFileSystem : public IFileSystem {
 private:
     DeviceBridge::Components::W25Q128Manager _eeprom;
+    W25Q128BlockDevice _blockDevice;
+    lfs_t _lfs;
+    lfs_config _lfsConfig;
+    lfs_file_t _currentFile;
     bool _initialized;
-    uint16_t _currentAddress;
-    uint16_t _fileStartAddress;
-    uint16_t _availableSpace;
+    bool _mounted;
+    char _currentFilename[LFS_NAME_MAX];
     
-    // EEPROM layout constants
-    static constexpr uint16_t HEADER_SIZE = 8;           // File header size
-    static constexpr uint16_t MAX_FILENAME_SIZE = 32;    // Maximum filename length
-    static constexpr uint16_t FILE_ENTRY_OVERHEAD = 48;  // Header + filename + metadata
+    // LittleFS configuration constants
+    static constexpr uint32_t LFS_BLOCK_CYCLES = 500;    // Wear leveling cycles
+    static constexpr uint32_t LFS_CACHE_SIZE = 256;      // Cache size
+    static constexpr uint32_t LFS_LOOKAHEAD_SIZE = 128;  // Lookahead buffer
     
-    // File management
-    struct FileHeader {
-        uint16_t magic;        // File validity marker
-        uint16_t fileSize;     // Size of file data
-        uint8_t filenameLen;   // Length of filename
-        uint8_t fileType;      // File type identifier
-        uint16_t checksum;     // Data integrity checksum
-    };
+    // File system statistics
+    uint32_t _totalFiles;
+    uint32_t _totalSpace;
+    uint32_t _usedSpace;
     
     // Private methods
-    uint16_t calculateAvailableSpace();
-    bool writeFileHeader(const char* filename, uint16_t dataSize);
-    bool findNextWriteAddress();
-    uint16_t calculateChecksum(const uint8_t* data, uint16_t length);
-    bool verifyIntegrity(uint16_t address, uint16_t expectedSize);
+    bool initializeLittleFS();
+    bool mountFileSystem();
+    void unmountFileSystem();
+    bool formatFileSystem();
+    void updateStatistics();
+    int convertLfsError(int lfsError);
+    const char* getLfsErrorMessage(int lfsError);
     
 public:
     EEPROMFileSystem();
@@ -69,7 +75,7 @@ public:
     Common::StorageType getStorageType() const override { 
         return Common::StorageType(Common::StorageType::EEPROM); 
     }
-    const char* getStorageName() const override { return "EEPROM"; }
+    const char* getStorageName() const override { return "LittleFS-EEPROM"; }
     bool isWriteProtected() const override { return false; } // EEPROM not write-protectable
     bool hasActiveFile() const override { return _hasActiveFile; }
     
@@ -79,15 +85,31 @@ public:
     uint16_t getLastError() const override { return _lastError; }
     const char* getLastErrorMessage() const override { return _lastErrorMessage; }
     
-    // EEPROM specific features
+    // LittleFS-enhanced features
     bool format() override final;
-    bool flush() override { return true; }  // EEPROM writes are immediate
-    bool sync() override { return true; }   // EEPROM writes are immediate
+    bool flush() override final;             // Sync file system to storage
+    bool sync() override final;              // Sync file system to storage
     
-    // EEPROM-specific methods
-    bool defragment();                      // Compact storage space
-    uint16_t getWearLevel();               // Get wear leveling statistics
-    bool verifyAllFiles();                 // Verify integrity of all stored files
+    // LittleFS-specific methods
+    bool createDirectory(const char* path);  // Create directory
+    bool removeDirectory(const char* path);  // Remove directory
+    bool isDirectory(const char* path);      // Check if path is directory
+    uint32_t getFileSize(const char* filename); // Get file size
+    bool renameFile(const char* oldname, const char* newname); // Rename file
+    bool copyFile(const char* src, const char* dst); // Copy file
+    
+    // Advanced file operations
+    int readFile(const char* filename, uint8_t* buffer, uint32_t bufferSize); // Read entire file
+    bool writeFile(const char* filename, const uint8_t* data, uint32_t length); // Write entire file
+    bool appendToFile(const char* filename, const uint8_t* data, uint32_t length); // Append to file
+    
+    // File system integrity and maintenance
+    bool checkFileSystem();                 // Check file system integrity
+    uint32_t getBlockSize() const;          // Get block size
+    uint32_t getTotalBlocks() const;        // Get total block count
+    uint32_t getFreeBlocks() const;         // Get free block count
+    uint32_t getBadBlocks() const;          // Get bad block count
+    float getFragmentation() const;         // Get fragmentation percentage
 };
 
 } // namespace DeviceBridge::Storage
