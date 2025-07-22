@@ -89,6 +89,9 @@ public:
     uint32_t getFileSize(const char* filename);
     bool readFileSegment(const char* filename, uint32_t offset, uint8_t* buffer, uint16_t length);
     
+    // Enhanced file operations for feature requests
+    bool readFile(const char* filename, char* buffer, uint16_t bufferSize) override;
+    
     // IFileSystem interface implementation
     Common::StorageType getStorageType() const override { return Common::StorageType::EEPROM; }
     const char* getStorageName() const override { return "EEPROM Minimal"; }

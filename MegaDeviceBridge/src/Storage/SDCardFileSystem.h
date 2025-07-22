@@ -49,6 +49,9 @@ public:
     uint32_t getTotalSpace() override final;
     uint32_t getFreeSpace() override final;
     
+    // Enhanced file operations for feature requests
+    bool readFile(const char* filename, char* buffer, uint16_t bufferSize) override final;
+    
     // Status inquiry
     Common::StorageType getStorageType() const override { 
         return Common::StorageType(Common::StorageType::SD_CARD); 

@@ -77,6 +77,9 @@ public:
     uint32_t getTotalSpace() override final;
     uint32_t getFreeSpace() override final;
     
+    // Enhanced file operations for feature requests
+    bool readFile(const char* filename, char* buffer, uint16_t bufferSize) override final;
+    
     // Status inquiry
     Common::StorageType getStorageType() const override { 
         return Common::StorageType(Common::StorageType::SERIAL_TRANSFER); 
@@ -102,6 +105,9 @@ public:
     void setProgressCallback(void (*callback)(uint32_t percent));
     bool enableBinaryMode(bool enable);   // Switch between text and binary transfer
     bool setTransferSpeed(uint32_t baudRate); // Change serial speed for transfer
+    
+    // Enhanced serial transfer methods for feature requests
+    bool writeDataWithHexStream(const uint8_t* data, uint16_t length);
     
 private:
     void (*_progressCallback)(uint32_t percent) = nullptr;

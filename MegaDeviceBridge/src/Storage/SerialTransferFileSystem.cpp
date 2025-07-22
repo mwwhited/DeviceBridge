@@ -88,17 +88,25 @@ bool SerialTransferFileSystem::writeData(const uint8_t* data, uint16_t length) {
     
     // Start transfer if this is the first write
     if (!_transferInProgress) {
-        if (!sendTransferHeader(_currentFilename, 0)) { // Size unknown at start
-            setError(FileSystemErrors::FILE_WRITE_FAILED, "Failed to send transfer header");
-            return false;
-        }
+        // Send BEGIN delimiter with filename
+        Serial.print(F("------BEGIN---"));
+        Serial.print(_currentFilename);
+        Serial.print(F("------\r\n"));
         _transferInProgress = true;
     }
     
-    // Send data chunk
-    if (!sendDataChunk(data, length)) {
-        setError(FileSystemErrors::FILE_WRITE_FAILED, "Failed to send data chunk");
-        return false;
+    // Send data as hex stream with CRLF every 128 bytes (64 hex pairs)
+    for (uint16_t i = 0; i < length; i++) {
+        // Check if we need a line break (every 64 bytes = 128 hex chars)
+        if (i > 0 && i % 64 == 0) {
+            Serial.print(F("\r\n"));
+        }
+        
+        // Send byte as hex
+        if (data[i] < 0x10) {
+            Serial.print(F("0"));
+        }
+        Serial.print(data[i], HEX);
     }
     
     _transferredBytes += length;
@@ -120,10 +128,10 @@ bool SerialTransferFileSystem::closeFile() {
     
     // Send transfer end packet
     if (_transferInProgress) {
-        if (!sendTransferEnd()) {
-            setError(FileSystemErrors::FILE_CLOSE_FAILED, "Failed to send transfer end");
-            return false;
-        }
+        // Send END delimiter with filename
+        Serial.print(F("\r\n------END---"));
+        Serial.print(_currentFilename);
+        Serial.print(F("------\r\n"));
         _transferInProgress = false;
     }
     
@@ -144,16 +152,15 @@ bool SerialTransferFileSystem::fileExists(const char* filename) {
 }
 
 bool SerialTransferFileSystem::listFiles(char* buffer, uint16_t bufferSize) {
-    if (!isAvailable()) {
-        setError(FileSystemErrors::NOT_AVAILABLE, "Serial not available");
+    if (!buffer || bufferSize < 20) {
+        setError(FileSystemErrors::INVALID_PARAMETER, "Invalid buffer parameters");
         return false;
     }
     
-    // Show transfer statistics
-    snprintf(buffer, bufferSize, "Serial Transfer: %lu files, %lu bytes\n", 
-             getFilesCreated(), getBytesWritten());
-    clearError();
-    return true;
+    // Serial storage doesn't support file listing
+    snprintf(buffer, bufferSize, "NOT SUPPORTED");
+    setError(FileSystemErrors::INVALID_PARAMETER, "List files not supported for serial storage");
+    return false;
 }
 
 uint32_t SerialTransferFileSystem::getFileCount() {
@@ -330,6 +337,52 @@ void SerialTransferFileSystem::sendProgressUpdate() {
 bool SerialTransferFileSystem::waitForAcknowledgment(uint32_t timeoutMs) {
     // Simple implementation - just add delay for transmission
     delay(timeoutMs / 100); // Short delay to allow transmission
+    return true;
+}
+
+bool SerialTransferFileSystem::readFile(const char* filename, char* buffer, uint16_t bufferSize) {
+    if (!buffer || bufferSize < 20) {
+        setError(FileSystemErrors::INVALID_PARAMETER, "Invalid read parameters");
+        return false;
+    }
+    
+    // Serial storage doesn't support file reading
+    snprintf(buffer, bufferSize, "NOT SUPPORTED");
+    setError(FileSystemErrors::INVALID_PARAMETER, "Read not supported for serial storage");
+    return false;
+}
+
+bool SerialTransferFileSystem::writeDataWithHexStream(const uint8_t* data, uint16_t length) {
+    if (!Serial || !isAvailable() || !_hasActiveFile) {
+        setError(FileSystemErrors::NOT_AVAILABLE, "Serial not available for hex stream");
+        return false;
+    }
+    
+    if (!data || length == 0) {
+        return true; // No data to write
+    }
+    
+    // Send hex stream with line breaks every 128 bytes (64 hex pairs)
+    static uint16_t bytesOnLine = 0;
+    
+    for (uint16_t i = 0; i < length; i++) {
+        // Check if we need a line break
+        if (bytesOnLine >= 64) {
+            Serial.print(F("\r\n"));
+            bytesOnLine = 0;
+        }
+        
+        // Send byte as hex
+        if (data[i] < 0x10) {
+            Serial.print(F("0"));
+        }
+        Serial.print(data[i], HEX);
+        bytesOnLine++;
+    }
+    
+    _transferredBytes += length;
+    _bytesWritten += length;
+    clearError();
     return true;
 }
 

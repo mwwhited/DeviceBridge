@@ -37,6 +37,9 @@ public:
     virtual uint32_t getTotalSpace() = 0;
     virtual uint32_t getFreeSpace() = 0;
     
+    // Enhanced file operations for feature requests
+    virtual bool readFile(const char* filename, char* buffer, uint16_t bufferSize) = 0;
+    
     // Status inquiry
     virtual Common::StorageType getStorageType() const = 0;
     virtual const char* getStorageName() const = 0;

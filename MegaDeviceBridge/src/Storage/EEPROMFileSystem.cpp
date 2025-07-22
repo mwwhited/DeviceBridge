@@ -429,6 +429,53 @@ bool EEPROMFileSystem::readFileSegment(const char* filename, uint32_t offset, ui
     return _eeprom.readData(entry.address + offset, buffer, length);
 }
 
+bool EEPROMFileSystem::readFile(const char* filename, char* buffer, uint16_t bufferSize) {
+    if (!filename || !buffer || bufferSize < 50) {
+        setError(FileSystemErrors::INVALID_PARAMETER, "Invalid read parameters");
+        return false;
+    }
+    
+    // Find file size
+    uint32_t fileSize = getFileSize(filename);
+    if (fileSize == 0) {
+        setError(FileSystemErrors::FILE_NOT_FOUND, "File not found");
+        return false;
+    }
+    
+    uint16_t offset = 0;
+    offset += snprintf(buffer + offset, bufferSize - offset, 
+                      "File: %s (%lu bytes)\r\n", filename, fileSize);
+    
+    // Read file in chunks - return raw binary data for EEPROM
+    uint8_t readBuffer[64];
+    uint32_t bytesRead = 0;
+    uint32_t maxBytesToShow = (bufferSize - offset - 50) / 2; // Space for hex representation
+    
+    if (fileSize > maxBytesToShow) {
+        offset += snprintf(buffer + offset, bufferSize - offset,
+                          "(Showing first %lu bytes)\r\n", maxBytesToShow);
+        fileSize = maxBytesToShow;
+    }
+    
+    while (bytesRead < fileSize && offset < bufferSize - 100) {
+        uint16_t chunkSize = (fileSize - bytesRead > 64) ? 64 : (fileSize - bytesRead);
+        
+        if (readFileSegment(filename, bytesRead, readBuffer, chunkSize)) {
+            // Add the raw data (will be interpreted by receiving storage)
+            for (uint16_t i = 0; i < chunkSize && offset < bufferSize - 10; i++) {
+                buffer[offset++] = readBuffer[i];
+            }
+            bytesRead += chunkSize;
+        } else {
+            break;
+        }
+    }
+    
+    buffer[offset] = '\0'; // Null terminate
+    clearError();
+    return true;
+}
+
 // Private methods
 int EEPROMFileSystem::scanForFile(const char* filename) {
     if (!filename) return -1;

@@ -280,6 +280,50 @@ bool SDCardFileSystem::reinitialize() {
     return initialize();
 }
 
+bool SDCardFileSystem::readFile(const char* filename, char* buffer, uint16_t bufferSize) {
+    if (!filename || !buffer || bufferSize < 50) {
+        setError(FileSystemErrors::INVALID_PARAMETER, "Invalid read parameters");
+        return false;
+    }
+    
+    if (!isAvailable()) {
+        setError(FileSystemErrors::NOT_AVAILABLE, "SD card not available");
+        return false;
+    }
+    
+    File file = SD.open(filename, FILE_READ);
+    if (!file) {
+        setError(FileSystemErrors::FILE_NOT_FOUND, "File not found");
+        return false;
+    }
+    
+    uint32_t fileSize = file.size();
+    uint16_t offset = 0;
+    
+    offset += snprintf(buffer + offset, bufferSize - offset, 
+                      "File: %s (%lu bytes)\r\n", filename, fileSize);
+    
+    // Read file data directly (raw binary) - let receiving storage decide format
+    uint32_t maxBytesToRead = bufferSize - offset - 10;
+    uint32_t bytesToRead = (fileSize > maxBytesToRead) ? maxBytesToRead : fileSize;
+    
+    if (fileSize > maxBytesToRead) {
+        offset += snprintf(buffer + offset, bufferSize - offset,
+                          "(Showing first %lu bytes)\r\n", maxBytesToRead);
+    }
+    
+    int bytesRead = file.read((uint8_t*)(buffer + offset), bytesToRead);
+    if (bytesRead > 0) {
+        offset += bytesRead;
+    }
+    
+    file.close();
+    
+    buffer[offset] = '\0'; // Null terminate
+    clearError();
+    return true;
+}
+
 // Private methods
 bool SDCardFileSystem::checkCardPresence() const {
     // SD_CD pin is active LOW (card present when LOW)
