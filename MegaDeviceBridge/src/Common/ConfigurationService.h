@@ -43,22 +43,29 @@ public:
     static constexpr uint32_t getChunkSendTimeoutMs() { return Buffer::CHUNK_SEND_TIMEOUT_MS; }
     static constexpr uint16_t getMinChunkSize() { return Buffer::MIN_CHUNK_SIZE; }
     
-    // Flow control threshold calculation - OPTIMIZED FOR TDS2024
-    static constexpr uint16_t getPreWarningFlowThreshold(uint16_t bufferSize) {
+    // Flow control threshold calculation - OPTIMIZED FOR TDS2024 with compile-time evaluation
+    static constexpr uint16_t getPreWarningFlowThreshold(uint16_t bufferSize = Buffer::RING_BUFFER_SIZE) {
         return (bufferSize * Buffer::FLOW_CONTROL_40_PERCENT) / Buffer::FLOW_CONTROL_40_DIVISOR;
     }
     
-    static constexpr uint16_t getModerateFlowThreshold(uint16_t bufferSize) {
+    static constexpr uint16_t getModerateFlowThreshold(uint16_t bufferSize = Buffer::RING_BUFFER_SIZE) {
         return (bufferSize * Buffer::FLOW_CONTROL_50_PERCENT) / Buffer::FLOW_CONTROL_50_DIVISOR;
     }
     
-    static constexpr uint16_t getCriticalFlowThreshold(uint16_t bufferSize) {
+    static constexpr uint16_t getCriticalFlowThreshold(uint16_t bufferSize = Buffer::RING_BUFFER_SIZE) {
         return (bufferSize * Buffer::FLOW_CONTROL_70_PERCENT) / Buffer::FLOW_CONTROL_70_DIVISOR;
     }
     
-    static constexpr uint16_t getRecoveryFlowThreshold(uint16_t bufferSize) {
+    static constexpr uint16_t getRecoveryFlowThreshold(uint16_t bufferSize = Buffer::RING_BUFFER_SIZE) {
         return (bufferSize * Buffer::FLOW_CONTROL_40_PERCENT) / Buffer::FLOW_CONTROL_40_DIVISOR;
     }
+    
+    // Pre-computed constants for default ring buffer size (compile-time optimized)
+    // Using direct calculation to avoid forward declaration issues
+    static constexpr uint16_t DEFAULT_PRE_WARNING_THRESHOLD = (Buffer::RING_BUFFER_SIZE * Buffer::FLOW_CONTROL_40_PERCENT) / Buffer::FLOW_CONTROL_40_DIVISOR;
+    static constexpr uint16_t DEFAULT_MODERATE_THRESHOLD = (Buffer::RING_BUFFER_SIZE * Buffer::FLOW_CONTROL_50_PERCENT) / Buffer::FLOW_CONTROL_50_DIVISOR;
+    static constexpr uint16_t DEFAULT_CRITICAL_THRESHOLD = (Buffer::RING_BUFFER_SIZE * Buffer::FLOW_CONTROL_70_PERCENT) / Buffer::FLOW_CONTROL_70_DIVISOR;
+    static constexpr uint16_t DEFAULT_RECOVERY_THRESHOLD = (Buffer::RING_BUFFER_SIZE * Buffer::FLOW_CONTROL_40_PERCENT) / Buffer::FLOW_CONTROL_40_DIVISOR;
     
     // Legacy flow control thresholds for compatibility
     static constexpr uint16_t getLegacyModerateFlowThreshold(uint16_t bufferSize) {
@@ -91,7 +98,7 @@ public:
     static constexpr uint8_t getPsSignature1() { return FileFormats::PS_SIGNATURE_1; }
     static constexpr uint8_t getPsSignature2() { return FileFormats::PS_SIGNATURE_2; }
     
-    // TIFF signatures
+    // TIFF signatures - compile-time optimized comparisons
     static constexpr bool isTiffLittleEndian(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4) {
         return (b1 == FileFormats::TIFF_LE_1 && b2 == FileFormats::TIFF_LE_2 && 
                 b3 == FileFormats::TIFF_LE_3 && b4 == FileFormats::TIFF_LE_4);
@@ -100,6 +107,15 @@ public:
     static constexpr bool isTiffBigEndian(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4) {
         return (b1 == FileFormats::TIFF_BE_1 && b2 == FileFormats::TIFF_BE_2 && 
                 b3 == FileFormats::TIFF_BE_3 && b4 == FileFormats::TIFF_BE_4);
+    }
+    
+    // Compile-time optimized file format detection helpers
+    static constexpr bool isBmpSignature(uint8_t b1, uint8_t b2) {
+        return (b1 == FileFormats::BMP_SIGNATURE_1 && b2 == FileFormats::BMP_SIGNATURE_2);
+    }
+    
+    static constexpr bool isPostScriptSignature(uint8_t b1, uint8_t b2) {
+        return (b1 == FileFormats::PS_SIGNATURE_1 && b2 == FileFormats::PS_SIGNATURE_2);
     }
     
     // Flash memory configuration access
