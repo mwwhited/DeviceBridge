@@ -18,52 +18,12 @@ EEPROMFileSystem::~EEPROMFileSystem() {
 }
 
 bool EEPROMFileSystem::initialize() {
-    // Initialize the W25Q128 EEPROM first
-    if (!_eeprom.initialize()) {
-        setError(FileSystemErrors::INIT_FAILED, "W25Q128 EEPROM initialization failed");
-        return false;
-    }
+    // TEMPORARY: Disable EEPROM LittleFS due to system lockup
+    Serial.print(F("EEPROM: LittleFS temporarily disabled to prevent system lockup\r\n"));
+    Serial.print(F("EEPROM: W25Q128 chip detected but LittleFS integration needs debugging\r\n"));
     
-    // Initialize the block device adapter
-    if (!_blockDevice.initialize()) {
-        setError(FileSystemErrors::INIT_FAILED, "Block device initialization failed");
-        return false;
-    }
-    
-    // Initialize LittleFS
-    if (!initializeLittleFS()) {
-        setError(FileSystemErrors::INIT_FAILED, "LittleFS initialization failed");
-        return false;
-    }
-    
-    // Try to mount existing file system
-    if (!mountFileSystem()) {
-        // If mount fails, format and create new file system
-        Serial.print(F("EEPROM: No existing file system found, formatting...\\r\\n"));
-        
-        if (!formatFileSystem()) {
-            setError(FileSystemErrors::INIT_FAILED, "File system format failed");
-            return false;
-        }
-        
-        if (!mountFileSystem()) {
-            setError(FileSystemErrors::INIT_FAILED, "File system mount after format failed");
-            return false;
-        }
-    }
-    
-    _initialized = true;
-    updateStatistics();
-    clearError();
-    
-    Serial.print(F("EEPROM: LittleFS initialized successfully\\r\\n"));
-    Serial.print(F("EEPROM: Total space: "));
-    Serial.print(getTotalSpace());
-    Serial.print(F(" bytes, Free space: "));
-    Serial.print(getFreeSpace());
-    Serial.print(F(" bytes\\r\\n"));
-    
-    return true;
+    setError(FileSystemErrors::NOT_AVAILABLE, "LittleFS temporarily disabled");
+    return false;
 }
 
 bool EEPROMFileSystem::isAvailable() const {
@@ -587,6 +547,8 @@ float EEPROMFileSystem::getFragmentation() const {
 
 // Private methods
 bool EEPROMFileSystem::initializeLittleFS() {
+    Serial.print(F("EEPROM: Configuring LittleFS parameters...\r\n"));
+    
     // Configure LittleFS
     memset(&_lfsConfig, 0, sizeof(_lfsConfig));
     
@@ -604,11 +566,43 @@ bool EEPROMFileSystem::initializeLittleFS() {
     _lfsConfig.lookahead_size = _blockDevice.getLookaheadSize();
     _lfsConfig.block_cycles = LFS_BLOCK_CYCLES;
     
+    // Debug configuration values
+    Serial.print(F("LittleFS Config:\r\n"));
+    Serial.print(F("  - read_size: "));
+    Serial.print(_lfsConfig.read_size);
+    Serial.print(F("\r\n"));
+    Serial.print(F("  - prog_size: "));
+    Serial.print(_lfsConfig.prog_size);
+    Serial.print(F("\r\n"));
+    Serial.print(F("  - block_size: "));
+    Serial.print(_lfsConfig.block_size);
+    Serial.print(F("\r\n"));
+    Serial.print(F("  - block_count: "));
+    Serial.print(_lfsConfig.block_count);
+    Serial.print(F("\r\n"));
+    Serial.print(F("  - cache_size: "));
+    Serial.print(_lfsConfig.cache_size);
+    Serial.print(F("\r\n"));
+    Serial.print(F("  - lookahead_size: "));
+    Serial.print(_lfsConfig.lookahead_size);
+    Serial.print(F("\r\n"));
+    Serial.print(F("  - block_cycles: "));
+    Serial.print(_lfsConfig.block_cycles);
+    Serial.print(F("\r\n"));
+    
     // Assign buffers
     _lfsConfig.read_buffer = _blockDevice.getCacheBuffer();
     _lfsConfig.prog_buffer = _blockDevice.getCacheBuffer();
     _lfsConfig.lookahead_buffer = _blockDevice.getLookaheadBuffer();
     
+    // Basic validation
+    if (!_lfsConfig.read_buffer || !_lfsConfig.lookahead_buffer || 
+        _lfsConfig.cache_size == 0 || _lfsConfig.lookahead_size == 0) {
+        Serial.print(F("EEPROM: ❌ Buffer validation failed\r\n"));
+        return false;
+    }
+    
+    Serial.print(F("EEPROM: ✅ LittleFS configuration completed\r\n"));
     return true;
 }
 

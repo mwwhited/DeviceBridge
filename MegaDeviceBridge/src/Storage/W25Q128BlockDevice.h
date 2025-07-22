@@ -23,10 +23,10 @@ private:
     static constexpr uint32_t PROG_SIZE = 256;        // Page program size
     static constexpr uint32_t READ_SIZE = 1;          // Minimum read size
     static constexpr uint32_t ERASE_SIZE = 4096;      // Sector erase size
-    static constexpr uint32_t CACHE_SIZE = 256;       // Cache size for performance
-    static constexpr uint32_t LOOKAHEAD_SIZE = 128;   // Lookahead buffer size
+    static constexpr uint32_t CACHE_SIZE = 64;        // Minimal cache size for Arduino Mega
+    static constexpr uint32_t LOOKAHEAD_SIZE = 32;    // Minimal lookahead buffer size
     
-    // Performance optimization
+    // Minimal buffers to prevent memory issues
     uint8_t _cache_buffer[CACHE_SIZE];
     uint8_t _lookahead_buffer[LOOKAHEAD_SIZE];
     

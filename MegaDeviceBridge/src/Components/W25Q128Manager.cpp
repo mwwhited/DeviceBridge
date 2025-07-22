@@ -15,20 +15,75 @@ W25Q128Manager::~W25Q128Manager() {
 }
 
 bool W25Q128Manager::initialize() {
+    Serial.print(F("W25Q128: Starting initialization...\r\n"));
+    Serial.print(F("W25Q128: CS pin: "));
+    Serial.print(_csPin);
+    Serial.print(F("\r\n"));
+    
     // Configure CS pin
+    Serial.print(F("W25Q128: Configuring CS pin as OUTPUT...\r\n"));
     pinMode(_csPin, OUTPUT);
     chipSelect(false); // Deselect initially
+    Serial.print(F("W25Q128: CS pin configured and deselected\r\n"));
     
     // Initialize SPI (should already be done by main)
+    Serial.print(F("W25Q128: Initializing SPI...\r\n"));
     SPI.begin();
+    Serial.print(F("W25Q128: SPI initialized\r\n"));
+    
+    // Small delay to ensure SPI is stable
+    delay(10);
+    Serial.print(F("W25Q128: SPI stabilization delay complete\r\n"));
     
     // Read JEDEC ID to verify chip presence
+    Serial.print(F("W25Q128: Reading JEDEC ID to detect chip...\r\n"));
     uint32_t jedecId = readJedecId();
+    
+    Serial.print(F("W25Q128: JEDEC ID read: 0x"));
+    Serial.print(jedecId, HEX);
+    Serial.print(F(" (raw 32-bit)\r\n"));
+    
+    Serial.print(F("W25Q128: JEDEC ID masked: 0x"));
+    Serial.print(jedecId & 0xFFFFFF, HEX);
+    Serial.print(F(" (24-bit)\r\n"));
+    
+    Serial.print(F("W25Q128: Expected JEDEC ID: 0x"));
+    Serial.print(Common::Flash::W25Q128_JEDEC_ID, HEX);
+    Serial.print(F("\r\n"));
+    
+    // Analyze individual bytes
+    uint8_t manufacturerId = (jedecId >> 16) & 0xFF;
+    uint8_t deviceId1 = (jedecId >> 8) & 0xFF;
+    uint8_t deviceId2 = jedecId & 0xFF;
+    
+    Serial.print(F("W25Q128: Manufacturer ID: 0x"));
+    Serial.print(manufacturerId, HEX);
+    Serial.print(F(" (expected: 0xEF for Winbond)\r\n"));
+    
+    Serial.print(F("W25Q128: Device ID 1: 0x"));
+    Serial.print(deviceId1, HEX);
+    Serial.print(F(" (expected: 0x40)\r\n"));
+    
+    Serial.print(F("W25Q128: Device ID 2: 0x"));
+    Serial.print(deviceId2, HEX);
+    Serial.print(F(" (expected: 0x18)\r\n"));
     
     // W25Q128 JEDEC ID should be 0xEF4018 (Winbond, 128Mbit)
     if ((jedecId & 0xFFFFFF) == Common::Flash::W25Q128_JEDEC_ID) {
+        Serial.print(F("W25Q128: ✅ Chip identified successfully as W25Q128\r\n"));
         _initialized = true;
         return true;
+    }
+    
+    Serial.print(F("W25Q128: ❌ Chip not detected or JEDEC ID mismatch\r\n"));
+    
+    // Provide diagnostic information
+    if (jedecId == 0x000000 || jedecId == 0xFFFFFF) {
+        Serial.print(F("W25Q128: ❌ No response from chip (likely not present or wrong CS pin)\r\n"));
+    } else if (manufacturerId == 0xEF) {
+        Serial.print(F("W25Q128: ⚠️  Winbond chip detected but wrong capacity\r\n"));
+    } else {
+        Serial.print(F("W25Q128: ⚠️  Different flash chip detected\r\n"));
     }
     
     return false;
@@ -108,7 +163,18 @@ bool W25Q128Manager::readData(uint32_t address, uint8_t* buffer, uint32_t length
 }
 
 bool W25Q128Manager::writePage(uint32_t address, const uint8_t* buffer, uint32_t length) {
-    if (!_initialized || !isAddressValid(address) || !buffer || length == 0) {
+    if (!_initialized) {
+        Serial.print(F("W25Q128: ❌ Write failed - not initialized\r\n"));
+        return false;
+    }
+    if (!isAddressValid(address)) {
+        Serial.print(F("W25Q128: ❌ Write failed - invalid address 0x"));
+        Serial.print(address, HEX);
+        Serial.print(F("\r\n"));
+        return false;
+    }
+    if (!buffer || length == 0) {
+        Serial.print(F("W25Q128: ❌ Write failed - invalid buffer or length\r\n"));
         return false;
     }
     
@@ -116,12 +182,19 @@ bool W25Q128Manager::writePage(uint32_t address, const uint8_t* buffer, uint32_t
     uint32_t pageOffset = address % PAGE_SIZE;
     if (pageOffset + length > PAGE_SIZE) {
         length = PAGE_SIZE - pageOffset;
+        Serial.print(F("W25Q128: ⚠️  Length adjusted to avoid page boundary crossing\r\n"));
     }
     
     // Note: No mutex needed in loop-based architecture
     
     waitForReady();
     writeEnable();
+    
+    // Verify write enable was successful
+    uint8_t status = readStatus();
+    if (!(status & STATUS_WEL)) {
+        return false;
+    }
     
     chipSelect(true);
     SPI.transfer(CMD_PAGE_PROGRAM);
@@ -136,23 +209,45 @@ bool W25Q128Manager::writePage(uint32_t address, const uint8_t* buffer, uint32_t
     chipSelect(false);
     waitForReady();
     
+    // Verify write was successful by checking status
+    status = readStatus();
+    if (status & STATUS_WEL) {
+        return false;
+    }
+    
     // Note: No mutex needed in loop-based architecture
     
     return true;
 }
 
 bool W25Q128Manager::eraseSector(uint32_t address) {
-    if (!_initialized || !isAddressValid(address)) {
+    if (!_initialized) {
+        Serial.print(F("W25Q128: ❌ Erase failed - not initialized\r\n"));
+        return false;
+    }
+    if (!isAddressValid(address)) {
+        Serial.print(F("W25Q128: ❌ Erase failed - invalid address 0x"));
+        Serial.print(address, HEX);
+        Serial.print(F("\r\n"));
         return false;
     }
     
     // Align to sector boundary
+    uint32_t originalAddress = address;
     address = getSectorAddress(address);
+    
+    // Minimal logging to prevent lockups
     
     // Note: No mutex needed in loop-based architecture
     
     waitForReady();
     writeEnable();
+    
+    // Verify write enable was successful
+    uint8_t status = readStatus();
+    if (!(status & STATUS_WEL)) {
+        return false;
+    }
     
     chipSelect(true);
     SPI.transfer(CMD_SECTOR_ERASE_4KB);
@@ -162,6 +257,12 @@ bool W25Q128Manager::eraseSector(uint32_t address) {
     chipSelect(false);
     
     waitForReady(); // Sector erase can take up to 400ms
+    
+    // Verify erase was successful
+    status = readStatus();
+    if (status & STATUS_WEL) {
+        return false;
+    }
     
     // Note: No mutex needed in loop-based architecture
     

@@ -14,11 +14,35 @@ W25Q128BlockDevice::~W25Q128BlockDevice() {
 }
 
 bool W25Q128BlockDevice::initialize() {
-    if (!_flash || !_flash->isInitialized()) {
+    Serial.print(F("W25Q128BlockDevice: Starting initialization...\r\n"));
+    
+    if (!_flash) {
+        Serial.print(F("W25Q128BlockDevice: ❌ Flash manager pointer is null\r\n"));
         return false;
     }
+    Serial.print(F("W25Q128BlockDevice: ✅ Flash manager pointer is valid\r\n"));
+    
+    if (!_flash->isInitialized()) {
+        Serial.print(F("W25Q128BlockDevice: ❌ Flash manager not initialized\r\n"));
+        return false;
+    }
+    Serial.print(F("W25Q128BlockDevice: ✅ Flash manager is initialized\r\n"));
+    
+    Serial.print(F("W25Q128BlockDevice: Block device configuration:\r\n"));
+    Serial.print(F("  - Total blocks: "));
+    Serial.print(getBlockCount());
+    Serial.print(F("\r\n"));
+    Serial.print(F("  - Block size: "));
+    Serial.print(getBlockSize());
+    Serial.print(F(" bytes\r\n"));
+    Serial.print(F("  - Total capacity: "));
+    Serial.print((uint32_t)getBlockCount() * getBlockSize());
+    Serial.print(F(" bytes ("));
+    Serial.print((uint32_t)getBlockCount() * getBlockSize() / 1024);
+    Serial.print(F(" KB)\r\n"));
     
     _initialized = true;
+    Serial.print(F("W25Q128BlockDevice: ✅ Initialization complete\r\n"));
     return true;
 }
 
@@ -60,15 +84,17 @@ int W25Q128BlockDevice::program(uint32_t block, uint32_t offset, const void* buf
     uint32_t remaining = size;
     uint32_t current_offset = offset;
     
+    uint32_t data_offset = 0;
     while (remaining > 0) {
         uint32_t page_offset = (address + current_offset) % _flash->getPageSize();
         uint32_t bytes_to_write = min(remaining, _flash->getPageSize() - page_offset);
         
-        if (!_flash->writePage(address + current_offset, data + current_offset, bytes_to_write)) {
+        if (!_flash->writePage(address + current_offset, data + data_offset, bytes_to_write)) {
             return LFS_ERR_IO;
         }
         
         current_offset += bytes_to_write;
+        data_offset += bytes_to_write;
         remaining -= bytes_to_write;
     }
     
