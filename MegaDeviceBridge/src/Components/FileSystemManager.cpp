@@ -11,6 +11,24 @@
 // PROGMEM component name for memory optimization
 static const char component_name[] PROGMEM = "FileSystemManager";
 
+// Performance-critical file format detection constants cached for maximum speed
+namespace FileFormatConstants {
+    static constexpr uint8_t BMP_SIGNATURE_1 = DeviceBridge::Common::FileFormats::BMP_SIGNATURE_1;
+    static constexpr uint8_t BMP_SIGNATURE_2 = DeviceBridge::Common::FileFormats::BMP_SIGNATURE_2;
+    static constexpr uint8_t PCX_SIGNATURE = DeviceBridge::Common::FileFormats::PCX_SIGNATURE;
+    static constexpr uint8_t ESC_CHARACTER = DeviceBridge::Common::FileFormats::ESC_CHARACTER;
+    static constexpr uint8_t PS_SIGNATURE_1 = DeviceBridge::Common::FileFormats::PS_SIGNATURE_1;
+    static constexpr uint8_t PS_SIGNATURE_2 = DeviceBridge::Common::FileFormats::PS_SIGNATURE_2;
+    static constexpr uint8_t TIFF_LE_1 = DeviceBridge::Common::FileFormats::TIFF_LE_1;
+    static constexpr uint8_t TIFF_LE_2 = DeviceBridge::Common::FileFormats::TIFF_LE_2;
+    static constexpr uint8_t TIFF_LE_3 = DeviceBridge::Common::FileFormats::TIFF_LE_3;
+    static constexpr uint8_t TIFF_LE_4 = DeviceBridge::Common::FileFormats::TIFF_LE_4;
+    static constexpr uint8_t TIFF_BE_1 = DeviceBridge::Common::FileFormats::TIFF_BE_1;
+    static constexpr uint8_t TIFF_BE_2 = DeviceBridge::Common::FileFormats::TIFF_BE_2;
+    static constexpr uint8_t TIFF_BE_3 = DeviceBridge::Common::FileFormats::TIFF_BE_3;
+    static constexpr uint8_t TIFF_BE_4 = DeviceBridge::Common::FileFormats::TIFF_BE_4;
+}
+
 namespace DeviceBridge::Components {
 
 FileSystemManager::FileSystemManager()
@@ -600,32 +618,33 @@ Common::FileType FileSystemManager::detectFileType(const uint8_t *data, uint16_t
         return Common::FileType::BINARY;
     }
 
-    // Check for common file format headers using ConfigurationService
-    // Use cached configuration service pointer
+    // Check for common file format headers using cached constants for maximum performance
     
     // BMP files start with "BM"
-    if (data[0] == _cachedConfigurationService->getBmpSignature1() && data[1] == _cachedConfigurationService->getBmpSignature2()) {
+    if (data[0] == FileFormatConstants::BMP_SIGNATURE_1 && data[1] == FileFormatConstants::BMP_SIGNATURE_2) {
         return Common::FileType::BMP;
     }
 
     // PCX files start with 0x0A
-    if (data[0] == _cachedConfigurationService->getPcxSignature()) {
+    if (data[0] == FileFormatConstants::PCX_SIGNATURE) {
         return Common::FileType::PCX;
     }
 
     // TIFF files start with "II" (little-endian) or "MM" (big-endian)
-    if (_cachedConfigurationService->isTiffLittleEndian(data[0], data[1], data[2], data[3]) ||
-        _cachedConfigurationService->isTiffBigEndian(data[0], data[1], data[2], data[3])) {
+    if ((data[0] == FileFormatConstants::TIFF_LE_1 && data[1] == FileFormatConstants::TIFF_LE_2 && 
+         data[2] == FileFormatConstants::TIFF_LE_3 && data[3] == FileFormatConstants::TIFF_LE_4) ||
+        (data[0] == FileFormatConstants::TIFF_BE_1 && data[1] == FileFormatConstants::TIFF_BE_2 && 
+         data[2] == FileFormatConstants::TIFF_BE_3 && data[3] == FileFormatConstants::TIFF_BE_4)) {
         return Common::FileType::TIFF;
     }
 
     // PostScript/EPS files start with "%!"
-    if (data[0] == _cachedConfigurationService->getPsSignature1() && data[1] == _cachedConfigurationService->getPsSignature2()) {
+    if (data[0] == FileFormatConstants::PS_SIGNATURE_1 && data[1] == FileFormatConstants::PS_SIGNATURE_2) {
         return Common::FileType::EPSIMAGE;
     }
 
     // Check for printer command sequences (HP PCL commands often start with ESC)
-    if (data[0] == _cachedConfigurationService->getEscCharacter()) { // ESC character
+    if (data[0] == FileFormatConstants::ESC_CHARACTER) { // ESC character
         if (length >= 3) {
             // HP PCL commands: ESC E (reset), ESC & (parameterized command)
             if (data[1] == 0x45 || data[1] == 0x26) {
