@@ -59,10 +59,11 @@ bool FileSystemManager::initialize() {
     }
     
     // Initialize plugin registry for FileTransferManager compatibility
-    if (!initializePluginRegistry()) {
-        Serial.print(F("Warning: Plugin registry initialization failed\r\n"));
-        // Don't fail initialization - this is for copyto functionality
-    }
+    // TEMPORARILY DISABLED due to memory constraints
+    // if (!initializePluginRegistry()) {
+    //     Serial.print(F("Warning: Plugin registry initialization failed\r\n"));
+    //     // Don't fail initialization - this is for copyto functionality
+    // }
     
     // Legacy initialization for compatibility
     _flags.sdAvailable = initializeSD() ? 1 : 0;

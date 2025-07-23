@@ -1,6 +1,7 @@
 #include "ConfigurationManager.h"
 #include "../Common/ConfigurationService.h"
 #include "../Storage/FileTransferManager.h"
+#include "../Storage/EEPROMFileSystem.h"
 #include "DisplayManager.h"
 #include "FileSystemManager.h"
 #include "ParallelPortManager.h"
@@ -174,7 +175,7 @@ void ConfigurationManager::processCommand(const char* command, size_t commandLen
     } else if (startsWith(command, commandLen, "format ")) {
         handleFormatCommand(String(command));
     } else if (startsWith(command, commandLen, "copyto ")) {
-        handleCopyToCommand(String(command));
+        handleCopyToCommand(command, commandLen);
     } else if (equalsIgnoreCase(command, commandLen, "restart") || equalsIgnoreCase(command, commandLen, "reset")) {
         Serial.print(F("Restarting system...\r\n"));
         delay(100);
@@ -1748,10 +1749,9 @@ void ConfigurationManager::printFlowControlStatistics() {
     Serial.print(F("\r\n"));
 }
 
-void ConfigurationManager::handleCopyToCommand(const String &command) {
-    String params = command.substring(7); // Remove "copyto "
-
-    if (params.length() == 0) {
+void ConfigurationManager::handleCopyToCommand(const char* command, size_t commandLen) {
+    // Skip "copyto " (7 characters)
+    if (commandLen <= 7) {
         Serial.print(F("Usage: copyto {storage} {filename}\r\n"));
         Serial.print(F("  storage: sd, eeprom, or serial\r\n"));
         Serial.print(F("  filename: file to copy from current storage\r\n"));
@@ -1759,28 +1759,42 @@ void ConfigurationManager::handleCopyToCommand(const String &command) {
         return;
     }
 
-    // Parse target storage and filename
-    int spaceIndex = params.indexOf(' ');
-    if (spaceIndex == -1) {
+    const char* params = command + 7;
+    size_t paramsLen = commandLen - 7;
+
+    // Find space separator between storage and filename
+    const char* spacePtr = nullptr;
+    for (size_t i = 0; i < paramsLen; i++) {
+        if (params[i] == ' ') {
+            spacePtr = params + i;
+            break;
+        }
+    }
+
+    if (!spacePtr) {
         Serial.print(F("Error: Missing filename\r\n"));
         Serial.print(F("Usage: copyto {storage} {filename}\r\n"));
         return;
     }
 
-    String targetStorageStr = params.substring(0, spaceIndex);
-    String filename = params.substring(spaceIndex + 1);
+    // Extract storage type
+    size_t storageLen = spacePtr - params;
+    char targetStorageStr[16];
+    safeCopy(targetStorageStr, sizeof(targetStorageStr), params, storageLen);
 
-    // Trim whitespace
-    targetStorageStr.trim();
-    filename.trim();
+    // Extract filename (skip space)
+    const char* filenameStart = spacePtr + 1;
+    size_t filenameLen = paramsLen - (filenameStart - params);
+    char filename[64];
+    safeCopy(filename, sizeof(filename), filenameStart, filenameLen);
 
     // Parse target storage type
     Common::StorageType targetStorage(Common::StorageType::SD_CARD); // Initialize with default
-    if (targetStorageStr.equalsIgnoreCase("sd")) {
+    if (equalsIgnoreCase(targetStorageStr, strlen(targetStorageStr), "sd")) {
         targetStorage = Common::StorageType::SD_CARD;
-    } else if (targetStorageStr.equalsIgnoreCase("eeprom")) {
+    } else if (equalsIgnoreCase(targetStorageStr, strlen(targetStorageStr), "eeprom")) {
         targetStorage = Common::StorageType::EEPROM;
-    } else if (targetStorageStr.equalsIgnoreCase("serial")) {
+    } else if (equalsIgnoreCase(targetStorageStr, strlen(targetStorageStr), "serial")) {
         targetStorage = Common::StorageType::SERIAL_TRANSFER;
     } else {
         Serial.print(F("Error: Invalid storage type '"));
@@ -1807,28 +1821,62 @@ void ConfigurationManager::handleCopyToCommand(const String &command) {
     Serial.print(targetStorage.toString());
     Serial.print(F("...\r\n"));
 
-    // Create FileTransferManager and perform copy
-    Storage::FileTransferManager transferManager;
-
-    // Check if transfer is supported
-    if (!transferManager.isTransferSupported(currentStorage, targetStorage)) {
-        Serial.print(F("Error: Transfer from "));
-        Serial.print(currentStorage.toString());
-        Serial.print(F(" to "));
-        Serial.print(targetStorage.toString());
-        Serial.print(F(" is not supported\r\n"));
+    // Check available memory before starting transfer
+    int freeMemory = _cachedSystemManager->getFreeMemory();
+    if (freeMemory < 500) {  // Need at least 500 bytes free
+        Serial.print(F("Error: Insufficient memory for transfer ("));
+        Serial.print(freeMemory);
+        Serial.print(F(" bytes free)\r\n"));
         return;
     }
-
-    // Perform the copy
-    bool success = transferManager.copyTo(filename.c_str(), currentStorage, targetStorage);
-
+    
+    // Implement copyto directly to avoid memory overhead
+    bool success = false;
+    
+    if (currentStorage.value == Common::StorageType::EEPROM && 
+        targetStorage.value == Common::StorageType::SERIAL_TRANSFER) {
+        
+        // Create a minimal EEPROM file system instance for reading
+        DeviceBridge::Storage::EEPROMFileSystem eepromFS;
+        if (eepromFS.initialize()) {
+            char fileBuffer[128];
+            if (eepromFS.readFile(filename, fileBuffer, sizeof(fileBuffer))) {
+                // Send BEGIN delimiter
+                Serial.print(F("------BEGIN---"));
+                Serial.print(filename);
+                Serial.print(F("------\r\n"));
+                
+                // Parse hex data and send it
+                const char* hexStart = strstr(fileBuffer, "\r\n");
+                if (hexStart) {
+                    hexStart += 2;
+                    // Skip optional second line
+                    const char* secondLine = strstr(hexStart, "\r\n");
+                    if (secondLine) {
+                        hexStart = secondLine + 2;
+                    }
+                    
+                    // Send hex data directly
+                    Serial.print(hexStart);
+                }
+                
+                // Send END delimiter
+                Serial.print(F("\r\n------END---"));
+                Serial.print(filename);
+                Serial.print(F("------\r\n"));
+                
+                success = true;
+            }
+        }
+    } else {
+        Serial.print(F("Error: Only EEPROM to Serial transfer is currently supported\r\n"));
+        return;
+    }
+    
     if (success) {
         Serial.print(F("✅ Copy successful!\r\n"));
     } else {
-        Serial.print(F("❌ Copy failed: "));
-        Serial.print(transferManager.getLastError());
-        Serial.print(F("\r\n"));
+        Serial.print(F("❌ Copy failed: Unable to read source file\r\n"));
     }
 }
 

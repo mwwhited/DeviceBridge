@@ -26,7 +26,7 @@ private:
     void handleLEDCommand(const char* command, size_t commandLen);
     void handleListCommand(const char* command, size_t commandLen);  // Already converted
     void handleFormatCommand(const String& command);
-    void handleCopyToCommand(const String& command);
+    void handleCopyToCommand(const char* command, size_t commandLen);
     void handleDebugCommand(const String& command);
     
     // Command output methods

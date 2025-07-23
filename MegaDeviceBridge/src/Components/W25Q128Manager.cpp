@@ -1,6 +1,18 @@
 #include "W25Q128Manager.h"
 #include "../Common/ServiceLocator.h"
 #include "../Common/ConfigurationService.h"
+#include "SystemManager.h"
+
+// Debug helper function
+static bool isEEPROMDebugEnabled() {
+    auto& services = DeviceBridge::ServiceLocator::getInstance();
+    auto* systemManager = services.getSystemManager();
+    return systemManager && systemManager->isEEPROMDebugEnabled();
+}
+
+// Debug macros for conditional output
+#define W25Q128_DEBUG_PRINT(...) do { if (isEEPROMDebugEnabled()) { Serial.print(__VA_ARGS__); } } while(0)
+#define W25Q128_DEBUG_PRINTLN(...) do { if (isEEPROMDebugEnabled()) { Serial.println(__VA_ARGS__); } } while(0)
 
 namespace DeviceBridge::Components {
 
@@ -15,39 +27,38 @@ W25Q128Manager::~W25Q128Manager() {
 }
 
 bool W25Q128Manager::initialize() {
-    Serial.print(F("W25Q128: Starting initialization...\r\n"));
-    Serial.print(F("W25Q128: CS pin: "));
-    Serial.print(_csPin);
-    Serial.print(F("\r\n"));
+    W25Q128_DEBUG_PRINTLN(F("W25Q128: Starting initialization..."));
+    W25Q128_DEBUG_PRINT(F("W25Q128: CS pin: "));
+    W25Q128_DEBUG_PRINTLN(_csPin);
     
     // Configure CS pin
-    Serial.print(F("W25Q128: Configuring CS pin as OUTPUT...\r\n"));
+    W25Q128_DEBUG_PRINTLN(F("W25Q128: Configuring CS pin as OUTPUT..."));
     pinMode(_csPin, OUTPUT);
     chipSelect(false); // Deselect initially
-    Serial.print(F("W25Q128: CS pin configured and deselected\r\n"));
+    W25Q128_DEBUG_PRINTLN(F("W25Q128: CS pin configured and deselected"));
     
     // Initialize SPI (should already be done by main)
-    Serial.print(F("W25Q128: Initializing SPI...\r\n"));
+    W25Q128_DEBUG_PRINTLN(F("W25Q128: Initializing SPI..."));
     SPI.begin();
-    Serial.print(F("W25Q128: SPI initialized\r\n"));
+    W25Q128_DEBUG_PRINTLN(F("W25Q128: SPI initialized"));
     
     // Small delay to ensure SPI is stable
     delay(10);
-    Serial.print(F("W25Q128: SPI stabilization delay complete\r\n"));
+    W25Q128_DEBUG_PRINTLN(F("W25Q128: SPI stabilization delay complete"));
     
     // Read JEDEC ID to verify chip presence
-    Serial.print(F("W25Q128: Reading JEDEC ID to detect chip...\r\n"));
+    W25Q128_DEBUG_PRINTLN(F("W25Q128: Reading JEDEC ID to detect chip..."));
     uint32_t jedecId = readJedecId();
     
-    Serial.print(F("W25Q128: JEDEC ID read: 0x"));
-    Serial.print(jedecId, HEX);
-    Serial.print(F(" (raw 32-bit)\r\n"));
+    W25Q128_DEBUG_PRINT(F("W25Q128: JEDEC ID read: 0x"));
+    W25Q128_DEBUG_PRINT(jedecId, HEX);
+    W25Q128_DEBUG_PRINTLN(F(" (raw 32-bit)"));
     
-    Serial.print(F("W25Q128: JEDEC ID masked: 0x"));
-    Serial.print(jedecId & 0xFFFFFF, HEX);
-    Serial.print(F(" (24-bit)\r\n"));
+    W25Q128_DEBUG_PRINT(F("W25Q128: JEDEC ID masked: 0x"));
+    W25Q128_DEBUG_PRINT(jedecId & 0xFFFFFF, HEX);
+    W25Q128_DEBUG_PRINTLN(F(" (24-bit)"));
     
-    Serial.print(F("W25Q128: Expected JEDEC ID: 0x"));
+    W25Q128_DEBUG_PRINT(F("W25Q128: Expected JEDEC ID: 0x"));
     Serial.print(Common::Flash::W25Q128_JEDEC_ID, HEX);
     Serial.print(F("\r\n"));
     
@@ -70,20 +81,20 @@ bool W25Q128Manager::initialize() {
     
     // W25Q128 JEDEC ID should be 0xEF4018 (Winbond, 128Mbit)
     if ((jedecId & 0xFFFFFF) == Common::Flash::W25Q128_JEDEC_ID) {
-        Serial.print(F("W25Q128: ✅ Chip identified successfully as W25Q128\r\n"));
+        W25Q128_DEBUG_PRINTLN(F("W25Q128: ✅ Chip identified successfully as W25Q128"));
         _initialized = true;
         return true;
     }
     
-    Serial.print(F("W25Q128: ❌ Chip not detected or JEDEC ID mismatch\r\n"));
+    W25Q128_DEBUG_PRINTLN(F("W25Q128: ❌ Chip not detected or JEDEC ID mismatch"));
     
     // Provide diagnostic information
     if (jedecId == 0x000000 || jedecId == 0xFFFFFF) {
-        Serial.print(F("W25Q128: ❌ No response from chip (likely not present or wrong CS pin)\r\n"));
+        W25Q128_DEBUG_PRINTLN(F("W25Q128: ❌ No response from chip (likely not present or wrong CS pin)"));
     } else if (manufacturerId == 0xEF) {
-        Serial.print(F("W25Q128: ⚠️  Winbond chip detected but wrong capacity\r\n"));
+        W25Q128_DEBUG_PRINTLN(F("W25Q128: ⚠️  Winbond chip detected but wrong capacity"));
     } else {
-        Serial.print(F("W25Q128: ⚠️  Different flash chip detected\r\n"));
+        W25Q128_DEBUG_PRINTLN(F("W25Q128: ⚠️  Different flash chip detected"));
     }
     
     return false;

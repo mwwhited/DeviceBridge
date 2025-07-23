@@ -1,5 +1,8 @@
 #include "FileTransferManager.h"
 #include <string.h>
+#include "../Common/ServiceLocator.h"
+#include "EEPROMFileSystem.h"
+#include "SerialTransferFileSystem.h"
 
 namespace DeviceBridge::Storage {
 
@@ -24,25 +27,49 @@ bool FileTransferManager::copyToWithNewName(const char* sourceFilename, Common::
         return false;
     }
     
-    // Get source filesystem
-    IFileSystem* sourceFS = _registry.createFileSystem(sourceType);
-    if (!sourceFS) {
-        setError("Cannot create source filesystem");
+    // Get FileSystemManager instance to avoid plugin registry
+    auto& services = DeviceBridge::ServiceLocator::getInstance();
+    auto* fileSystemManager = services.getFileSystemManager();
+    if (!fileSystemManager) {
+        setError("FileSystemManager not available");
         return false;
     }
     
-    // Get destination filesystem  
-    IFileSystem* destFS = _registry.createFileSystem(destinationType);
-    if (!destFS) {
-        delete sourceFS;
-        setError("Cannot create destination filesystem");
+    // For now, use a simplified approach that works directly with the existing storage
+    // This avoids the plugin registry memory overhead
+    if (sourceType.value != Common::StorageType::EEPROM || destinationType.value != Common::StorageType::SERIAL_TRANSFER) {
+        setError("Only EEPROM to Serial transfer currently supported");
         return false;
+    }
+    
+    // Get the active EEPROM filesystem and create a Serial transfer filesystem
+    IFileSystem* sourceFS = nullptr;
+    IFileSystem* destFS = nullptr;
+    
+    // Create temporary filesystem instances for transfer
+    static DeviceBridge::Storage::EEPROMFileSystem eepromFS;
+    static DeviceBridge::Storage::SerialTransferFileSystem serialFS;
+    
+    sourceFS = &eepromFS;
+    destFS = &serialFS;
+    
+    // Initialize them if needed
+    if (!sourceFS->isAvailable()) {
+        if (!sourceFS->initialize()) {
+            setError("Cannot initialize source filesystem");
+            return false;
+        }
+    }
+    
+    if (!destFS->isAvailable()) {
+        if (!destFS->initialize()) {
+            setError("Cannot initialize destination filesystem");
+            return false;
+        }
     }
     
     // Check if source file exists
     if (!sourceFS->fileExists(sourceFilename)) {
-        delete sourceFS;
-        delete destFS;
         setError("Source file not found");
         return false;
     }
@@ -57,32 +84,90 @@ bool FileTransferManager::copyToWithNewName(const char* sourceFilename, Common::
             // For Serial: writeData will output hex stream with BEGIN/END delimiters
             // For SD/EEPROM: writeData will write binary data
             
-            // Extract the actual data from the read buffer (skip header info)
-            const char* dataStart = strstr(_transferBuffer, "\r\n");
-            if (dataStart) {
-                dataStart += 2; // Skip the \r\n
-                // Look for second line (if present)
-                const char* secondLine = strstr(dataStart, "\r\n");
-                if (secondLine) {
-                    dataStart = secondLine + 2; // Skip second header line
+            // Handle different source data formats
+            uint16_t dataLength = 0;
+            uint8_t binaryBuffer[128]; // Buffer for converted binary data
+            
+            if (sourceType.value == Common::StorageType::EEPROM) {
+                // EEPROM returns formatted text with hex data
+                // Format: "File: filename (size bytes)\r\n[hex data]"
+                const char* dataStart = strstr(_transferBuffer, "\r\n");
+                if (dataStart) {
+                    dataStart += 2; // Skip the \r\n
+                    // Skip optional second header line
+                    const char* secondLine = strstr(dataStart, "\r\n");
+                    if (secondLine) {
+                        dataStart = secondLine + 2;
+                    }
+                    
+                    // Convert hex string to binary data
+                    dataLength = 0;
+                    const char* hexPtr = dataStart;
+                    while (*hexPtr && dataLength < sizeof(binaryBuffer)) {
+                        // Skip whitespace and line breaks
+                        if (*hexPtr == ' ' || *hexPtr == '\t' || *hexPtr == '\r' || *hexPtr == '\n') {
+                            hexPtr++;
+                            continue;
+                        }
+                        
+                        // Parse hex pair
+                        if (hexPtr[0] && hexPtr[1]) {
+                            uint8_t byte = 0;
+                            // Parse first hex digit
+                            if (hexPtr[0] >= '0' && hexPtr[0] <= '9') {
+                                byte = (hexPtr[0] - '0') << 4;
+                            } else if (hexPtr[0] >= 'A' && hexPtr[0] <= 'F') {
+                                byte = (hexPtr[0] - 'A' + 10) << 4;
+                            } else if (hexPtr[0] >= 'a' && hexPtr[0] <= 'f') {
+                                byte = (hexPtr[0] - 'a' + 10) << 4;
+                            } else {
+                                break; // Invalid hex character
+                            }
+                            
+                            // Parse second hex digit
+                            if (hexPtr[1] >= '0' && hexPtr[1] <= '9') {
+                                byte |= (hexPtr[1] - '0');
+                            } else if (hexPtr[1] >= 'A' && hexPtr[1] <= 'F') {
+                                byte |= (hexPtr[1] - 'A' + 10);
+                            } else if (hexPtr[1] >= 'a' && hexPtr[1] <= 'f') {
+                                byte |= (hexPtr[1] - 'a' + 10);
+                            } else {
+                                break; // Invalid hex character
+                            }
+                            
+                            binaryBuffer[dataLength++] = byte;
+                            hexPtr += 2;
+                        } else {
+                            break; // Incomplete hex pair
+                        }
+                    }
+                    
+                    if (dataLength > 0) {
+                        success = destFS->writeData(binaryBuffer, dataLength);
+                    } else {
+                        setError("No data to transfer");
+                    }
+                } else {
+                    setError("Could not parse EEPROM file format");
                 }
             } else {
-                dataStart = _transferBuffer; // No header found, use entire buffer
-            }
-            
-            uint16_t dataLength = strlen(dataStart);
-            if (dataLength > 0) {
-                success = destFS->writeData((const uint8_t*)dataStart, dataLength);
+                // For other storage types, use raw data
+                dataLength = strlen(_transferBuffer);
+                if (dataLength > 0) {
+                    success = destFS->writeData((const uint8_t*)_transferBuffer, dataLength);
+                }
             }
             
             // Close destination file
             destFS->closeFile();
+        } else {
+            setError("Failed to create destination file");
         }
+    } else {
+        setError("Failed to read source file");
     }
     
-    // Cleanup
-    delete sourceFS;
-    delete destFS;
+    // No cleanup needed for static instances
     
     if (success) {
         snprintf(_lastError, sizeof(_lastError), "Copy successful: %s -> %s", 
