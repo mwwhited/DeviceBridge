@@ -58,6 +58,12 @@ bool FileSystemManager::initialize() {
         return false;
     }
     
+    // Initialize plugin registry for FileTransferManager compatibility
+    if (!initializePluginRegistry()) {
+        Serial.print(F("Warning: Plugin registry initialization failed\r\n"));
+        // Don't fail initialization - this is for copyto functionality
+    }
+    
     // Legacy initialization for compatibility
     _flags.sdAvailable = initializeSD() ? 1 : 0;
     _flags.eepromAvailable = initializeEEPROM() ? 1 : 0;
@@ -843,6 +849,39 @@ bool FileSystemManager::initializeFileSystem() {
     
     // At least one file system must be available
     return sdInit || eepromInit || serialInit;
+}
+
+bool FileSystemManager::initializePluginRegistry() {
+    Storage::FileSystemRegistry& registry = Storage::FileSystemRegistry::getInstance();
+    
+    // Initialize and register all plugins
+    bool allSuccessful = true;
+    
+    if (!_sdCardPlugin.initialize()) {
+        Serial.print(F("SD Card plugin initialization failed\r\n"));
+        allSuccessful = false;
+    } else if (!registry.registerPlugin(&_sdCardPlugin)) {
+        Serial.print(F("SD Card plugin registration failed\r\n"));
+        allSuccessful = false;
+    }
+    
+    if (!_eepromPlugin.initialize()) {
+        Serial.print(F("EEPROM plugin initialization failed\r\n"));
+        allSuccessful = false;
+    } else if (!registry.registerPlugin(&_eepromPlugin)) {
+        Serial.print(F("EEPROM plugin registration failed\r\n"));
+        allSuccessful = false;
+    }
+    
+    if (!_serialPlugin.initialize()) {
+        Serial.print(F("Serial Transfer plugin initialization failed\r\n"));
+        allSuccessful = false;
+    } else if (!registry.registerPlugin(&_serialPlugin)) {
+        Serial.print(F("Serial Transfer plugin registration failed\r\n"));
+        allSuccessful = false;
+    }
+    
+    return allSuccessful;
 }
 
 bool FileSystemManager::selectActiveFileSystem(Common::StorageType storageType) {

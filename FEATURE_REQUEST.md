@@ -1,11 +1,12 @@
-- For serial storage commands
-  - list should return `NOT SUPPORTED`
-  - write should be in the following format
-  ```stream-format
-  ------BEGIN---{filepath}------
-  {hex stream with crlf every 128 bytes}
-  ------END---{filepath}------
-```
-- Add a `read hex {file}` feature to the cli
-  - based on the current storage device the content of the named file should be output to the serial connection as a hex string
-  - if the current storage is Serial then it should just output `NOT SUPPORTED`
+- review the application
+  - find large memory allocations such as strings
+  - prefer zero allocation patterns using offsets and length into pointers
+  - protect pointer bounds especially for writes
+- **DO NOT ALLOW** `String` to be used
+- Review application code
+  - create utility functions for duplicated methods
+  - prefer static method and passing by reference to reduce allocations
+  - optimize recursive methods and functions for tail calls
+  - avoid large memory allocations
+- update list to return files in the same format as list eeprom where {director}/{file}.{ext}
+- 

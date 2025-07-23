@@ -10,6 +10,10 @@
 #include "../Storage/SDCardFileSystem.h"
 #include "../Storage/EEPROMFileSystem.h"
 #include "../Storage/SerialTransferFileSystem.h"
+#include "../Storage/SDCardFileSystemPlugin.h"
+#include "../Storage/EEPROMFileSystemPlugin.h"
+#include "../Storage/SerialTransferFileSystemPlugin.h"
+#include "../Storage/FileSystemRegistry.h"
 
 namespace DeviceBridge::Components {
 
@@ -27,6 +31,11 @@ private:
     Storage::EEPROMFileSystem _eepromFileSystem;
     Storage::SerialTransferFileSystem _serialTransferFileSystem;
     Storage::IFileSystem* _activeFileSystem;
+    
+    // Plugin instances for FileSystemRegistry integration
+    Storage::SDCardFileSystemPlugin _sdCardPlugin;
+    Storage::EEPROMFileSystemPlugin _eepromPlugin;
+    Storage::SerialTransferFileSystemPlugin _serialPlugin;
     
     // Legacy compatibility (to be removed)
     File _currentFile;
@@ -66,6 +75,9 @@ private:
     bool initializeFileSystem();
     bool selectActiveFileSystem(Common::StorageType storageType);
     Storage::IFileSystem* getFileSystemForType(Common::StorageType storageType);
+    
+    // Plugin registry integration
+    bool initializePluginRegistry();
     
     // Hot-swap detection
     bool checkSDCardPresence();

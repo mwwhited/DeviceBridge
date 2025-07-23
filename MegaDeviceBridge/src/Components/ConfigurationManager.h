@@ -19,13 +19,14 @@ private:
     // Note: No longer storing direct references - using ServiceLocator
     
     // Serial command processing
-    void processCommand(const String& command);
-    void handleTimeSetCommand(const String& command);
-    void handleStorageCommand(const String& command);
+    void processCommand(const char* command, size_t commandLen);
+    void handleTimeSetCommand(const char* command, size_t commandLen);
+    void handleStorageCommand(const char* command, size_t commandLen);
     void handleHeartbeatCommand(const String& command);
-    void handleLEDCommand(const String& command);
-    void handleListCommand(const String& command);
+    void handleLEDCommand(const char* command, size_t commandLen);
+    void handleListCommand(const char* command, size_t commandLen);  // Already converted
     void handleFormatCommand(const String& command);
+    void handleCopyToCommand(const String& command);
     void handleDebugCommand(const String& command);
     
     // Command output methods

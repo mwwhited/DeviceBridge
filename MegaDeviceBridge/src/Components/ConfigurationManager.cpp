@@ -1,10 +1,11 @@
 #include "ConfigurationManager.h"
+#include "../Common/ConfigurationService.h"
+#include "../Storage/FileTransferManager.h"
 #include "DisplayManager.h"
 #include "FileSystemManager.h"
 #include "ParallelPortManager.h"
 #include "SystemManager.h"
 #include "TimeManager.h"
-#include "../Common/ConfigurationService.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -13,15 +14,43 @@ static const char component_name[] PROGMEM = "ConfigurationManager";
 
 namespace DeviceBridge::Components {
 
+// Utility functions for zero-allocation string operations with bounds checking
+namespace {
+    bool startsWithIgnoreCase(const char* str, size_t strLen, const char* prefix) {
+        size_t prefixLen = strlen(prefix);
+        if (strLen < prefixLen) return false;
+        return strncasecmp(str, prefix, prefixLen) == 0;
+    }
+    
+    bool startsWith(const char* str, size_t strLen, const char* prefix) {
+        size_t prefixLen = strlen(prefix);
+        if (strLen < prefixLen) return false;
+        return strncmp(str, prefix, prefixLen) == 0;
+    }
+    
+    bool equalsIgnoreCase(const char* str1, size_t str1Len, const char* str2) {
+        size_t str2Len = strlen(str2);
+        if (str1Len != str2Len) return false;
+        return strncasecmp(str1, str2, str1Len) == 0;
+    }
+    
+    // Safe string copy with bounds checking
+    void safeCopy(char* dest, size_t destSize, const char* src, size_t maxCopy) {
+        size_t copyLen = (maxCopy < destSize - 1) ? maxCopy : destSize - 1;
+        strncpy(dest, src, copyLen);
+        dest[copyLen] = '\0';
+    }
+}
+
 ConfigurationManager::ConfigurationManager() : _lastCommandCheck(0) {}
 
 ConfigurationManager::~ConfigurationManager() { stop(); }
 
-bool ConfigurationManager::initialize() { 
+bool ConfigurationManager::initialize() {
     // Cache service dependencies first (performance optimization)
     cacheServiceDependencies();
-    
-    return true; 
+
+    return true;
 }
 
 void ConfigurationManager::update(unsigned long currentTime) {
@@ -38,18 +67,36 @@ void ConfigurationManager::stop() {
 
 void ConfigurationManager::checkSerialCommands() {
     if (Serial.available()) {
-        String command = Serial.readStringUntil('\n');
-        command.trim();
-
-        if (command.length() > 0) {
-            processCommand(command);
+        static char commandBuffer[64]; // Static to avoid allocation
+        int bytesRead = Serial.readBytesUntil('\n', commandBuffer, sizeof(commandBuffer) - 1);
+        
+        if (bytesRead > 0) {
+            commandBuffer[bytesRead] = '\0'; // Null terminate
+            
+            // Trim whitespace
+            char* start = commandBuffer;
+            while (*start == ' ' || *start == '\t' || *start == '\r') start++;
+            
+            char* end = start + strlen(start) - 1;
+            while (end > start && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) end--;
+            *(end + 1) = '\0';
+            
+            // Move trimmed string to beginning if needed
+            if (start != commandBuffer) {
+                memmove(commandBuffer, start, strlen(start) + 1);
+            }
+            
+            size_t cmdLen = strlen(commandBuffer);
+            if (cmdLen > 0) {
+                processCommand(commandBuffer, cmdLen);
+            }
         }
     }
 }
 
-void ConfigurationManager::processCommand(const String &command) {
+void ConfigurationManager::processCommand(const char* command, size_t commandLen) {
     // Use cached system manager pointer
-    if (command.equalsIgnoreCase(F("validate")) || command.equalsIgnoreCase(F("test"))) {
+    if (equalsIgnoreCase(command, commandLen, "validate") || equalsIgnoreCase(command, commandLen, "test")) {
         // Run comprehensive system validation
         Serial.print(F("\r\n=== COMPREHENSIVE SYSTEM VALIDATION ===\r\n"));
 
@@ -79,58 +126,60 @@ void ConfigurationManager::processCommand(const String &command) {
             Serial.print(F("❌ CRITICAL ISSUES DETECTED\r\n"));
         }
         Serial.print(F("=====================================\r\n"));
-    } else if (command.equalsIgnoreCase(F("info"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "info")) {
         _cachedSystemManager->printSystemInfo();
         _cachedSystemManager->printMemoryInfo();
-    } else if (command.equalsIgnoreCase(F("status"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "status")) {
         printDetailedStatus();
-    } else if (command.startsWith(F("time set "))) {
-        handleTimeSetCommand(command);
-    } else if (command.startsWith(F("storage "))) {
-        handleStorageCommand(command);
-    } else if (command.equalsIgnoreCase(F("storage"))) {
+    } else if (startsWith(command, commandLen, "time set ")) {
+        handleTimeSetCommand(command, commandLen);
+    } else if (startsWith(command, commandLen, "storage ")) {
+        handleStorageCommand(command, commandLen);
+    } else if (equalsIgnoreCase(command, commandLen, "storage")) {
         printStorageStatus();
-    } else if (command.equalsIgnoreCase(F("testwrite")) || command.startsWith(F("testwrite "))) {
-        handleTestWriteCommand(command);
-    } else if (command.equalsIgnoreCase(F("testwritelong")) || command.startsWith(F("testwritelong "))) {
-        handleTestWriteLongCommand(command);
-    } else if (command.startsWith(F("heartbeat "))) {
-        handleHeartbeatCommand(command);
-    } else if (command.startsWith(F("debug "))) {
-        handleDebugCommand(command);
-    } else if (command.equalsIgnoreCase(F("time"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "testwrite") || startsWith(command, commandLen, "testwrite ")) {
+        handleTestWriteCommand(String(command));
+    } else if (equalsIgnoreCase(command, commandLen, "testwritelong") || startsWith(command, commandLen, "testwritelong ")) {
+        handleTestWriteLongCommand(String(command));
+    } else if (startsWith(command, commandLen, "heartbeat ")) {
+        handleHeartbeatCommand(String(command));
+    } else if (startsWith(command, commandLen, "debug ")) {
+        handleDebugCommand(String(command));
+    } else if (equalsIgnoreCase(command, commandLen, "time")) {
         printCurrentTime();
-    } else if (command.equalsIgnoreCase(F("buttons"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "buttons")) {
         printButtonStatus();
-    } else if (command.equalsIgnoreCase(F("parallel")) || command.equalsIgnoreCase(F("lpt"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "parallel") || equalsIgnoreCase(command, commandLen, "lpt")) {
         printParallelPortStatus();
-    } else if (command.equalsIgnoreCase(F("testint")) || command.equalsIgnoreCase(F("testinterrupt"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "testint") || equalsIgnoreCase(command, commandLen, "testinterrupt")) {
         testInterruptPin();
-    } else if (command.equalsIgnoreCase(F("testlpt")) || command.equalsIgnoreCase(F("testprinter"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "testlpt") || equalsIgnoreCase(command, commandLen, "testprinter")) {
         testPrinterProtocol();
-    } else if (command.equalsIgnoreCase(F("clearbuffer")) || command.equalsIgnoreCase(F("clearport"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "clearbuffer") || equalsIgnoreCase(command, commandLen, "clearport")) {
         clearLPTBuffer();
-    } else if (command.equalsIgnoreCase(F("resetcritical")) || command.equalsIgnoreCase(F("clearcritical"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "resetcritical") || equalsIgnoreCase(command, commandLen, "clearcritical")) {
         resetCriticalState();
-    } else if (command.startsWith(F("flowcontrol "))) {
-        handleFlowControlCommand(command);
-    } else if (command.equalsIgnoreCase(F("flowstats")) || command.equalsIgnoreCase(F("flowstatus"))) {
+    } else if (startsWith(command, commandLen, "flowcontrol ")) {
+        handleFlowControlCommand(String(command));
+    } else if (equalsIgnoreCase(command, commandLen, "flowstats") || equalsIgnoreCase(command, commandLen, "flowstatus")) {
         printFlowControlStatistics();
-    } else if (command.startsWith(F("lcdthrottle "))) {
-        handleLCDThrottleCommand(command);
-    } else if (command.startsWith(F("led "))) {
-        handleLEDCommand(command);
-    } else if (command.equalsIgnoreCase(F("files")) || command.equalsIgnoreCase(F("lastfile"))) {
+    } else if (startsWith(command, commandLen, "lcdthrottle ")) {
+        handleLCDThrottleCommand(String(command));
+    } else if (startsWith(command, commandLen, "led ")) {
+        handleLEDCommand(command, commandLen);
+    } else if (equalsIgnoreCase(command, commandLen, "files") || equalsIgnoreCase(command, commandLen, "lastfile")) {
         printLastFileInfo();
-    } else if (command.startsWith(F("list "))) {
-        handleListCommand(command);
-    } else if (command.startsWith(F("format "))) {
-        handleFormatCommand(command);
-    } else if (command.equalsIgnoreCase(F("restart")) || command.equalsIgnoreCase(F("reset"))) {
+    } else if ((startsWith(command, commandLen, "list") && (equalsIgnoreCase(command, commandLen, "list") || startsWith(command, commandLen, "list ")))) {
+        handleListCommand(command, commandLen);  // Already converted to const char*
+    } else if (startsWith(command, commandLen, "format ")) {
+        handleFormatCommand(String(command));
+    } else if (startsWith(command, commandLen, "copyto ")) {
+        handleCopyToCommand(String(command));
+    } else if (equalsIgnoreCase(command, commandLen, "restart") || equalsIgnoreCase(command, commandLen, "reset")) {
         Serial.print(F("Restarting system...\r\n"));
         delay(100);
         asm volatile("  jmp 0"); // Software reset
-    } else if (command.equalsIgnoreCase(F("help"))) {
+    } else if (equalsIgnoreCase(command, commandLen, "help")) {
         printHelpMenu();
     } else {
         Serial.print(F("Unknown command: "));
@@ -163,9 +212,11 @@ void ConfigurationManager::printHelpMenu() {
     Serial.print(F("  debug parallel on/off - Enable/disable parallel port debug logging\r\n"));
     Serial.print(F("  debug eeprom on/off   - Enable/disable EEPROM debug logging\r\n"));
     Serial.print(F("  files/lastfile    - Show last saved file info with SD status\r\n"));
+    Serial.print(F("  list              - List files on current storage\r\n"));
     Serial.print(F("  list sd           - List all files on SD card\r\n"));
     Serial.print(F("  list eeprom       - List all files on EEPROM\r\n"));
     Serial.print(F("  format eeprom     - Format EEPROM filesystem (erases all files)\r\n"));
+    Serial.print(F("  copyto {storage} {file} - Copy file between storage types (sd/eeprom/serial)\r\n"));
     Serial.print(F("\r\nStorage Commands:\r\n"));
     Serial.print(F("  storage           - Show storage/hardware status\r\n"));
     Serial.print(F("  storage sd        - Use SD card storage\r\n"));
@@ -229,24 +280,64 @@ void ConfigurationManager::printCurrentTime() {
     }
 }
 
-void ConfigurationManager::handleTimeSetCommand(const String &command) {
+void ConfigurationManager::handleTimeSetCommand(const char* command, size_t commandLen) {
     // Use cached display manager pointer
     // Use cached time manager pointer
     // Expected format: "time set 2025-07-19 19:30"
-    String timeStr = command.substring(9); // Remove "time set "
-    timeStr.trim();
-
-    if (timeStr.length() < 16) {
+    
+    if (commandLen < 25) { // "time set YYYY-MM-DD HH:MM" = 25 chars
+        Serial.print(F("Invalid time format. Use: time set YYYY-MM-DD HH:MM\r\n"));
+        return;
+    }
+    
+    if (commandLen < 9 || !startsWith(command, commandLen, "time set ")) {
+        Serial.print(F("Invalid time format. Use: time set YYYY-MM-DD HH:MM\r\n"));
+        return;
+    }
+    
+    const char* timeStr = command + 9; // Skip "time set "
+    size_t timeStrLen = commandLen - 9;
+    
+    // Skip any leading spaces
+    while (*timeStr == ' ' && timeStrLen > 0) {
+        timeStr++;
+        timeStrLen--;
+    }
+    
+    if (timeStrLen < 16) {
         Serial.print(F("Invalid time format. Use: time set YYYY-MM-DD HH:MM\r\n"));
         return;
     }
 
-    // Parse date and time
-    int year = timeStr.substring(0, 4).toInt();
-    int month = timeStr.substring(5, 7).toInt();
-    int day = timeStr.substring(8, 10).toInt();
-    int hour = timeStr.substring(11, 13).toInt();
-    int minute = timeStr.substring(14, 16).toInt();
+    // Parse date and time using char array operations with bounds checking
+    char yearStr[5], monthStr[3], dayStr[3], hourStr[3], minuteStr[3];
+    
+    // Validate we have enough characters for each field
+    if (timeStrLen < 16 || timeStr[4] != '-' || timeStr[7] != '-' || timeStr[10] != ' ' || timeStr[13] != ':') {
+        Serial.print(F("Invalid time format. Use: time set YYYY-MM-DD HH:MM\r\n"));
+        return;
+    }
+    
+    // Extract year (positions 0-3) with bounds checking
+    safeCopy(yearStr, sizeof(yearStr), timeStr, 4);
+    
+    // Extract month (positions 5-6) with bounds checking
+    safeCopy(monthStr, sizeof(monthStr), timeStr + 5, 2);
+    
+    // Extract day (positions 8-9) with bounds checking
+    safeCopy(dayStr, sizeof(dayStr), timeStr + 8, 2);
+    
+    // Extract hour (positions 11-12) with bounds checking
+    safeCopy(hourStr, sizeof(hourStr), timeStr + 11, 2);
+    
+    // Extract minute (positions 14-15) with bounds checking
+    safeCopy(minuteStr, sizeof(minuteStr), timeStr + 14, 2);
+    
+    int year = atoi(yearStr);
+    int month = atoi(monthStr);
+    int day = atoi(dayStr);
+    int hour = atoi(hourStr);
+    int minute = atoi(minuteStr);
 
     // Validate ranges
     if (year < 2020 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 ||
@@ -266,22 +357,52 @@ void ConfigurationManager::handleTimeSetCommand(const String &command) {
     }
 }
 
-void ConfigurationManager::handleStorageCommand(const String &command) {
+void ConfigurationManager::handleStorageCommand(const char* command, size_t commandLen) {
     // Use cached file system manager pointer
     // Use cached display manager pointer
-    String storageType = command.substring(8); // Remove "storage "
-    storageType.trim();
-    storageType.toLowerCase();
+    
+    if (commandLen < 10) { // "storage " + at least 2 chars
+        Serial.print(F("Invalid storage type. Use: sd, eeprom, serial, or auto\r\n"));
+        return;
+    }
+    
+    if (!startsWith(command, commandLen, "storage ")) {
+        Serial.print(F("Invalid storage type. Use: sd, eeprom, serial, or auto\r\n"));
+        return;
+    }
+    
+    const char* storageStr = command + 8; // Skip "storage "
+    size_t storageStrLen = commandLen - 8;
+    
+    // Skip any leading spaces
+    while (*storageStr == ' ' && storageStrLen > 0) {
+        storageStr++;
+        storageStrLen--;
+    }
+    
+    // Convert to lowercase in a local buffer with bounds checking
+    char storageType[16];
+    safeCopy(storageType, sizeof(storageType), storageStr, storageStrLen);
+    
+    // Trim trailing spaces
+    char* end = storageType + strlen(storageType) - 1;
+    while (end > storageType && (*end == ' ' || *end == '\r' || *end == '\n')) end--;
+    *(end + 1) = '\0';
+    
+    // Convert to lowercase
+    for (int i = 0; storageType[i]; i++) {
+        storageType[i] = tolower(storageType[i]);
+    }
 
     Common::StorageType newStorage(Common::StorageType::AUTO_SELECT); // Initialize with default
 
-    if (storageType == F("sd")) {
+    if (strcmp(storageType, "sd") == 0) {
         newStorage = Common::StorageType(Common::StorageType::SD_CARD);
-    } else if (storageType == F("eeprom")) {
+    } else if (strcmp(storageType, "eeprom") == 0) {
         newStorage = Common::StorageType(Common::StorageType::EEPROM);
-    } else if (storageType == F("serial")) {
+    } else if (strcmp(storageType, "serial") == 0) {
         newStorage = Common::StorageType(Common::StorageType::SERIAL_TRANSFER);
-    } else if (storageType == F("auto")) {
+    } else if (strcmp(storageType, "auto") == 0) {
         newStorage = Common::StorageType(Common::StorageType::AUTO_SELECT);
     } else {
         Serial.print(F("Invalid storage type. Use: sd, eeprom, serial, or auto\r\n"));
@@ -354,7 +475,7 @@ void ConfigurationManager::printParallelPortStatus() {
     Serial.print(F("Data Count: "));
     Serial.print(_cachedParallelPortManager->getDataCount());
     Serial.print(F("\r\n"));
-    
+
     // Data integrity check
     uint32_t totalRead = _cachedParallelPortManager->getTotalBytesReceived();
     uint32_t totalWritten = _cachedFileSystemManager->getTotalBytesWritten();
@@ -405,19 +526,19 @@ void ConfigurationManager::printParallelPortStatus() {
     Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_STROBE));
     Serial.print(F(")\r\n"));
-    
+
     Serial.print(F("  /Auto Feed: "));
     Serial.print(_cachedParallelPortManager->isAutoFeedLow() ? F("ACTIVE") : F("INACTIVE"));
     Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_AUTO_FEED));
     Serial.print(F(")\r\n"));
-    
+
     Serial.print(F("  /Initialize: "));
     Serial.print(_cachedParallelPortManager->isInitializeLow() ? F("ACTIVE") : F("INACTIVE"));
     Serial.print(F(" (pin "));
     Serial.print(digitalRead(Common::Pins::LPT_INITIALIZE));
     Serial.print(F(")\r\n"));
-    
+
     Serial.print(F("  /Select In: "));
     Serial.print(_cachedParallelPortManager->isSelectInLow() ? F("ACTIVE") : F("INACTIVE"));
     Serial.print(F(" (pin "));
@@ -540,7 +661,7 @@ void ConfigurationManager::printStorageStatus() {
     // Use cached file system manager pointer
     // Use cached system manager pointer
     // Use cached parallel port manager pointer
-    
+
     Serial.print(F("\r\n=== Storage Device Status ===\r\n"));
 
     Serial.print(F("SD Card: "));
@@ -569,7 +690,7 @@ void ConfigurationManager::printStorageStatus() {
     uint16_t moderateThreshold = _cachedConfigurationService->getModerateFlowThreshold(bufferCapacity);
     uint16_t criticalThreshold = _cachedConfigurationService->getCriticalFlowThreshold(bufferCapacity);
     uint16_t recoveryThreshold = _cachedConfigurationService->getRecoveryFlowThreshold(bufferCapacity);
-    
+
     Serial.print(F("\r\n=== LPT Buffer Status ===\r\n"));
     uint16_t bufferLevel = _cachedParallelPortManager->getBufferLevel();
     Serial.print(F("Buffer Level: "));
@@ -579,7 +700,7 @@ void ConfigurationManager::printStorageStatus() {
     Serial.print(F(" bytes ("));
     Serial.print((bufferLevel * 100) / bufferCapacity);
     Serial.print(F("% full)\r\n"));
-    
+
     Serial.print(F("Flow Control Thresholds:\r\n"));
     Serial.print(F("  60% ("));
     Serial.print(moderateThreshold);
@@ -591,19 +712,19 @@ void ConfigurationManager::printStorageStatus() {
     Serial.print(F(" bytes): Extended busy delay ("));
     Serial.print(_cachedConfigurationService->getCriticalFlowDelayUs());
     Serial.print(F("μs)\r\n"));
-    
+
     Serial.print(F("Buffer Status: "));
     if (bufferLevel >= bufferCapacity) {
         Serial.print(F("❌ FULL - DATA LOSS RISK!"));
-    } else if (bufferLevel >= criticalThreshold) {  // 80% threshold
+    } else if (bufferLevel >= criticalThreshold) { // 80% threshold
         Serial.print(F("🔴 CRITICAL - Extended flow control ("));
         Serial.print(_cachedConfigurationService->getCriticalFlowDelayUs());
         Serial.print(F("μs)"));
-    } else if (bufferLevel >= moderateThreshold) {  // 60% threshold
+    } else if (bufferLevel >= moderateThreshold) { // 60% threshold
         Serial.print(F("⚠️  WARNING - Moderate flow control ("));
         Serial.print(_cachedConfigurationService->getModerateFlowDelayUs());
         Serial.print(F("μs)"));
-    } else if (bufferLevel >= recoveryThreshold) {  // 50% threshold
+    } else if (bufferLevel >= recoveryThreshold) { // 50% threshold
         Serial.print(F("🟡 ELEVATED - Ready for flow control"));
     } else if (bufferLevel > 0) {
         Serial.print(F("✅ Normal - Data available"));
@@ -611,7 +732,7 @@ void ConfigurationManager::printStorageStatus() {
         Serial.print(F("✅ Empty"));
     }
     Serial.print(F("\r\n"));
-    
+
     // Add critical state information
     if (_cachedParallelPortManager->isCriticalFlowControlActive()) {
         Serial.print(F("⚠️  CRITICAL FLOW CONTROL ACTIVE\r\n"));
@@ -619,7 +740,7 @@ void ConfigurationManager::printStorageStatus() {
         // Calculate duration (approximation)
         Serial.print(F("Active\r\n"));
     }
-    
+
     // Add interrupt statistics
     Serial.print(F("Interrupt Count: "));
     Serial.print(_cachedParallelPortManager->getInterruptCount());
@@ -627,7 +748,7 @@ void ConfigurationManager::printStorageStatus() {
     Serial.print(F("Data Count: "));
     Serial.print(_cachedParallelPortManager->getDataCount());
     Serial.print(F("\r\n"));
-    
+
     // Add LCD refresh status
     // Use cached display manager pointer
     Serial.print(F("\r\n=== LCD Refresh Status ===\r\n"));
@@ -769,9 +890,9 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
     // Use cached file system manager pointer
     // Use cached time manager pointer
     // Use cached system manager pointer
-    
+
     Serial.print(F("\r\n=== Long Test File Write (Multiple Chunks) ===\r\n"));
-    
+
     // Parse optional chunk count parameter (default 10)
     int chunkCount = 10;
     if (command.length() > 14) { // "testwritelong "
@@ -784,11 +905,11 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
             }
         }
     }
-    
+
     Serial.print(F("Chunks to write: "));
     Serial.print(chunkCount);
     Serial.print(F("\r\n"));
-    
+
     // Create base test data with timestamp
     char baseData[48];
     if (_cachedTimeManager->isRTCAvailable()) {
@@ -798,59 +919,59 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
     } else {
         snprintf(baseData, sizeof(baseData), "LONG-TEST %lu", millis());
     }
-    
+
     Serial.print(F("Base Data: "));
     Serial.print(baseData);
     Serial.print(F("\r\n"));
     Serial.print(F("Active Storage: "));
     Serial.print(_cachedFileSystemManager->getActiveStorage().toSimple());
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Writing long test file...\r\n"));
     Serial.print(F("Watch L2 LED for activity!\r\n"));
-    
+
     // First chunk - new file
     Common::DataChunk chunk;
     memset(&chunk, 0, sizeof(chunk));
-    
+
     chunk.isNewFile = 1;
     chunk.isEndOfFile = 0;
     chunk.timestamp = millis();
-    
+
     // Create first chunk data
     char chunkData[80];
-    snprintf(chunkData, sizeof(chunkData), "%s - Chunk 1/%d - Memory: %d\r\n", 
-            baseData, chunkCount, _cachedSystemManager->getFreeMemory());
+    snprintf(chunkData, sizeof(chunkData), "%s - Chunk 1/%d - Memory: %d\r\n", baseData, chunkCount,
+             _cachedSystemManager->getFreeMemory());
     chunk.length = strlen(chunkData);
     strncpy((char *)chunk.data, chunkData, sizeof(chunk.data) - 1);
-    
+
     // Process first chunk (creates file)
     _cachedFileSystemManager->processDataChunk(chunk);
     Serial.print(F("Chunk 1 written\r\n"));
-    
+
     // Write remaining chunks with delays to show L2 LED activity
     for (int i = 2; i <= chunkCount; i++) {
         delay(100); // 100ms delay between chunks to make LED visible
-        
+
         // Prepare next chunk
         memset(&chunk, 0, sizeof(chunk));
         chunk.isNewFile = 0;
         chunk.isEndOfFile = 0;
         chunk.timestamp = millis();
-        
-        snprintf(chunkData, sizeof(chunkData), "%s - Chunk %d/%d - Free: %d\r\n", 
-                 baseData, i, chunkCount, _cachedSystemManager->getFreeMemory());
+
+        snprintf(chunkData, sizeof(chunkData), "%s - Chunk %d/%d - Free: %d\r\n", baseData, i, chunkCount,
+                 _cachedSystemManager->getFreeMemory());
         chunk.length = strlen(chunkData);
         strncpy((char *)chunk.data, chunkData, sizeof(chunk.data) - 1);
-        
+
         // Process chunk
         _cachedFileSystemManager->processDataChunk(chunk);
-        
+
         Serial.print(F("Chunk "));
         Serial.print(i);
         Serial.print(F(" written\r\n"));
     }
-    
+
     // Final chunk - end of file
     delay(100);
     memset(&chunk, 0, sizeof(chunk));
@@ -858,27 +979,27 @@ void ConfigurationManager::handleTestWriteLongCommand(const String &command) {
     chunk.isEndOfFile = 1;
     chunk.length = 0;
     chunk.timestamp = millis();
-    
+
     // Process end chunk (closes file)
     _cachedFileSystemManager->processDataChunk(chunk);
-    
+
     // Check final status
     Serial.print(F("Write errors after completion: "));
     Serial.print(_cachedFileSystemManager->getWriteErrors());
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Final Storage Used: "));
     Serial.print(_cachedFileSystemManager->getActiveStorage().toSimple());
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Files Now Stored: "));
     Serial.print(_cachedFileSystemManager->getFilesStored());
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("New file: "));
     Serial.print(_cachedFileSystemManager->getCurrentFilename());
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Long test write completed - "));
     Serial.print(chunkCount);
     Serial.print(F(" chunks written.\r\n"));
@@ -927,7 +1048,7 @@ void ConfigurationManager::printLastFileInfo() {
         Serial.print(F("Total Bytes Written: "));
         Serial.print(_cachedFileSystemManager->getTotalBytesWritten());
         Serial.print(F(" bytes\r\n"));
-        
+
         Serial.print(F("Current File Bytes Written: "));
         Serial.print(_cachedFileSystemManager->getCurrentFileBytesWritten());
         Serial.print(F(" bytes\r\n"));
@@ -987,45 +1108,72 @@ void ConfigurationManager::handleHeartbeatCommand(const String &command) {
     }
 }
 
-void ConfigurationManager::handleLEDCommand(const String &command) {
+void ConfigurationManager::handleLEDCommand(const char* command, size_t commandLen) {
     // Use cached display manager pointer
     // Expected format: "led l1 on", "led l2 off", "led status"
-    String params = command.substring(4); // Remove "led "
-    params.trim();
-    params.toLowerCase();
+    
+    if (strlen(command) < 6) { // "led " + at least 2 chars
+        Serial.print(F("Usage: led <led> <action>\r\n"));
+        return;
+    }
+    
+    const char* params = command + 4; // Skip "led "
+    
+    // Skip any leading spaces
+    while (*params == ' ') params++;
+    
+    // Convert to lowercase in a local buffer
+    char paramsBuf[32];
+    strncpy(paramsBuf, params, sizeof(paramsBuf) - 1);
+    paramsBuf[sizeof(paramsBuf) - 1] = '\0';
+    
+    // Trim trailing spaces
+    char* end = paramsBuf + strlen(paramsBuf) - 1;
+    while (end > paramsBuf && (*end == ' ' || *end == '\r' || *end == '\n')) end--;
+    *(end + 1) = '\0';
+    
+    // Convert to lowercase
+    for (int i = 0; paramsBuf[i]; i++) {
+        paramsBuf[i] = tolower(paramsBuf[i]);
+    }
 
-    if (params.startsWith(F("l1 "))) {
-        String action = params.substring(3);
-        action.trim();
+    if (strncmp(paramsBuf, "l1 ", 3) == 0) {
+        const char* action = paramsBuf + 3;
+        
+        // Skip spaces after "l1 "
+        while (*action == ' ') action++;
 
-        if (action == F("on") || action == F("1") || action == F("true")) {
+        if (strcmp(action, "on") == 0 || strcmp(action, "1") == 0 || strcmp(action, "true") == 0) {
             digitalWrite(Common::Pins::LPT_READ_LED, HIGH);
             Serial.print(F("L1 LED (LPT Read Activity) turned ON\r\n"));
             _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("L1 LED ON"));
-        } else if (action == F("off") || action == F("0") || action == F("false")) {
+        } else if (strcmp(action, "off") == 0 || strcmp(action, "0") == 0 || strcmp(action, "false") == 0) {
             digitalWrite(Common::Pins::LPT_READ_LED, LOW);
             Serial.print(F("L1 LED (LPT Read Activity) turned OFF\r\n"));
             _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("L1 LED OFF"));
         } else {
             Serial.print(F("Invalid action for L1. Use: led l1 on/off\r\n"));
         }
-    } else if (params.startsWith(F("l2 "))) {
-        String action = params.substring(3);
-        action.trim();
+    } else if (strncmp(paramsBuf, "l2 ", 3) == 0) {
+        const char* action = paramsBuf + 3;
+        
+        // Skip spaces after "l2 "
+        while (*action == ' ') action++;
+        
         // Use cached display manager pointer
 
-        if (action == F("on") || action == F("1") || action == F("true")) {
+        if (strcmp(action, "on") == 0 || strcmp(action, "1") == 0 || strcmp(action, "true") == 0) {
             digitalWrite(Common::Pins::DATA_WRITE_LED, HIGH);
             Serial.print(F("L2 LED (Data Write Activity) turned ON\r\n"));
             _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("L2 LED ON"));
-        } else if (action == F("off") || action == F("0") || action == F("false")) {
+        } else if (strcmp(action, "off") == 0 || strcmp(action, "0") == 0 || strcmp(action, "false") == 0) {
             digitalWrite(Common::Pins::DATA_WRITE_LED, LOW);
             Serial.print(F("L2 LED (Data Write Activity) turned OFF\r\n"));
             _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("L2 LED OFF"));
         } else {
             Serial.print(F("Invalid action for L2. Use: led l2 on/off\r\n"));
         }
-    } else if (params == F("status")) {
+    } else if (strcmp(paramsBuf, "status") == 0) {
         Serial.print(F("\r\n=== LED Status ===\r\n"));
         Serial.print(F("L1 LED (Pin 30 - LPT Read): "));
         Serial.print(digitalRead(Common::Pins::LPT_READ_LED) ? F("ON") : F("OFF"));
@@ -1047,13 +1195,63 @@ void ConfigurationManager::handleLEDCommand(const String &command) {
     }
 }
 
-void ConfigurationManager::handleListCommand(const String &command) {
+void ConfigurationManager::handleListCommand(const char* command, size_t commandLen) {
     // Use cached file system manager pointer
-    String target = command.substring(5); // Remove "list "
-    target.trim();
-    target.toLowerCase();
+    char targetDevice[16] = "";
+    
+    // Use command directly as it's already a char*
+    int cmdLen = strlen(command);
+    
+    // Check if command starts with "list "
+    bool hasListPrefix = (cmdLen >= 5) && 
+                        (strncmp(command, "list ", 5) == 0);
 
-    if (target == F("sd")) {
+    if (hasListPrefix && cmdLen > 5) {
+        // Extract parameter after "list "
+        strcpy(targetDevice, &command[5]);
+        
+        // Trim whitespace and convert to lowercase
+        char* start = targetDevice;
+        while (*start == ' ') start++; // Skip leading spaces
+        
+        char* end = start + strlen(start) - 1;
+        while (end > start && (*end == ' ' || *end == '\r' || *end == '\n')) end--; // Skip trailing spaces
+        *(end + 1) = '\0';
+        
+        // Move trimmed string to beginning if needed
+        if (start != targetDevice) {
+            memmove(targetDevice, start, strlen(start) + 1);
+        }
+        
+        // Convert to lowercase
+        for (int i = 0; targetDevice[i]; i++) {
+            targetDevice[i] = tolower(targetDevice[i]);
+        }
+        
+    } else {
+        // Use current storage for just "list" command
+        Common::StorageType currentStorage = _cachedFileSystemManager->getCurrentStorageType();
+
+        switch (currentStorage.value) {
+            case Common::StorageType::SD_CARD:
+                strcpy(targetDevice, "sd");
+                break;
+            case Common::StorageType::EEPROM:
+                strcpy(targetDevice, "eeprom");
+                break;
+            case Common::StorageType::SERIAL_TRANSFER:
+                strcpy(targetDevice, "serial");
+                break;
+            case Common::StorageType::AUTO_SELECT:
+                strcpy(targetDevice, "sd");  // Default to SD for auto-select
+                break;
+            default:
+                strcpy(targetDevice, "unknown");
+                break;
+        }
+    }
+
+    if (strcmp(targetDevice, "sd") == 0 || strcmp(targetDevice, "sd card") == 0) {
         Serial.print(F("\r\n=== SD Card File Listing ===\r\n"));
 
         // Check SD card status first
@@ -1082,50 +1280,52 @@ void ConfigurationManager::handleListCommand(const String &command) {
 
         Serial.print(F("SD Card Files:\r\n"));
 
-       while (true) {
-    File entry = root.openNextFile();
-    if (!entry) break;
+        while (true) {
+            File entry = root.openNextFile();
+            if (!entry)
+                break;
 
-    if (entry.isDirectory()) {
-        Serial.print(F("Dir: "));
-        Serial.println(entry.name());
+            if (entry.isDirectory()) {
+                Serial.print(F("Dir: "));
+                Serial.println(entry.name());
 
-        File subDir = SD.open(entry.name());
-        if (subDir && subDir.isDirectory()) {
-            while (true) {
-                File subEntry = subDir.openNextFile();
-                if (!subEntry) break;
+                File subDir = SD.open(entry.name());
+                if (subDir && subDir.isDirectory()) {
+                    while (true) {
+                        File subEntry = subDir.openNextFile();
+                        if (!subEntry)
+                            break;
 
-                if (!subEntry.isDirectory()) {
-                    fileCount++;
-                    uint32_t fileSize = subEntry.size();
-                    totalSize += fileSize;
+                        if (!subEntry.isDirectory()) {
+                            fileCount++;
+                            uint32_t fileSize = subEntry.size();
+                            totalSize += fileSize;
 
-                    Serial.print(F("  "));
-                    Serial.print(subEntry.name());
-                    Serial.print(F(" ("));
-                    Serial.print(fileSize);
-                    Serial.println(F(" bytes)"));
+                            Serial.print(F("  "));
+                            Serial.print(subEntry.name());
+                            Serial.print(F(" ("));
+                            Serial.print(fileSize);
+                            Serial.println(F(" bytes)"));
+                        }
+                        subEntry.close();
+                    }
+                    subDir.close();
+                } else {
+                    Serial.println(F("Failed to open subdirectory"));
                 }
-                subEntry.close();
-            }
-            subDir.close();
-        } else {
-            Serial.println(F("Failed to open subdirectory"));
-        }
-    } else {
-        fileCount++;
-        uint32_t fileSize = entry.size();
-        totalSize += fileSize;
+            } else {
+                fileCount++;
+                uint32_t fileSize = entry.size();
+                totalSize += fileSize;
 
-        Serial.print(F("  "));
-        Serial.print(entry.name());
-        Serial.print(F(" ("));
-        Serial.print(fileSize);
-        Serial.println(F(" bytes)"));
-    }
-    entry.close();
-}
+                Serial.print(F("  "));
+                Serial.print(entry.name());
+                Serial.print(F(" ("));
+                Serial.print(fileSize);
+                Serial.println(F(" bytes)"));
+            }
+            entry.close();
+        }
 
         root.close();
 
@@ -1137,16 +1337,16 @@ void ConfigurationManager::handleListCommand(const String &command) {
         Serial.print(totalSize);
         Serial.print(F(" bytes\r\n"));
         Serial.print(F("=============================\r\n"));
-    } else if (target == F("eeprom")) {
+    } else if (strcmp(targetDevice, "eeprom") == 0) {
         Serial.print(F("\r\n=== EEPROM File Listing ===\r\n"));
-        
+
         // Check EEPROM status first
         if (!_cachedFileSystemManager->isEEPROMAvailable()) {
             Serial.print(F("EEPROM: Not Available\r\n"));
             Serial.print(F("============================\r\n"));
             return;
         }
-        
+
         // Use the EEPROM filesystem's listFiles method
         char buffer[1024];
         if (_cachedFileSystemManager->listEEPROMFiles(buffer, sizeof(buffer))) {
@@ -1155,11 +1355,19 @@ void ConfigurationManager::handleListCommand(const String &command) {
             Serial.print(F("Failed to list EEPROM files\r\n"));
         }
         Serial.print(F("============================\r\n"));
-        
+
+    } else if (strcmp(targetDevice, "serial") == 0 || strcmp(targetDevice, "serial transfer") == 0) {
+        Serial.print(F("\r\n=== Serial Storage ===\r\n"));
+        Serial.print(F("Serial storage does not support file listing.\r\n"));
+        Serial.print(F("Files are streamed directly during transfer.\r\n"));
+        Serial.print(F("======================\r\n"));
+
     } else {
-        Serial.print(F("Usage: list [sd|eeprom]\r\n"));
+        Serial.print(F("Usage: list [sd|eeprom|serial] or just 'list' for current storage\r\n"));
+        Serial.print(F("  list        - Show files on current storage\r\n"));
         Serial.print(F("  list sd     - Show all files on SD card\r\n"));
         Serial.print(F("  list eeprom - Show all files on EEPROM\r\n"));
+        Serial.print(F("  list serial - Show serial storage info\r\n"));
     }
 }
 
@@ -1168,18 +1376,18 @@ void ConfigurationManager::handleFormatCommand(const String &command) {
     params.trim();
     params.toLowerCase();
 
-    if (params == F("eeprom")) {
+    if (params.equals("eeprom")) {
         Serial.print(F("\r\n=== EEPROM Format ===\r\n"));
         Serial.print(F("⚠️ WARNING: This will erase all files on EEPROM!\r\n"));
         Serial.print(F("Formatting EEPROM filesystem...\r\n"));
-        
+
         if (_cachedFileSystemManager->formatEEPROM()) {
             Serial.print(F("✅ EEPROM formatted successfully\r\n"));
         } else {
             Serial.print(F("❌ EEPROM format failed\r\n"));
         }
         Serial.print(F("=====================\r\n"));
-        
+
     } else {
         Serial.print(F("Usage: format eeprom\r\n"));
         Serial.print(F("  format eeprom - Format EEPROM filesystem (erases all files)\r\n"));
@@ -1214,7 +1422,8 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
             Serial.print(F("  debug lcd status - Show current debug mode status\r\n"));
         }
     } else if (params.startsWith(F("parallel")) || params.startsWith(F("lpt"))) {
-        String lptParams = params.startsWith(F("parallel")) ? params.substring(9) : params.substring(4); // Remove "parallel " or "lpt "
+        String lptParams = params.startsWith(F("parallel")) ? params.substring(9)
+                                                            : params.substring(4); // Remove "parallel " or "lpt "
         lptParams.trim();
 
         if (lptParams == F("on")) {
@@ -1281,9 +1490,9 @@ void ConfigurationManager::handleDebugCommand(const String &command) {
 void ConfigurationManager::clearLPTBuffer() {
     // Use cached parallel port manager pointer
     // Use cached display manager pointer
-    
+
     Serial.print(F("\r\n=== Clearing LPT Buffer ===\r\n"));
-    
+
     // Show buffer status before clearing
     uint16_t bufferLevel = _cachedParallelPortManager->getBufferLevel();
     Serial.print(F("Buffer level before: "));
@@ -1291,10 +1500,10 @@ void ConfigurationManager::clearLPTBuffer() {
     Serial.print(F("/"));
     Serial.print(_cachedConfigurationService->getRingBufferSize());
     Serial.print(F(" bytes\r\n"));
-    
+
     // Clear the buffer
     _cachedParallelPortManager->clearBuffer();
-    
+
     // Show buffer status after clearing
     bufferLevel = _cachedParallelPortManager->getBufferLevel();
     Serial.print(F("Buffer level after: "));
@@ -1302,31 +1511,31 @@ void ConfigurationManager::clearLPTBuffer() {
     Serial.print(F("/"));
     Serial.print(_cachedConfigurationService->getRingBufferSize());
     Serial.print(F(" bytes\r\n"));
-    
+
     Serial.print(F("LPT buffer cleared successfully\r\n"));
     Serial.print(F("===========================\r\n"));
-    
+
     _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("Buffer Cleared"));
 }
 
 void ConfigurationManager::resetCriticalState() {
     // Use cached parallel port manager pointer
     // Use cached display manager pointer
-    
+
     Serial.print(F("\r\n=== Resetting Critical State ===\r\n"));
-    
+
     bool wasCritical = _cachedParallelPortManager->isCriticalFlowControlActive();
-    
+
     // Reset the critical state
     _cachedParallelPortManager->resetCriticalState();
-    
+
     Serial.print(F("Critical flow control state: "));
     Serial.print(wasCritical ? F("WAS ACTIVE - Now Reset") : F("Was not active"));
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Buffer and flow control reset\r\n"));
     Serial.print(F("===============================\r\n"));
-    
+
     if (wasCritical) {
         _cachedDisplayManager->displayMessage(Common::DisplayMessage::INFO, F("Critical Reset"));
     } else {
@@ -1334,14 +1543,14 @@ void ConfigurationManager::resetCriticalState() {
     }
 }
 
-void ConfigurationManager::handleLCDThrottleCommand(const String& command) {
+void ConfigurationManager::handleLCDThrottleCommand(const String &command) {
     // Use cached display manager pointer
     String params = command.substring(12); // Remove "lcdthrottle "
     params.trim();
     params.toLowerCase();
-    
+
     Serial.print(F("\r\n=== LCD Throttle Control ===\r\n"));
-    
+
     if (params == F("on") || params == F("enable") || params == F("true")) {
         _cachedDisplayManager->setStorageOperationActive(true);
         Serial.print(F("LCD refresh throttled to 500ms\r\n"));
@@ -1366,7 +1575,7 @@ void ConfigurationManager::handleLCDThrottleCommand(const String& command) {
         Serial.print(F("  off/disable - Restore LCD to 100ms refresh\r\n"));
         Serial.print(F("  status     - Show current throttle status\r\n"));
     }
-    
+
     Serial.print(F("============================\r\n"));
 }
 
@@ -1378,7 +1587,7 @@ bool ConfigurationManager::selfTest() {
 
     // Test configuration integrity
     Serial.print(F("  Testing configuration values... "));
-    
+
     // Test critical pin configurations
     // Use cached configuration service pointer
     if (_cachedConfigurationService->getHeartbeatPin() >= 0 && _cachedConfigurationService->getHeartbeatPin() <= 53) {
@@ -1387,7 +1596,7 @@ bool ConfigurationManager::selfTest() {
         Serial.print(F("❌ FAIL - Invalid pin configuration\r\n"));
         result = false;
     }
-    
+
     // Test serial command processing capability
     Serial.print(F("  Testing serial interface... "));
     if (Serial.available() >= 0) { // Serial is accessible
@@ -1396,13 +1605,13 @@ bool ConfigurationManager::selfTest() {
         Serial.print(F("❌ FAIL\r\n"));
         result = false;
     }
-    
+
     // Dependencies validated by ServiceLocator at startup
 
     return result;
 }
 
-const char *ConfigurationManager::getComponentName() const { 
+const char *ConfigurationManager::getComponentName() const {
     static char name_buffer[24];
     strcpy_P(name_buffer, component_name);
     return name_buffer;
@@ -1473,7 +1682,7 @@ void ConfigurationManager::printDependencyStatus() const {
     Serial.print(F("\r\n"));
 }
 
-void ConfigurationManager::handleFlowControlCommand(const String& command) {
+void ConfigurationManager::handleFlowControlCommand(const String &command) {
     String param = command.substring(12); // Skip "flowcontrol "
     param.trim();
 
@@ -1499,44 +1708,128 @@ void ConfigurationManager::printFlowControlStatistics() {
     }
 
     auto stats = _cachedParallelPortManager->getFlowControlStatistics();
-    
+
     Serial.print(F("\r\n=== Hardware Flow Control Statistics ===\r\n"));
     Serial.print(F("Current State: "));
     Serial.print(DeviceBridge::Parallel::HardwareFlowControl::getStateName(stats.currentState));
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Time in Current State: "));
     Serial.print(stats.timeInCurrentState);
     Serial.print(F("ms\r\n"));
-    
+
     Serial.print(F("Total State Transitions: "));
     Serial.print(stats.stateTransitions);
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Emergency Activations: "));
     Serial.print(stats.emergencyActivations);
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Recovery Operations: "));
     Serial.print(stats.recoveryOperations);
     Serial.print(F("\r\n"));
-    
+
     Serial.print(F("Flow Control Status: "));
     switch (stats.currentState) {
-        case DeviceBridge::Parallel::HardwareFlowControl::FlowState::NORMAL:
-            Serial.print(F("✅ Normal - Ready for data"));
-            break;
-        case DeviceBridge::Parallel::HardwareFlowControl::FlowState::WARNING:
-            Serial.print(F("⚠️ Warning - Buffer filling"));
-            break;
-        case DeviceBridge::Parallel::HardwareFlowControl::FlowState::CRITICAL:
-            Serial.print(F("🔶 Critical - Buffer nearly full"));
-            break;
-        case DeviceBridge::Parallel::HardwareFlowControl::FlowState::EMERGENCY:
-            Serial.print(F("🚨 Emergency - Stop transmission"));
-            break;
+    case DeviceBridge::Parallel::HardwareFlowControl::FlowState::NORMAL:
+        Serial.print(F("✅ Normal - Ready for data"));
+        break;
+    case DeviceBridge::Parallel::HardwareFlowControl::FlowState::WARNING:
+        Serial.print(F("⚠️ Warning - Buffer filling"));
+        break;
+    case DeviceBridge::Parallel::HardwareFlowControl::FlowState::CRITICAL:
+        Serial.print(F("🔶 Critical - Buffer nearly full"));
+        break;
+    case DeviceBridge::Parallel::HardwareFlowControl::FlowState::EMERGENCY:
+        Serial.print(F("🚨 Emergency - Stop transmission"));
+        break;
     }
     Serial.print(F("\r\n"));
+}
+
+void ConfigurationManager::handleCopyToCommand(const String &command) {
+    String params = command.substring(7); // Remove "copyto "
+
+    if (params.length() == 0) {
+        Serial.print(F("Usage: copyto {storage} {filename}\r\n"));
+        Serial.print(F("  storage: sd, eeprom, or serial\r\n"));
+        Serial.print(F("  filename: file to copy from current storage\r\n"));
+        Serial.print(F("Example: copyto eeprom myfile.bin\r\n"));
+        return;
+    }
+
+    // Parse target storage and filename
+    int spaceIndex = params.indexOf(' ');
+    if (spaceIndex == -1) {
+        Serial.print(F("Error: Missing filename\r\n"));
+        Serial.print(F("Usage: copyto {storage} {filename}\r\n"));
+        return;
+    }
+
+    String targetStorageStr = params.substring(0, spaceIndex);
+    String filename = params.substring(spaceIndex + 1);
+
+    // Trim whitespace
+    targetStorageStr.trim();
+    filename.trim();
+
+    // Parse target storage type
+    Common::StorageType targetStorage(Common::StorageType::SD_CARD); // Initialize with default
+    if (targetStorageStr.equalsIgnoreCase("sd")) {
+        targetStorage = Common::StorageType::SD_CARD;
+    } else if (targetStorageStr.equalsIgnoreCase("eeprom")) {
+        targetStorage = Common::StorageType::EEPROM;
+    } else if (targetStorageStr.equalsIgnoreCase("serial")) {
+        targetStorage = Common::StorageType::SERIAL_TRANSFER;
+    } else {
+        Serial.print(F("Error: Invalid storage type '"));
+        Serial.print(targetStorageStr);
+        Serial.print(F("'\r\n"));
+        Serial.print(F("Valid types: sd, eeprom, serial\r\n"));
+        return;
+    }
+
+    // Get current storage type from FileSystemManager
+    Common::StorageType currentStorage = _cachedFileSystemManager->getCurrentStorageType();
+
+    // Check if source and destination are different
+    if (currentStorage.value == targetStorage.value) {
+        Serial.print(F("Error: Source and destination storage are the same\r\n"));
+        return;
+    }
+
+    Serial.print(F("Copying file '"));
+    Serial.print(filename);
+    Serial.print(F("' from "));
+    Serial.print(currentStorage.toString());
+    Serial.print(F(" to "));
+    Serial.print(targetStorage.toString());
+    Serial.print(F("...\r\n"));
+
+    // Create FileTransferManager and perform copy
+    Storage::FileTransferManager transferManager;
+
+    // Check if transfer is supported
+    if (!transferManager.isTransferSupported(currentStorage, targetStorage)) {
+        Serial.print(F("Error: Transfer from "));
+        Serial.print(currentStorage.toString());
+        Serial.print(F(" to "));
+        Serial.print(targetStorage.toString());
+        Serial.print(F(" is not supported\r\n"));
+        return;
+    }
+
+    // Perform the copy
+    bool success = transferManager.copyTo(filename.c_str(), currentStorage, targetStorage);
+
+    if (success) {
+        Serial.print(F("✅ Copy successful!\r\n"));
+    } else {
+        Serial.print(F("❌ Copy failed: "));
+        Serial.print(transferManager.getLastError());
+        Serial.print(F("\r\n"));
+    }
 }
 
 unsigned long ConfigurationManager::getUpdateInterval() const {
