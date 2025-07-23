@@ -135,7 +135,7 @@ namespace Timing {
 namespace Buffer {
   constexpr uint16_t RING_BUFFER_SIZE = 512;          // Main parallel port ring buffer
   constexpr uint16_t DATA_CHUNK_SIZE = 512;           // Data chunk size (matches ring buffer for optimal transfer)
-  constexpr uint16_t EEPROM_BUFFER_SIZE = 32;         // EEPROM write buffer (32 * 4 bytes = 128 bytes) - OPTIMIZED
+  constexpr uint16_t EEPROM_BUFFER_SIZE = 32;         // EEPROM write buffer (32 * 1 bytes = 32 bytes) - MEMORY OPTIMIZED
   constexpr uint32_t CRITICAL_TIMEOUT_MS = 20000;     // 20 seconds emergency timeout
   constexpr uint32_t CHUNK_SEND_TIMEOUT_MS = 50;      // Send partial chunks after 50ms of data collection
   constexpr uint16_t MIN_CHUNK_SIZE = 64;             // Minimum chunk size to send (unless timeout or EOF)

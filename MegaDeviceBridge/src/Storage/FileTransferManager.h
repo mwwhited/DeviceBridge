@@ -15,7 +15,7 @@ namespace DeviceBridge::Storage {
  */
 class FileTransferManager {
 private:
-    static constexpr uint16_t TRANSFER_BUFFER_SIZE = 256;
+    static constexpr uint16_t TRANSFER_BUFFER_SIZE = 128;  // Memory optimized (128 bytes saved)
     
     FileSystemRegistry& _registry;
     char _transferBuffer[TRANSFER_BUFFER_SIZE];

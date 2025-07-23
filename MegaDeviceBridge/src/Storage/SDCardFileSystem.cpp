@@ -66,13 +66,17 @@ bool SDCardFileSystem::createFile(const char* filename) {
         closeFile();
     }
     
-    // Create directories if they don't exist
-    String filepath(filename);
-    int lastSlash = filepath.lastIndexOf('/');
-    if (lastSlash > 0) {
-        String dirPath = filepath.substring(0, lastSlash);
-        if (!SD.exists(dirPath)) {
-            // Note: SD library doesn't have mkdir, files create directories automatically
+    // Create directories if they don't exist (zero-allocation version)
+    static char dirPath[80];  // Static buffer to avoid allocation
+    const char* lastSlashPtr = strrchr(filename, '/');
+    if (lastSlashPtr && lastSlashPtr != filename) {
+        size_t dirLen = lastSlashPtr - filename;
+        if (dirLen < sizeof(dirPath)) {
+            strncpy(dirPath, filename, dirLen);
+            dirPath[dirLen] = '\0';
+            if (!SD.exists(dirPath)) {
+                // Note: SD library doesn't have mkdir, files create directories automatically
+            }
         }
     }
     

@@ -297,19 +297,35 @@ bool FileSystemManager::createNewFile() {
         if (_flags.sdAvailable) {
             sendDisplayMessage(Common::DisplayMessage::INFO, _currentFilename);
 
-            String currentPath = "/" + String(_currentFilename);
-            int lastSlash = currentPath.lastIndexOf('/');
-            if (lastSlash >= 0) {
-                String dirPath = currentPath.substring(0, lastSlash);
-                if (!SD.exists(dirPath.c_str())) {
+            // Zero-allocation path handling using static buffers
+            static char currentPath[80];  // Static buffer to avoid stack allocation
+            static char dirPath[70];      // Static buffer for directory path
+            static char createPath[65];   // Static buffer for mkdir path
+            
+            // Build current path: "/" + _currentFilename
+            currentPath[0] = '/';
+            strncpy(currentPath + 1, _currentFilename, sizeof(currentPath) - 2);
+            currentPath[sizeof(currentPath) - 1] = '\0';
+            
+            // Find last slash position
+            char* lastSlashPtr = strrchr(currentPath, '/');
+            if (lastSlashPtr && lastSlashPtr != currentPath) { // Not the leading slash
+                // Extract directory path
+                size_t dirLen = lastSlashPtr - currentPath;
+                strncpy(dirPath, currentPath, dirLen);
+                dirPath[dirLen] = '\0';
+                
+                if (!SD.exists(dirPath)) {
                     // Create directory without leading slash for Arduino SD library
-                    String createPath = dirPath.substring(1); // Remove leading '/'
-                    if (!SD.mkdir(createPath.c_str())) {
+                    strncpy(createPath, dirPath + 1, sizeof(createPath) - 1); // Skip leading '/'
+                    createPath[sizeof(createPath) - 1] = '\0';
+                    
+                    if (!SD.mkdir(createPath)) {
                         // Try without subdirectory - fallback to root
                         sendDisplayMessage(Common::DisplayMessage::ERROR, F("Dir Failed - Using Root"));
                         // Use just the filename without directory structure
-                        auto fileName = currentPath.substring(lastSlash + 1);
-                        currentPath = "/" + fileName;
+                        strcpy(currentPath, "/");
+                        strcat(currentPath, lastSlashPtr + 1);
                     } else {
                         sendDisplayMessage(Common::DisplayMessage::INFO, F("Dir Created"));
                     }
@@ -317,8 +333,15 @@ bool FileSystemManager::createNewFile() {
                     sendDisplayMessage(Common::DisplayMessage::INFO, F("Dir Exists"));
                 }
             }
-            auto fileName = currentPath.substring(lastSlash + 1);
-            sendDisplayMessage(Common::DisplayMessage::INFO, ("File: " + fileName).c_str());
+            // Display filename without String allocation
+            static char fileMsg[90];  // Static buffer for message
+            strcpy(fileMsg, "File: ");
+            if (lastSlashPtr) {
+                strcat(fileMsg, lastSlashPtr + 1); // Filename after last slash
+            } else {
+                strcat(fileMsg, _currentFilename); // No directory, use full filename
+            }
+            sendDisplayMessage(Common::DisplayMessage::INFO, fileMsg);
 
             // Lock LPT port during SD operations to prevent interference
             _cachedParallelPortManager->lockPort();

@@ -1836,37 +1836,55 @@ void ConfigurationManager::handleCopyToCommand(const char* command, size_t comma
     if (currentStorage.value == Common::StorageType::EEPROM && 
         targetStorage.value == Common::StorageType::SERIAL_TRANSFER) {
         
-        // Create a minimal EEPROM file system instance for reading
+        // Create a minimal EEPROM file system instance for reading  
         DeviceBridge::Storage::EEPROMFileSystem eepromFS;
         if (eepromFS.initialize()) {
-            char fileBuffer[128];
-            if (eepromFS.readFile(filename, fileBuffer, sizeof(fileBuffer))) {
-                // Send BEGIN delimiter
-                Serial.print(F("------BEGIN---"));
-                Serial.print(filename);
-                Serial.print(F("------\r\n"));
+            // Read file directly using readFileSegment to avoid string mixing issues
+            // Send BEGIN delimiter first
+            Serial.print(F("------BEGIN---"));
+            Serial.print(filename);
+            Serial.print(F("------\r\n"));
+            
+            // Read and send file data in chunks
+            uint8_t dataBuffer[64];
+            uint32_t bytesToRead = 0;
+            uint32_t totalBytesRead = 0;
+            const uint32_t maxBytesToTransfer = 256; // Limit for memory safety
+            
+            // Use the private readFileSegment method directly
+            uint32_t fileSize = eepromFS.getFileSize(filename);
+            if (fileSize > 0) {
+                uint32_t bytesToProcess = (fileSize > maxBytesToTransfer) ? maxBytesToTransfer : fileSize;
                 
-                // Parse hex data and send it
-                const char* hexStart = strstr(fileBuffer, "\r\n");
-                if (hexStart) {
-                    hexStart += 2;
-                    // Skip optional second line
-                    const char* secondLine = strstr(hexStart, "\r\n");
-                    if (secondLine) {
-                        hexStart = secondLine + 2;
-                    }
+                while (totalBytesRead < bytesToProcess) {
+                    uint16_t chunkSize = ((bytesToProcess - totalBytesRead) > 64) ? 64 : (bytesToProcess - totalBytesRead);
                     
-                    // Send hex data directly
-                    Serial.print(hexStart);
+                    if (eepromFS.readFileSegment(filename, totalBytesRead, dataBuffer, chunkSize)) {
+                        // Convert chunk to hex and send
+                        for (uint16_t i = 0; i < chunkSize; i++) {
+                            // Add line break every 64 bytes  
+                            if ((totalBytesRead + i) > 0 && (totalBytesRead + i) % 64 == 0) {
+                                Serial.print(F("\r\n"));
+                            }
+                            
+                            // Send byte as hex (uppercase)
+                            if (dataBuffer[i] < 0x10) {
+                                Serial.print(F("0"));
+                            }
+                            Serial.print(dataBuffer[i], HEX);
+                        }
+                        totalBytesRead += chunkSize;
+                    } else {
+                        break; // Error reading file segment
+                    }
                 }
-                
-                // Send END delimiter
-                Serial.print(F("\r\n------END---"));
-                Serial.print(filename);
-                Serial.print(F("------\r\n"));
-                
-                success = true;
+                success = (totalBytesRead > 0);
             }
+            
+            // Send END delimiter
+            Serial.print(F("\r\n------END---"));
+            Serial.print(filename);
+            Serial.print(F("------\r\n"));
         }
     } else {
         Serial.print(F("Error: Only EEPROM to Serial transfer is currently supported\r\n"));

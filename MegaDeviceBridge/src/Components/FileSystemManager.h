@@ -54,7 +54,7 @@ private:
     
     // EEPROM file management
     uint32_t _eepromCurrentAddress;
-    uint32_t _eepromWriteBuffer[Common::Buffer::EEPROM_BUFFER_SIZE]; // 128-byte buffer (32 * 4 bytes) - OPTIMIZED
+    uint8_t _eepromWriteBuffer[Common::Buffer::EEPROM_BUFFER_SIZE]; // 32-byte buffer (32 * 1 bytes) - MEMORY OPTIMIZED
     uint16_t _eepromBufferIndex;
     Common::StorageType _activeStorage;
     Common::StorageType _preferredStorage;
